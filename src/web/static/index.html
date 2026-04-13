@@ -5,6 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>워프봇</title>
     <link rel="stylesheet" href="/static/style.css">
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#4db8ff">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="오디스 프라임">
+    <link rel="apple-touch-icon" href="/static/icon-192.png">
 </head>
 <body>
     <div id="app">
@@ -194,5 +199,10 @@
     </div>
 
     <script src="/static/app.js"></script>
+    <script>
+        if ("serviceWorker" in navigator) {
+            navigator.serviceWorker.register("/static/sw.js").catch(() => {});
+        }
+    </script>
 </body>
 </html>

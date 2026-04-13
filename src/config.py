@@ -19,7 +19,12 @@ MARKET_API_BASE = "https://api.warframe.market/v1"
 MARKET_RATE_LIMIT = 3  # 초당 최대 요청 수
 
 # 관리자
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")  # 반드시 .env에 설정 필요
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+
+# Web Push (VAPID)
+VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "")
+VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "")
+VAPID_EMAIL = os.getenv("VAPID_EMAIL", "admin@example.com")
 
 # 로깅
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")

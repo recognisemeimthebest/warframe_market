@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="80" fill="#1a1a2e"/>
+  <!-- 육각형 외곽 -->
+  <polygon points="256,60 420,155 420,357 256,452 92,357 92,155" fill="none" stroke="#4db8ff" stroke-width="18"/>
+  <!-- 내부 육각형 -->
+  <polygon points="256,120 380,188 380,324 256,392 132,324 132,188" fill="none" stroke="#4db8ff" stroke-width="8" opacity="0.4"/>
+  <!-- 중앙 심볼 - Cephalon 눈 -->
+  <circle cx="256" cy="256" r="48" fill="#0f3460" stroke="#4db8ff" stroke-width="10"/>
+  <circle cx="256" cy="256" r="22" fill="#4db8ff"/>
+  <circle cx="256" cy="256" r="10" fill="#1a1a2e"/>
+  <!-- 십자 라인 -->
+  <line x1="256" y1="175" x2="256" y2="208" stroke="#4db8ff" stroke-width="6" stroke-linecap="round"/>
+  <line x1="256" y1="304" x2="256" y2="337" stroke="#4db8ff" stroke-width="6" stroke-linecap="round"/>
+  <line x1="175" y1="256" x2="208" y2="256" stroke="#4db8ff" stroke-width="6" stroke-linecap="round"/>
+  <line x1="304" y1="256" x2="337" y2="256" stroke="#4db8ff" stroke-width="6" stroke-linecap="round"/>
+</svg>

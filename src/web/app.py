@@ -64,6 +64,9 @@ from src.world.api import (
     get_world_state,
 )
 
+from src.config import VAPID_PUBLIC_KEY
+from src.web.push import delete_subscription, init_push_db, save_subscription, send_push_all
+
 logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -108,6 +111,7 @@ async def startup() -> None:
     init_trade_db()
     init_watchlist_db()
     init_modding_db()
+    init_push_db()
 
     # statistics 백필 (서버 최초 시작 시 히스토리 채우기)
     asyncio.create_task(backfill_statistics(get_popular_slugs()))
@@ -579,6 +583,32 @@ async def api_admin_delete_share(share_id: int):
     return {"ok": ok}
 
 
+# ── Web Push API ──
+
+@app.get("/api/push/vapid-public-key")
+async def api_vapid_key():
+    return {"key": VAPID_PUBLIC_KEY}
+
+
+@app.post("/api/push/subscribe")
+async def api_push_subscribe(body: dict):
+    try:
+        save_subscription(
+            endpoint=body["endpoint"],
+            p256dh=body["keys"]["p256dh"],
+            auth=body["keys"]["auth"],
+        )
+        return {"ok": True}
+    except Exception:
+        return {"ok": False}
+
+
+@app.post("/api/push/unsubscribe")
+async def api_push_unsubscribe(body: dict):
+    delete_subscription(body.get("endpoint", ""))
+    return {"ok": True}
+
+
 # ── 아이템 검색 API (자동완성용) ──
 
 @app.get("/api/items/search")
@@ -730,7 +760,7 @@ async def _handle_price_query(ws: WebSocket, query: str) -> None:
 
 
 async def broadcast(message: dict) -> None:
-    """모든 연결 클라이언트에게 메시지 전송 (알림용)."""
+    """모든 연결 클라이언트에게 메시지 전송 + 푸시 알림."""
     data = json.dumps(message)
     disconnected = set()
     for ws in connected_clients:
@@ -739,3 +769,21 @@ async def broadcast(message: dict) -> None:
         except Exception:
             disconnected.add(ws)
     connected_clients -= disconnected
+
+    # 급등/워치리스트 알림은 푸시로도 전송
+    if message.get("type") == "surge":
+        name = message.get("ko_name") or message.get("en_name") or message.get("slug", "")
+        pct = message.get("change_pct", 0)
+        asyncio.create_task(send_push_all(
+            title="급등 알림 📈",
+            body=f"{name} +{pct:.0f}%",
+            url="/",
+        ))
+    elif message.get("type") == "watchlist_alert":
+        name = message.get("item_name", "")
+        price = message.get("current_price", 0)
+        asyncio.create_task(send_push_all(
+            title="시세 감시 알림",
+            body=f"{name} 목표가 도달: {price}p",
+            url="/",
+        ))

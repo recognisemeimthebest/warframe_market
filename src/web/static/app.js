@@ -1264,7 +1264,8 @@ async function renderWatchlist() {
     const addForm = document.createElement("div");
     addForm.className = "watchlist-add-form";
     addForm.innerHTML = `
-        <div class="form-row"><label>아이템</label><input type="text" id="wl-item" placeholder="아이템 이름 검색..." autocomplete="off"></div>
+        <div class="form-row"><label>아이템</label><input type="text" id="wl-item" placeholder="아이템 이름 검색..." autocomplete="off" oninput="onWlItemInput(this)"></div>
+        <div id="wl-suggest" style="display:none;"></div>
         <div class="form-row"><label>목표가</label><input type="number" id="wl-price" placeholder="이 가격 이하면 알림" min="1"><span style="color:var(--text-muted);font-size:13px;margin-left:4px;">p</span></div>
         <div style="display:flex;gap:8px;justify-content:flex-end;">
             <button class="btn-submit" onclick="addWatchItem()" style="padding:6px 14px;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;background:var(--orange);color:#000;">추가</button>
@@ -1308,6 +1309,51 @@ async function renderWatchlist() {
     });
 }
 
+let _wlSuggestTimer = null;
+let _wlSelectedSlug = null;
+let _wlSelectedName = null;
+
+function onWlItemInput(input) {
+    _wlSelectedSlug = null;
+    _wlSelectedName = null;
+    clearTimeout(_wlSuggestTimer);
+    const q = input.value.trim();
+    if (q.length < 2) { hideWlSuggest(); return; }
+    _wlSuggestTimer = setTimeout(() => fetchWlSuggest(q), 300);
+}
+
+async function fetchWlSuggest(q) {
+    const suggestEl = document.getElementById("wl-suggest");
+    if (!suggestEl) return;
+    try {
+        const res = await fetch(`/api/items/search?q=${encodeURIComponent(q)}&limit=8`);
+        const json = await res.json();
+        const items = json.data || [];
+        if (!items.length) { hideWlSuggest(); return; }
+        suggestEl.innerHTML = "";
+        suggestEl.style.display = "";
+        items.forEach(item => {
+            const btn = document.createElement("button");
+            btn.className = "wl-suggest-btn";
+            const label = item.ko_name ? `${escapeHtml(item.ko_name)} <span style="opacity:.6;font-size:11px;">${escapeHtml(item.name)}</span>` : escapeHtml(item.name);
+            btn.innerHTML = label;
+            btn.onclick = () => {
+                _wlSelectedSlug = item.slug;
+                _wlSelectedName = item.ko_name || item.name;
+                document.getElementById("wl-item").value = _wlSelectedName;
+                hideWlSuggest();
+                document.getElementById("wl-price").focus();
+            };
+            suggestEl.appendChild(btn);
+        });
+    } catch { hideWlSuggest(); }
+}
+
+function hideWlSuggest() {
+    const el = document.getElementById("wl-suggest");
+    if (el) { el.style.display = "none"; el.innerHTML = ""; }
+}
+
 async function addWatchItem() {
     const name = localStorage.getItem("tradeName") || "";
     if (!name) { alert("거래소에서 먼저 닉네임을 등록해주세요."); return; }
@@ -1317,23 +1363,54 @@ async function addWatchItem() {
     if (!itemInput) { alert("아이템을 입력해주세요."); return; }
     if (price < 1) { alert("목표가를 입력해주세요."); return; }
 
-    const searchRes = await fetch(`/api/items/search?q=${encodeURIComponent(itemInput)}&limit=1`);
-    const searchJson = await searchRes.json();
-    const items = searchJson.data || [];
-    if (!items.length) { alert("아이템을 찾을 수 없습니다."); return; }
+    let slug = _wlSelectedSlug;
+    let itemName = _wlSelectedName;
 
-    const item = items[0];
+    if (!slug) {
+        // 직접 입력한 경우 재검색
+        const searchRes = await fetch(`/api/items/search?q=${encodeURIComponent(itemInput)}&limit=8`);
+        const searchJson = await searchRes.json();
+        const items = searchJson.data || [];
+        if (!items.length) { alert("아이템을 찾을 수 없습니다."); return; }
+        if (items.length > 1) {
+            // 여러 결과 — 리스트 보여주고 선택 유도
+            const suggestEl = document.getElementById("wl-suggest");
+            if (suggestEl) {
+                suggestEl.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:4px 8px 2px;">이 아이템을 말씀하시는 건가요?</div>';
+                suggestEl.style.display = "";
+                items.forEach(item => {
+                    const btn = document.createElement("button");
+                    btn.className = "wl-suggest-btn";
+                    const label = item.ko_name ? `${escapeHtml(item.ko_name)} <span style="opacity:.6;font-size:11px;">${escapeHtml(item.name)}</span>` : escapeHtml(item.name);
+                    btn.innerHTML = label;
+                    btn.onclick = () => {
+                        _wlSelectedSlug = item.slug;
+                        _wlSelectedName = item.ko_name || item.name;
+                        document.getElementById("wl-item").value = _wlSelectedName;
+                        hideWlSuggest();
+                    };
+                    suggestEl.appendChild(btn);
+                });
+            }
+            return;
+        }
+        slug = items[0].slug;
+        itemName = items[0].ko_name || items[0].name;
+    }
+
     const res = await fetch("/api/watchlist", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             user_name: name,
-            item_slug: item.slug,
-            item_name: item.ko_name || item.name,
+            item_slug: slug,
+            item_name: itemName,
             target_price: price,
         }),
     });
     const json = await res.json();
     if (!json.ok) { alert(json.msg); return; }
+    _wlSelectedSlug = null;
+    _wlSelectedName = null;
     renderWatchlist();
 }
 
@@ -2233,6 +2310,38 @@ async function adminDeleteModding(id) {
 }
 
 document.getElementById("admin-tab")?.addEventListener("click", () => { adminLoadAll(); });
+
+// ── PWA 푸시 알림 구독 ──
+
+async function registerPush() {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    try {
+        const reg = await navigator.serviceWorker.ready;
+        const existing = await reg.pushManager.getSubscription();
+        if (existing) return;
+
+        const res = await fetch("/api/push/vapid-public-key");
+        const { key } = await res.json();
+        if (!key) return;
+
+        const sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: key,
+        });
+        await fetch("/api/push/subscribe", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(sub.toJSON()),
+        });
+    } catch (_) {}
+}
+
+// 알림 권한 요청 후 구독
+if (Notification.permission === "granted") {
+    registerPush();
+} else if (Notification.permission !== "denied") {
+    Notification.requestPermission().then(p => { if (p === "granted") registerPush(); });
+}
 
 // ── 초기화 ──
 applyPalette();

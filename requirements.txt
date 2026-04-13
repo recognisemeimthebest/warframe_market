@@ -10,3 +10,6 @@ python-multipart>=0.0.9,<1.0
 
 # Environment
 python-dotenv>=1.0,<2.0
+
+# Web Push
+pywebpush>=2.0,<3.0
