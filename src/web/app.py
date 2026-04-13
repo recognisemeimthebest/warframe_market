@@ -5,7 +5,7 @@ import json
 import logging
 from pathlib import Path
 
-from fastapi import FastAPI, Query, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Query, Request, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -37,6 +37,7 @@ from src.market.trade import (
     list_users,
     register_user,
     reject_user,
+    revoke_user,
 )
 from src.market.watchlist import (
     add_watch,
@@ -130,9 +131,19 @@ async def shutdown() -> None:
 
 @app.get("/")
 async def index():
-    """메인 페이지."""
-    from fastapi.responses import FileResponse
     return FileResponse(STATIC_DIR / "index.html")
+
+
+@app.get("/admin")
+async def admin_page(request: Request):
+    client_ip = request.client.host
+    # 허용 IP: 로컬 + 관리자 PC 공인 IP
+    allowed_prefixes = ("127.", "192.168.", "10.", "172.")
+    allowed_ips = set()  # 필요시 공인 IP 추가: {"1.2.3.4"}
+    if not any(client_ip.startswith(p) for p in allowed_prefixes) and client_ip not in allowed_ips:
+        from fastapi.responses import HTMLResponse
+        return HTMLResponse("403 Forbidden", status_code=403)
+    return FileResponse(STATIC_DIR / "admin.html")
 
 
 @app.get("/api/surges")
@@ -520,6 +531,51 @@ async def api_modding_image(filename: str):
 async def api_modding_delete_share(share_id: int, author: str = Query("")):
     """모딩 공유 삭제."""
     ok = delete_share(share_id, author=author)
+    return {"ok": ok}
+
+
+# ── 관리자 API ──
+
+@app.get("/api/admin/users")
+async def api_admin_users():
+    users = list_users()
+    return {"data": [{"id": u.id, "name": u.name, "status": u.status, "created_at": u.created_at} for u in users]}
+
+
+@app.post("/api/admin/users/{name}/approve")
+async def api_admin_approve(name: str):
+    ok = approve_user(name)
+    return {"ok": ok}
+
+
+@app.post("/api/admin/users/{name}/revoke")
+async def api_admin_revoke(name: str):
+    ok = revoke_user(name)
+    return {"ok": ok}
+
+
+@app.delete("/api/admin/trade/{listing_id}")
+async def api_admin_delete_listing(listing_id: int):
+    ok = delete_listing(listing_id, is_admin=True)
+    return {"ok": ok}
+
+
+@app.get("/api/admin/modding")
+async def api_admin_modding():
+    shares = get_shares(category="", limit=200)
+    return {"data": [
+        {
+            "id": s.id, "category": s.category, "item_name": s.item_name,
+            "author": s.author, "memo": s.memo, "created_at": s.created_at,
+            "images": [f"/api/modding/images/{fname}" for fname in s.images],
+        }
+        for s in shares
+    ]}
+
+
+@app.delete("/api/admin/modding/{share_id}")
+async def api_admin_delete_share(share_id: int):
+    ok = delete_share(share_id, is_admin=True)
     return {"ok": ok}
 
 

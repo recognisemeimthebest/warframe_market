@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>워프봇 관리자</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>워프봇 관리자</h1>
+            <a href="/" style="font-size:13px;color:var(--text-muted);text-decoration:none;">← 돌아가기</a>
+        </header>
+
+        <div id="admin-panel" style="overflow-y:auto;flex:1;">
+            <div class="admin-sections">
+                <div class="admin-section">
+                    <div class="admin-section-header">
+                        <span>유저 관리</span>
+                        <button class="admin-refresh-btn" onclick="adminLoadUsers()">새로고침</button>
+                    </div>
+                    <div id="admin-users-list"><div class="admin-empty">로딩 중...</div></div>
+                </div>
+                <div class="admin-section">
+                    <div class="admin-section-header">
+                        <span>거래소 매물 관리</span>
+                        <button class="admin-refresh-btn" onclick="adminLoadTrade()">새로고침</button>
+                    </div>
+                    <div id="admin-trade-list"><div class="admin-empty">로딩 중...</div></div>
+                </div>
+                <div class="admin-section">
+                    <div class="admin-section-header">
+                        <span>모딩 공유 관리</span>
+                        <button class="admin-refresh-btn" onclick="adminLoadModding()">새로고침</button>
+                    </div>
+                    <div id="admin-modding-list"><div class="admin-empty">로딩 중...</div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function escapeHtml(s) {
+            return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+        }
+
+        async function adminLoadUsers() {
+            const data = await (await fetch("/api/admin/users")).json();
+            const el = document.getElementById("admin-users-list");
+            if (!data.data.length) { el.innerHTML = '<div class="admin-empty">등록된 유저 없음</div>'; return; }
+            const STATUS_KO = { pending: "대기", approved: "승인", rejected: "거절" };
+            el.innerHTML = data.data.map(u => `
+                <div class="admin-row">
+                    <span class="admin-row-name">${escapeHtml(u.name)}</span>
+                    <span class="admin-row-status admin-status-${u.status}">${STATUS_KO[u.status] || u.status}</span>
+                    <div class="admin-row-actions">
+                        ${u.status === "pending" ? `<button class="admin-btn admin-btn-approve" onclick="adminApprove('${escapeHtml(u.name)}')">승인</button>` : ""}
+                        ${u.status === "approved" ? `<button class="admin-btn admin-btn-revoke" onclick="adminRevoke('${escapeHtml(u.name)}')">취소</button>` : ""}
+                    </div>
+                </div>
+            `).join("");
+        }
+
+        async function adminApprove(name) {
+            await fetch(`/api/admin/users/${encodeURIComponent(name)}/approve`, { method: "POST" });
+            adminLoadUsers();
+        }
+
+        async function adminRevoke(name) {
+            await fetch(`/api/admin/users/${encodeURIComponent(name)}/revoke`, { method: "POST" });
+            adminLoadUsers();
+        }
+
+        async function adminLoadTrade() {
+            const data = await (await fetch("/api/trade/listings?limit=200")).json();
+            const el = document.getElementById("admin-trade-list");
+            if (!data.data.length) { el.innerHTML = '<div class="admin-empty">매물 없음</div>'; return; }
+            el.innerHTML = data.data.map(l => `
+                <div class="admin-row">
+                    <span class="admin-row-id">#${l.id}</span>
+                    <span class="admin-row-name">${escapeHtml(l.item_name)}</span>
+                    <span class="admin-row-meta">${l.trade_type === "sell" ? "팝니다" : "삽니다"} · ${l.price}p · ${escapeHtml(l.user_name)}</span>
+                    <button class="admin-btn admin-btn-delete" onclick="adminDeleteListing(${l.id})">삭제</button>
+                </div>
+            `).join("");
+        }
+
+        async function adminDeleteListing(id) {
+            await fetch(`/api/admin/trade/${id}`, { method: "DELETE" });
+            adminLoadTrade();
+        }
+
+        async function adminLoadModding() {
+            const data = await (await fetch("/api/admin/modding")).json();
+            const el = document.getElementById("admin-modding-list");
+            if (!data.data.length) { el.innerHTML = '<div class="admin-empty">공유 없음</div>'; return; }
+            el.innerHTML = data.data.map(s => `
+                <div class="admin-row">
+                    <span class="admin-row-id">#${s.id}</span>
+                    <span class="admin-row-name">${escapeHtml(s.item_name)}</span>
+                    <span class="admin-row-meta">${escapeHtml(s.author)} · ${escapeHtml(s.category)}</span>
+                    <button class="admin-btn admin-btn-delete" onclick="adminDeleteModding(${s.id})">삭제</button>
+                </div>
+            `).join("");
+        }
+
+        async function adminDeleteModding(id) {
+            await fetch(`/api/admin/modding/${id}`, { method: "DELETE" });
+            adminLoadModding();
+        }
+
+        adminLoadUsers();
+        adminLoadTrade();
+        adminLoadModding();
+    </script>
+</body>
+</html>

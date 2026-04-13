@@ -127,6 +127,16 @@ def reject_user(name: str) -> bool:
     return cursor.rowcount > 0
 
 
+def revoke_user(name: str) -> bool:
+    """승인된 유저 취소 → pending으로 되돌림."""
+    with _get_conn() as conn:
+        cursor = conn.execute(
+            "UPDATE trade_user SET status = 'pending' WHERE name = ? AND status = 'approved'",
+            (name,),
+        )
+    return cursor.rowcount > 0
+
+
 def list_users(status: str = "") -> list[TradeUser]:
     """유저 목록 조회."""
     with _get_conn() as conn:

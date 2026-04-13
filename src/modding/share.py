@@ -152,22 +152,28 @@ def delete_share(share_id: int, author: str = "", is_admin: bool = False) -> boo
     return cursor.rowcount > 0
 
 
-def get_shares(category: str, item_name: str = "", limit: int = 50) -> list[ModdingShare]:
-    """모딩 공유 목록 조회."""
+def get_shares(category: str = "", item_name: str = "", limit: int = 50) -> list[ModdingShare]:
+    """모딩 공유 목록 조회. category 빈 문자열이면 전체 카테고리 조회."""
     with _get_conn() as conn:
-        if item_name:
+        if category and item_name:
             rows = conn.execute(
                 "SELECT id, category, item_name, author, memo, created_at"
                 " FROM modding_share WHERE category = ? AND item_name = ?"
                 " ORDER BY created_at DESC LIMIT ?",
                 (category, item_name, limit),
             ).fetchall()
-        else:
+        elif category:
             rows = conn.execute(
                 "SELECT id, category, item_name, author, memo, created_at"
                 " FROM modding_share WHERE category = ?"
                 " ORDER BY created_at DESC LIMIT ?",
                 (category, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT id, category, item_name, author, memo, created_at"
+                " FROM modding_share ORDER BY created_at DESC LIMIT ?",
+                (limit,),
             ).fetchall()
 
         shares = []

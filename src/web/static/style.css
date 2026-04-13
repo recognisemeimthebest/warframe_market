@@ -392,5 +392,33 @@ footer { padding: 12px 16px; background: var(--surface); border-top: 1px solid v
 .modding-lightbox { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 9999; cursor: pointer; }
 .modding-lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 8px; }
 
+/* ── 관리자 패널 ── */
+.admin-login { padding: 20px 16px; display: flex; flex-direction: column; gap: 10px; }
+.admin-login p { font-size: 14px; color: var(--text-muted); }
+.admin-login-row { display: flex; gap: 8px; }
+.admin-login-row input { flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 14px; }
+.admin-login-row button { padding: 8px 16px; background: var(--primary); color: #000; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
+.admin-login-err { color: var(--red); font-size: 13px; min-height: 18px; }
+.admin-sections { display: flex; flex-direction: column; gap: 0; }
+.admin-section { border-bottom: 1px solid var(--border); }
+.admin-section-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px; background: var(--surface); font-size: 13px; font-weight: 600; color: var(--primary); }
+.admin-refresh-btn { padding: 4px 10px; font-size: 12px; background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--text-muted); cursor: pointer; }
+.admin-refresh-btn:hover { border-color: var(--primary); color: var(--primary); }
+.admin-row { display: flex; align-items: center; gap: 8px; padding: 8px 16px; border-bottom: 1px solid var(--border); font-size: 13px; flex-wrap: wrap; }
+.admin-row:last-child { border-bottom: none; }
+.admin-row-id { color: var(--text-muted); font-size: 11px; min-width: 28px; }
+.admin-row-name { font-weight: 600; flex: 1; min-width: 80px; }
+.admin-row-meta { color: var(--text-muted); font-size: 12px; }
+.admin-row-status { font-size: 11px; padding: 2px 7px; border-radius: 10px; font-weight: 600; }
+.admin-status-pending { background: rgba(255,152,0,0.15); color: var(--orange); }
+.admin-status-approved { background: rgba(76,175,80,0.15); color: var(--green); }
+.admin-status-rejected { background: rgba(255,107,107,0.15); color: var(--red); }
+.admin-row-actions { display: flex; gap: 6px; margin-left: auto; }
+.admin-btn { padding: 4px 10px; border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+.admin-btn-approve { background: rgba(76,175,80,0.2); color: var(--green); }
+.admin-btn-revoke { background: rgba(255,152,0,0.2); color: var(--orange); }
+.admin-btn-delete { background: rgba(255,107,107,0.2); color: var(--red); }
+.admin-empty { padding: 12px 16px; color: var(--text-muted); font-size: 13px; }
+
 main::-webkit-scrollbar, #messages::-webkit-scrollbar, #surge-list::-webkit-scrollbar, #trade-list::-webkit-scrollbar, #world-list::-webkit-scrollbar, #chat-watchlist::-webkit-scrollbar, #chat-auction::-webkit-scrollbar, #farming-results::-webkit-scrollbar, #modding-content::-webkit-scrollbar { width: 4px; }
 main::-webkit-scrollbar-thumb, #messages::-webkit-scrollbar-thumb, #surge-list::-webkit-scrollbar-thumb, #trade-list::-webkit-scrollbar-thumb, #world-list::-webkit-scrollbar-thumb, #chat-watchlist::-webkit-scrollbar-thumb, #chat-auction::-webkit-scrollbar-thumb, #farming-results::-webkit-scrollbar-thumb, #modding-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
