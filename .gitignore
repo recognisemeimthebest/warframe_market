@@ -25,6 +25,13 @@ Thumbs.db
 
 # Logs
 *.log
+logs/
+
+# Data (cached/generated)
+data/price_history/
+data/items.json
+data/ko_names.json
+data/wf_i18n.json
 
 # Claude Code (local dev tooling)
 .claude/

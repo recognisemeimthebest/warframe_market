@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>워프봇</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <h1>워프봇</h1>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span id="status" class="status offline">연결 중...</span>
+                <button id="settings-btn" onclick="toggleSettings()" title="설정">&#9881;</button>
+            </div>
+        </header>
+
+        <!-- 설정 패널 -->
+        <div id="settings-overlay" style="display:none;" onclick="toggleSettings()"></div>
+        <div id="settings-panel" style="display:none;">
+            <div class="settings-header">
+                <span class="settings-title">설정</span>
+                <button class="settings-close" onclick="toggleSettings()">&times;</button>
+            </div>
+            <div class="settings-body">
+                <div class="settings-section">
+                    <div class="settings-section-title">알림</div>
+                    <div class="settings-row">
+                        <span>방해 금지 모드</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="set-dnd" onchange="saveSettings()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="settings-hint">활성화하면 모든 알림이 일시 중단됩니다.</div>
+                    <div class="settings-row">
+                        <span>알림 방식</span>
+                        <select id="set-notify-style" onchange="saveSettings()">
+                            <option value="popup">상단 팝업</option>
+                            <option value="badge">뱃지만 표시</option>
+                            <option value="sound">소리 + 팝업</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="settings-section">
+                    <div class="settings-section-title">테마</div>
+                    <div class="settings-row">
+                        <span>모드</span>
+                        <div class="mode-toggle">
+                            <button class="mode-btn active" data-mode="dark" onclick="switchMode('dark')">다크</button>
+                            <button class="mode-btn" data-mode="light" onclick="switchMode('light')">라이트</button>
+                        </div>
+                    </div>
+                    <div class="settings-sub-label" id="palette-label">다크 팔레트</div>
+                    <div class="palette-grid" id="palette-grid"></div>
+                </div>
+            </div>
+        </div>
+
+        <nav id="tabs">
+            <button class="tab active" data-tab="chat">시세 조회</button>
+            <button class="tab" data-tab="surges">급등 알림</button>
+            <button class="tab" data-tab="trade">거래소</button>
+            <button class="tab" data-tab="world">월드</button>
+            <button class="tab" data-tab="farming">파밍</button>
+            <button class="tab" data-tab="modding">모딩 공유</button>
+        </nav>
+
+        <!-- 시세 조회 탭 -->
+        <main id="tab-chat" class="tab-content active">
+            <div id="chat-mode-bar">
+                <button class="chat-mode active" data-mode="chat">채팅</button>
+                <button class="chat-mode" data-mode="watchlist">시세 감시</button>
+                <button class="chat-mode" data-mode="auction">경매</button>
+            </div>
+            <div id="messages">
+                <div class="message bot">
+                    <div class="bubble">
+                        안녕! 워프레임 시세 봇이야.<br>
+                        아이템 이름을 입력하면 시세를 알려줄게!<br>
+                        <small>예: "라이노 프라임 세트" 또는 "rhino prime set"</small>
+                    </div>
+                </div>
+            </div>
+            <div id="chat-watchlist" style="display:none;"></div>
+            <div id="chat-auction" style="display:none;"></div>
+        </main>
+
+        <!-- 급등 알림 탭 -->
+        <main id="tab-surges" class="tab-content">
+            <div id="surge-filters">
+                <button class="surge-filter active" data-period="">전체</button>
+                <button class="surge-filter" data-period="1d">1일</button>
+                <button class="surge-filter" data-period="7d">1주</button>
+                <button class="surge-filter" data-period="30d">1달</button>
+            </div>
+            <div id="surge-list"></div>
+        </main>
+
+        <!-- 거래소 탭 -->
+        <main id="tab-trade" class="tab-content">
+            <div id="trade-register" style="display:none;">
+                <p>거래소를 이용하려면 등록이 필요합니다.</p>
+                <input type="text" id="trade-name-input" placeholder="닉네임 입력" maxlength="20">
+                <br><button onclick="tradeRegister()">등록 요청</button>
+            </div>
+            <div id="trade-pending" style="display:none;">
+                <div class="trade-status-msg">승인 대기 중입니다.<br>관리자가 승인하면 거래소를 이용할 수 있어요.</div>
+            </div>
+            <div id="trade-approved" style="display:none;">
+                <div id="trade-filters">
+                    <button class="trade-filter active" data-type="">전체</button>
+                    <button class="trade-filter" data-type="buy">삽니다</button>
+                    <button class="trade-filter" data-type="sell">팝니다</button>
+                </div>
+                <div id="trade-list"></div>
+            </div>
+        </main>
+
+        <!-- 월드 상태 탭 -->
+        <main id="tab-world" class="tab-content">
+            <div id="world-filters">
+                <button class="world-filter active" data-section="fissures">균열</button>
+                <button class="world-filter" data-section="arbitration">중재</button>
+                <button class="world-filter" data-section="invasions">침공</button>
+                <button class="world-filter" data-section="cycles">오픈월드</button>
+                <button class="world-filter" data-section="alerts">알림 설정</button>
+            </div>
+            <div id="world-list"></div>
+            <div class="alert-notify" id="alert-notify"></div>
+        </main>
+
+        <!-- 파밍 정보 탭 -->
+        <main id="tab-farming" class="tab-content">
+            <div id="farming-results"></div>
+        </main>
+
+        <!-- 모딩 공유 탭 -->
+        <main id="tab-modding" class="tab-content">
+            <div id="modding-content"></div>
+        </main>
+
+        <footer id="farming-footer" style="display:none;">
+            <form id="farming-form" onsubmit="return false;">
+                <input type="text" id="farming-input" placeholder="아이템/모드/워프레임 이름 검색..." autocomplete="off">
+                <button type="submit">검색</button>
+            </form>
+        </footer>
+
+        <footer id="chat-footer">
+            <form id="chat-form" onsubmit="return false;">
+                <input type="text" id="chat-input" placeholder="아이템 이름을 입력하세요..." autocomplete="off">
+                <button type="submit">전송</button>
+            </form>
+        </footer>
+
+        <footer id="trade-footer" style="display:none;">
+            <div id="trade-form-area">
+                <button id="trade-new-btn" onclick="toggleTradeForm()">+ 매물 등록</button>
+                <div id="trade-new-form">
+                    <div class="form-row">
+                        <label>유형</label>
+                        <select id="tf-type"><option value="buy">삽니다</option><option value="sell">팝니다</option></select>
+                    </div>
+                    <div class="form-row">
+                        <label>아이템</label>
+                        <input type="text" id="tf-item" placeholder="아이템 이름 검색..." autocomplete="off">
+                    </div>
+                    <div class="market-ref-hint" id="tf-market-ref"></div>
+                    <div class="form-row">
+                        <label>가격</label>
+                        <input type="number" id="tf-price" placeholder="플래티넘" min="1">
+                        <span style="color:var(--text-muted);font-size:13px;">p</span>
+                    </div>
+                    <div class="form-row">
+                        <label>수량</label>
+                        <input type="number" id="tf-qty" value="1" min="1" max="999" style="width:60px;flex:none;">
+                    </div>
+                    <div class="form-row">
+                        <label>메모</label>
+                        <input type="text" id="tf-memo" placeholder="(선택) 한마디" maxlength="100">
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn-cancel" onclick="toggleTradeForm()">취소</button>
+                        <button class="btn-submit" onclick="submitListing()">등록</button>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

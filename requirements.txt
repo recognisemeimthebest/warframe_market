@@ -1,0 +1,12 @@
+# Web server
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.34,<1.0
+
+# HTTP (async)
+httpx>=0.27,<1.0
+
+# File uploads (FastAPI UploadFile)
+python-multipart>=0.0.9,<1.0
+
+# Environment
+python-dotenv>=1.0,<2.0
