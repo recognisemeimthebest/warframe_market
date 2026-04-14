@@ -8,6 +8,27 @@ from pathlib import Path
 
 from src.config import DATA_DIR
 
+# ── 한글 자모 분해 ──
+_CHOSUNG  = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ"
+_JUNGSUNG = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ"
+_JONGSUNG = " ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ"
+
+def _jamo(text: str) -> str:
+    """한글 음절을 자모 시퀀스로 분해. 비한글 문자는 그대로."""
+    out = []
+    for ch in text:
+        if "가" <= ch <= "힣":
+            code = ord(ch) - 0xAC00
+            jong = code % 28
+            code //= 28
+            out.append(_CHOSUNG[code // 21])
+            out.append(_JUNGSUNG[code % 21])
+            if jong:
+                out.append(_JONGSUNG[jong])
+        else:
+            out.append(ch)
+    return "".join(out)
+
 logger = logging.getLogger(__name__)
 
 # 커뮤니티 약칭/별명 → slug (공식 번역에 없는 표현만)
@@ -269,6 +290,7 @@ def search_items(query: str, limit: int = 5) -> list[SearchResult]:
 
     q_lower = q.lower()
     q_no_space = q.replace(" ", "").lower()
+    q_jamo = _jamo(q_no_space)          # 자모 분해 버전 (퍼지 매칭용)
 
     # 1. 한글 정확 일치
     matched_slug = _ko_to_slug.get(q_lower) or _ko_to_slug.get(q_no_space)
@@ -288,29 +310,31 @@ def search_items(query: str, limit: int = 5) -> list[SearchResult]:
     if q_slug in _slug_to_en_name:
         return [SearchResult(slug=q_slug, name=_slug_to_en_name[q_slug], score=1.0, exact=True, ko_name=_slug_to_ko.get(q_slug, ""))]
 
-    # 4. 한글 부분 매칭 (API에 존재하는 아이템만)
+    # 4. 한글 부분 매칭 — 자모 단위로 비교
     candidates: list[SearchResult] = []
     seen_slugs: set[str] = set()
     for ko_key, slug in _ko_to_slug.items():
         if slug not in _slug_to_en_name or slug in seen_slugs:
             continue
-        # 부분 문자열 포함
-        if q_no_space in ko_key.replace(" ", "") or ko_key.replace(" ", "") in q_no_space:
-            score = SequenceMatcher(None, q_no_space, ko_key.replace(" ", "")).ratio()
+        ko_clean = ko_key.replace(" ", "")
+        ko_j = _jamo(ko_clean)
+        # 자모 부분 문자열 포함 여부
+        if q_jamo in ko_j or ko_j in q_jamo:
+            score = SequenceMatcher(None, q_jamo, ko_j).ratio()
             candidates.append(SearchResult(
                 slug=slug, name=_slug_to_en_name[slug],
                 score=max(score, 0.7), ko_name=_slug_to_ko.get(slug, ""),
             ))
             seen_slugs.add(slug)
 
-    # 5. 한글 퍼지 매칭 (부분 매칭에서 못 찾은 경우)
+    # 5. 한글 퍼지 매칭 — 자모 SequenceMatcher
     if len(candidates) < limit:
         for ko_key, slug in _ko_to_slug.items():
             if slug not in _slug_to_en_name or slug in seen_slugs:
                 continue
-            ko_clean = ko_key.replace(" ", "")
-            score = SequenceMatcher(None, q_no_space, ko_clean).ratio()
-            if score >= 0.5:
+            ko_j = _jamo(ko_key.replace(" ", ""))
+            score = SequenceMatcher(None, q_jamo, ko_j).ratio()
+            if score >= 0.55:          # 음절 기준 0.5보다 약간 높게 (자모는 더 세밀)
                 candidates.append(SearchResult(
                     slug=slug, name=_slug_to_en_name[slug],
                     score=score, ko_name=_slug_to_ko.get(slug, ""),
