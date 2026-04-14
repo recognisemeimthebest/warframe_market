@@ -661,7 +661,7 @@ function renderFissures(items) {
 
 function renderArbitration(arb) {
     const el = document.getElementById("world-list");
-    if (!arb) { el.innerHTML = '<div class="surge-empty">현재 중재 정보가 없습니다.</div>'; return; }
+    if (!arb) { el.innerHTML = '<div class="surge-empty">현재 중재 정보를 불러올 수 없습니다.<br><span style="font-size:11px;color:var(--text-muted)">DE에서 데이터를 제공하지 않는 경우가 있습니다.</span></div>'; return; }
 
     el.innerHTML = "";
     const card = document.createElement("div");

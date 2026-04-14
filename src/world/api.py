@@ -157,6 +157,9 @@ async def get_fissures() -> list[dict]:
 
 
 # ── 중재 (Arbitration) ──
+# worldState의 ArbitersSyndicate 블록에서 직접 계산.
+# 7개 노드를 1시간마다 순환하며, 24시간마다 DE가 새 블록을 제공한다.
+# (activation 기준 경과 시간 // 3600) % 노드 수 = 현재 인덱스
 
 async def get_arbitration() -> dict | None:
     await _load_mappings()
@@ -164,26 +167,37 @@ async def get_arbitration() -> dict | None:
     if not ws:
         return None
 
-    # 중재는 ExpiringKey 또는 별도 필드로 전달될 수 있음
-    # 방법: SyndicateMissions에서 ArbitrationSyndicate 찾기
     now_ms = int(time.time() * 1000)
+    now_sec = now_ms // 1000
 
     for synd in ws.get("SyndicateMissions", []):
-        tag = synd.get("Tag", "")
-        if "Arbitration" not in tag and "arbiter" not in tag.lower():
+        if synd.get("Tag", "") != "ArbitersSyndicate":
             continue
 
         nodes = synd.get("Nodes", [])
         if not nodes:
-            continue
+            return None
 
-        expiry_ms = _ts_to_ms(synd.get("Expiry", 0))
-        node_id = nodes[0]
+        act_ms = _ts_to_ms(synd.get("Activation", 0))
+        exp_ms = _ts_to_ms(synd.get("Expiry", 0))
+        if exp_ms <= now_ms:
+            return None  # 블록 만료
+
+        act_sec = act_ms // 1000
+        elapsed_sec = now_sec - act_sec
+        idx = (elapsed_sec // 3600) % len(nodes)
+        node_id = nodes[idx]
+
+        # 현재 노드가 교체되기까지 남은 시간
+        secs_into_slot = elapsed_sec % 3600
+        remaining_sec = 3600 - secs_into_slot
+        eta = f"{remaining_sec // 60}분"
+
         return {
             "node": _node_name(node_id),
             "missionType": _node_mission_type(node_id),
             "enemy": _node_enemy(node_id),
-            "eta": _eta_from_expiry(expiry_ms) if expiry_ms > now_ms else "",
+            "eta": eta,
         }
 
     return None
