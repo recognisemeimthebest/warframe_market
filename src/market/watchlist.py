@@ -149,6 +149,11 @@ def _update_watch(watch_id: int, current_price: int, triggered: bool) -> None:
             )
 
 
+def update_watch_price(watch_id: int, current_price: int) -> None:
+    """단일 감시 항목 현재가 즉시 갱신 (등록 직후 초기화용)."""
+    _update_watch(watch_id, current_price, triggered=False)
+
+
 async def check_watches(broadcast_fn=None) -> list[dict]:
     """활성 감시 항목들의 가격을 체크하고 도달 시 알림."""
     watches = get_all_active_watches()

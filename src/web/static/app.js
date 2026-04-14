@@ -175,21 +175,28 @@ function applyMultiSort(items, sorts, getValue) {
 
 // ── WebSocket ──
 function connect() {
+    // location.protocol이 file: 이거나 about: 인 경우(WebView 엣지 케이스) 방어
     const proto = location.protocol === "https:" ? "wss:" : "ws:";
-    ws = new WebSocket(`${proto}//${location.host}/ws`);
+    // location.host가 비어있는 경우(file:// 로드 등) 고정 주소로 폴백
+    const host = location.host || "warframe-chatbot.duckdns.org:9000";
+    const wsUrl = `${proto}//${host}/ws`;
+    ws = new WebSocket(wsUrl);
 
     ws.onopen = () => {
         statusEl.textContent = "온라인";
         statusEl.className = "status online";
         reconnectDelay = 1000;
     };
-    ws.onclose = () => {
+    ws.onclose = (ev) => {
         statusEl.textContent = "오프라인";
         statusEl.className = "status offline";
         setTimeout(connect, reconnectDelay);
         reconnectDelay = Math.min(reconnectDelay * 2, 30000);
     };
-    ws.onerror = () => ws.close();
+    ws.onerror = (ev) => {
+        console.warn("[WS] 연결 오류 — url:", ws.url, "readyState:", ws.readyState);
+        ws.close();
+    };
 
     ws.onmessage = (event) => {
         let data;
@@ -2341,6 +2348,43 @@ if (Notification.permission === "granted") {
     registerPush();
 } else if (Notification.permission !== "denied") {
     Notification.requestPermission().then(p => { if (p === "granted") registerPush(); });
+}
+
+// ── PWA 설치 ──
+let deferredInstallPrompt = null;
+
+window.addEventListener("beforeinstallprompt", (e) => {
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    const sec = document.getElementById("install-section");
+    if (sec) sec.style.display = "";
+});
+
+window.addEventListener("appinstalled", () => {
+    deferredInstallPrompt = null;
+    const sec = document.getElementById("install-section");
+    if (sec) sec.style.display = "none";
+});
+
+function installPwa() {
+    if (deferredInstallPrompt) {
+        deferredInstallPrompt.prompt();
+        deferredInstallPrompt.userChoice.then((r) => {
+            if (r.outcome === "accepted") {
+                const sec = document.getElementById("install-section");
+                if (sec) sec.style.display = "none";
+            }
+            deferredInstallPrompt = null;
+        });
+    } else {
+        showAlertNotify("브라우저 메뉴에서 '홈 화면에 추가'를 이용해주세요.");
+    }
+}
+
+// 이미 설치된 PWA면 설치 섹션 숨김
+if (window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone) {
+    const sec = document.getElementById("install-section");
+    if (sec) sec.style.display = "none";
 }
 
 // ── 초기화 ──

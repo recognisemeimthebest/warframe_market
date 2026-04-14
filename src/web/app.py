@@ -45,6 +45,7 @@ from src.market.watchlist import (
     init_watchlist_db,
     remove_watch,
     run_watchlist_monitor,
+    update_watch_price,
 )
 from src.modding.share import (
     IMAGES_DIR,
@@ -447,14 +448,22 @@ async def api_watchlist(user_name: str = ""):
 @app.post("/api/watchlist")
 async def api_add_watch(body: dict):
     """워치리스트 추가."""
+    slug = body.get("item_slug", "").strip()
     result = add_watch(
         user_name=body.get("user_name", "").strip(),
-        item_slug=body.get("item_slug", "").strip(),
+        item_slug=slug,
         item_name=body.get("item_name", "").strip(),
         target_price=body.get("target_price", 0),
     )
     if isinstance(result, str):
         return {"ok": False, "msg": result}
+    # 등록 직후 현재가 즉시 조회
+    try:
+        price = await get_item_price(slug)
+        if price and price.sell_min is not None:
+            update_watch_price(result, price.sell_min)
+    except Exception:
+        pass
     return {"ok": True, "id": result}
 
 
