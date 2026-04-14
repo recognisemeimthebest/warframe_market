@@ -157,8 +157,13 @@ def _build_cache(data: list | dict) -> int:
                 )
 
             info = _farming_cache[key]
-            chance = entry.get("chance", 0)
-            rate_str = f"{chance:.2f}%" if isinstance(chance, (int, float)) and chance > 0 else ""
+            chance_raw = entry.get("chance", 0)
+            # chance가 문자열로 저장된 경우 정규화 (enemy 드롭 테이블 포맷)
+            try:
+                chance = float(chance_raw) if chance_raw is not None else 0.0
+            except (ValueError, TypeError):
+                chance = 0.0
+            rate_str = f"{chance:.2f}%" if chance > 0 else ""
             rarity = entry.get("rarity", "")
             place = _strip_html(entry.get("place", ""))
 
@@ -303,11 +308,30 @@ def search_farming(query: str, limit: int = 5) -> list[dict]:
     return [_format_farming_result(info, score) for info, score in candidates[:limit]]
 
 
+_MIN_RATE_THRESHOLD = 0.5  # % 미만은 전역 모드 풀 노이즈로 간주
+
+
 def _format_farming_result(info: FarmingInfo, score: float) -> dict:
     """FarmingInfo → API 응답 dict."""
-    # 드롭 소스를 확률 높은 순으로 정렬 (상위 15개)
+    # 확률 파싱: chance가 문자열로 저장된 경우도 처리
+    all_drops = info.drops
+
+    # 전역 모드 드롭 풀 노이즈 필터링:
+    # drops.warframestat.us 데이터에는 모든 적/리치에 0.01~0.02% 확률로
+    # 임의 모드가 드랍 가능하도록 설정된 "전역 모드 테이블" 항목이 포함됨.
+    # 의미 있는 출처(≥ 0.5%)가 존재하면 저확률 노이즈를 제거.
+    # 모든 출처가 저확률인 경우(진짜 희귀 드랍)는 그대로 유지.
+    max_rate = max((_parse_rate(d.rate) for d in all_drops), default=0.0)
+    if max_rate >= _MIN_RATE_THRESHOLD:
+        # 의미있는 출처 있음 → 노이즈 제거
+        filtered = [d for d in all_drops if _parse_rate(d.rate) >= _MIN_RATE_THRESHOLD]
+    else:
+        # 전부 저확률 → 그대로 표시 (진짜 희귀 아이템)
+        filtered = all_drops
+
+    # 확률 높은 순 정렬, 상위 15개
     sorted_drops = sorted(
-        info.drops,
+        filtered,
         key=lambda d: _parse_rate(d.rate),
         reverse=True,
     )[:15]
