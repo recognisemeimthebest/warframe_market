@@ -1503,6 +1503,7 @@ let lichFilterElement = "";
 let lichFilterMinBonus = 0;
 let lichSorts = [];
 
+let auctionOnlineOnly = false;  // 온라인 판매자만 표시
 let _auctionDebounceTimer = null;
 
 function renderAuctionView() {
@@ -1541,6 +1542,16 @@ function _renderAuctionViewImpl() {
         atabs.appendChild(btn);
     });
     container.appendChild(atabs);
+
+    // 온라인 판매자 필터 (공통)
+    const onlineRow = document.createElement("div");
+    onlineRow.className = "auction-filter-row";
+    const onlineChip = document.createElement("div");
+    onlineChip.className = "auction-filter-chip" + (auctionOnlineOnly ? " active" : "");
+    onlineChip.textContent = "온라인만 보기";
+    onlineChip.addEventListener("click", () => { auctionOnlineOnly = !auctionOnlineOnly; renderAuctionView(); });
+    onlineRow.appendChild(onlineChip);
+    container.appendChild(onlineRow);
 
     // 리치/시스터 필터 UI
     if (auctionType === "lich") {
@@ -1733,6 +1744,9 @@ async function fetchRivenAuctions(container) {
             return;
         }
 
+        // 온라인 필터
+        if (auctionOnlineOnly) items = items.filter((a) => a.sellerStatus !== "offline");
+
         // 등급 계산
         items = items.map((a) => ({ ...a, _grade: gradeRiven(a) }));
 
@@ -1855,6 +1869,7 @@ async function fetchLichAuctions(container) {
         // 추가 클라이언트 필터 (소스, 보너스 — API에서 미지원) — 스냅샷 값 사용
         if (snapshotSource) items = items.filter((a) => a.source === snapshotSource);
         if (snapshotMinBonus > 0) items = items.filter((a) => a.bonus >= snapshotMinBonus);
+        if (auctionOnlineOnly) items = items.filter((a) => a.sellerStatus !== "offline");
 
         // 정렬
         items = applyMultiSort([...items], lichSorts, (item, key) => {
