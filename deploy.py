@@ -1,6 +1,11 @@
-"""Pi deploy script via paramiko SFTP."""
+"""Pi deploy script via paramiko SFTP.
 
-import os
+Usage:
+  python deploy.py              # upload + restart
+  python deploy.py --restart    # restart only
+  python deploy.py --cmd "..."  # run arbitrary SSH command
+"""
+
 import sys
 import io
 from pathlib import Path
@@ -23,6 +28,30 @@ UPLOAD_FILES = ["main.py", "requirements.txt"]
 
 EXCLUDE_SUFFIXES = {".pyc", ".db", ".db-shm", ".db-wal"}
 EXCLUDE_DIRS = {"__pycache__", ".git", "venv", "data", ".claude"}
+
+RESTART_CMD = (
+    "sudo systemctl restart warframe-chatbot 2>/dev/null || "
+    "(pkill -f 'python main.py' 2>/dev/null; echo 'pkill done')"
+)
+
+
+def _connect():
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client.connect(PI_HOST, port=PI_PORT, username=PI_USER, password=PI_PASS, timeout=10)
+    return client
+
+
+def _run(client, cmd):
+    _, stdout, stderr = client.exec_command(cmd)
+    out = stdout.read().decode("utf-8", errors="replace").strip()
+    err = stderr.read().decode("utf-8", errors="replace").strip()
+    code = stdout.channel.recv_exit_status()
+    if out:
+        print(out)
+    if err:
+        print("[stderr] " + err)
+    return code
 
 
 def sftp_mkdir_p(sftp, remote_path):
@@ -54,15 +83,32 @@ def upload_dir(sftp, local_dir, remote_dir):
     return count
 
 
-def deploy():
+def cmd_restart():
+    print("Restarting warframe-chatbot on Pi...")
+    client = _connect()
+    try:
+        code = _run(client, RESTART_CMD)
+        print("Done! (exit " + str(code) + ")")
+    finally:
+        client.close()
+
+
+def cmd_run(command):
+    print("Running: " + command)
+    print("-" * 50)
+    client = _connect()
+    try:
+        _run(client, command)
+    finally:
+        client.close()
+
+
+def cmd_deploy():
     print("Pi deploy: " + PI_USER + "@" + PI_HOST + ":" + PI_BASE)
     print("-" * 50)
 
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
+    client = _connect()
     try:
-        client.connect(PI_HOST, port=PI_PORT, username=PI_USER, password=PI_PASS, timeout=10)
         print("SSH connected\n")
 
         sftp = client.open_sftp()
@@ -89,16 +135,7 @@ def deploy():
         print("\nUploaded: " + str(total) + " files")
 
         print("\nRestarting server...")
-        _, stdout, stderr = client.exec_command(
-            "sudo systemctl restart warframe-chatbot 2>/dev/null || "
-            "(pkill -f 'python main.py' 2>/dev/null; echo 'pkill done')"
-        )
-        out = stdout.read().decode("utf-8", errors="replace").strip()
-        err = stderr.read().decode("utf-8", errors="replace").strip()
-        if out:
-            print("  " + out)
-        if err:
-            print("  stderr: " + err)
+        _run(client, RESTART_CMD)
 
     except Exception as e:
         print("ERROR: " + str(e))
@@ -110,4 +147,21 @@ def deploy():
 
 
 if __name__ == "__main__":
-    deploy()
+    args = sys.argv[1:]
+
+    try:
+        if not args:
+            cmd_deploy()
+        elif args[0] == "--restart":
+            cmd_restart()
+        elif args[0] == "--cmd" and len(args) >= 2:
+            cmd_run(" ".join(args[1:]))
+        else:
+            print("Usage:")
+            print("  python deploy.py              # upload + restart")
+            print("  python deploy.py --restart    # restart only")
+            print("  python deploy.py --cmd \"...\"  # run SSH command")
+            sys.exit(1)
+    except Exception as e:
+        print("ERROR: " + str(e))
+        sys.exit(1)
