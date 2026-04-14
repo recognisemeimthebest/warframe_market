@@ -2448,6 +2448,124 @@ if (window.matchMedia("(display-mode: standalone)").matches || window.navigator.
     if (sec) sec.style.display = "none";
 }
 
+// ── 렐릭 기대 수익 ──
+let relicSuggestTimer = null;
+
+function onRelicInput() {
+    clearTimeout(relicSuggestTimer);
+    const q = document.getElementById("relic-input").value.trim();
+    if (!q) { hideRelicSuggest(); return; }
+    relicSuggestTimer = setTimeout(() => fetchRelicSuggest(q), 250);
+}
+
+async function fetchRelicSuggest(q) {
+    try {
+        const res = await fetch(`/api/relics/search?q=${encodeURIComponent(q)}`);
+        if (!res.ok) return;
+        const json = await res.json();
+        showRelicSuggest(json.data || []);
+    } catch (_) {}
+}
+
+function showRelicSuggest(items) {
+    const box = document.getElementById("relic-suggest");
+    if (!items.length) { hideRelicSuggest(); return; }
+    box.innerHTML = "";
+    items.slice(0, 12).forEach((name) => {
+        const d = document.createElement("div");
+        d.className = "relic-suggest-item";
+        d.textContent = name;
+        d.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+            document.getElementById("relic-input").value = name;
+            hideRelicSuggest();
+            loadRelicValue();
+        });
+        box.appendChild(d);
+    });
+    box.style.display = "";
+}
+
+function hideRelicSuggest() {
+    document.getElementById("relic-suggest").style.display = "none";
+}
+
+document.getElementById("relic-input")?.addEventListener("blur", () => {
+    setTimeout(hideRelicSuggest, 200);
+});
+
+document.getElementById("relic-input")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); hideRelicSuggest(); loadRelicValue(); }
+});
+
+async function loadRelicValue() {
+    const name = document.getElementById("relic-input").value.trim();
+    const refine = document.getElementById("relic-refine").value;
+    if (!name) return;
+
+    const resultsEl = document.getElementById("relic-results");
+    resultsEl.innerHTML = `<div class="relic-loading">불러오는 중...</div>`;
+
+    try {
+        const res = await fetch(`/api/relics/value?name=${encodeURIComponent(name)}&ref=${encodeURIComponent(refine)}`);
+        if (!res.ok) { resultsEl.innerHTML = `<div class="relic-empty">렐릭을 찾을 수 없습니다.</div>`; return; }
+        const json = await res.json();
+        if (!json.ok) { resultsEl.innerHTML = `<div class="relic-empty">${escapeHtml(json.msg || "렐릭을 찾을 수 없습니다.")}</div>`; return; }
+        renderRelicResult(json.data);
+    } catch (_) {
+        resultsEl.innerHTML = `<div class="relic-empty">오류가 발생했습니다.</div>`;
+    }
+}
+
+function renderRelicResult(data) {
+    const resultsEl = document.getElementById("relic-results");
+    if (!data || !data.drops) { resultsEl.innerHTML = `<div class="relic-empty">데이터 없음</div>`; return; }
+
+    const refineKo = { Intact: "일반", Exceptional: "우수", Flawless: "흠없는", Radiant: "광휘" };
+    const refLabel = refineKo[data.refinement] || data.refinement;
+
+    const card = document.createElement("div");
+    card.className = "relic-card";
+
+    const evFormatted = data.expected_value ? data.expected_value.toFixed(1) : "?";
+    card.innerHTML = `
+        <div class="relic-card-header">
+            <div class="relic-card-title">${escapeHtml(data.name)} Relic <span style="font-size:12px;font-weight:400;color:var(--text-muted);">(${escapeHtml(refLabel)})</span></div>
+            <div class="relic-card-ev">
+                <span class="relic-card-ev-label">기대 수익</span>
+                <span class="relic-card-ev-value">${evFormatted}p</span>
+            </div>
+        </div>
+    `;
+
+    data.drops.forEach((drop) => {
+        const row = document.createElement("div");
+        row.className = "relic-drop-row";
+
+        const rarityClass = drop.rarity.toLowerCase();
+        const rarityKo = { common: "일반", uncommon: "고급", rare: "희귀" }[rarityClass] || drop.rarity;
+
+        const nameHtml = drop.slug
+            ? `<a href="https://warframe.market/items/${escapeHtml(drop.slug)}" target="_blank">${escapeHtml(drop.item)}</a>`
+            : escapeHtml(drop.item);
+
+        const priceHtml = drop.price != null
+            ? `<span class="relic-drop-price">${drop.price}p</span>`
+            : `<span class="relic-drop-price no-price">시세 없음</span>`;
+
+        row.innerHTML = `
+            <span class="relic-rarity ${rarityClass}">${rarityKo}</span>
+            <span class="relic-drop-name">${nameHtml}</span>
+            <span class="relic-drop-chance">${drop.chance}%</span>
+            ${priceHtml}
+        `;
+        card.appendChild(row);
+    });
+
+    resultsEl.innerHTML = "";
+    resultsEl.appendChild(card);
+}
+
 // ── 초기화 ──
 applyPalette();
 connect();

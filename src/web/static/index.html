@@ -77,6 +77,7 @@
             <button class="tab" data-tab="world">월드</button>
             <button class="tab" data-tab="farming">파밍</button>
             <button class="tab" data-tab="modding">모딩 공유</button>
+            <button class="tab" data-tab="relic">렐릭</button>
         </nav>
 
         <!-- 시세 조회 탭 -->
@@ -151,6 +152,26 @@
         <!-- 모딩 공유 탭 -->
         <main id="tab-modding" class="tab-content">
             <div id="modding-content"></div>
+        </main>
+
+        <!-- 렐릭 기대 수익 탭 -->
+        <main id="tab-relic" class="tab-content">
+            <div id="relic-search-area">
+                <div id="relic-input-row">
+                    <div style="flex:1;position:relative;">
+                        <input type="text" id="relic-input" placeholder="렐릭 이름 검색... (예: Axi A6)" autocomplete="off" oninput="onRelicInput()">
+                        <div id="relic-suggest" style="display:none;"></div>
+                    </div>
+                    <select id="relic-refine">
+                        <option value="Intact">Intact</option>
+                        <option value="Exceptional">Exceptional</option>
+                        <option value="Flawless">Flawless</option>
+                        <option value="Radiant" selected>Radiant</option>
+                    </select>
+                    <button onclick="loadRelicValue()">조회</button>
+                </div>
+            </div>
+            <div id="relic-results"></div>
         </main>
 
 

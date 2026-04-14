@@ -57,6 +57,7 @@ from src.modding.share import (
     save_image,
 )
 from src.wiki.drops import fetch_item_description, load_drop_table, refresh_drop_table, search_farming
+from src.market.relic import get_relic_value, search_relics, _build_relic_cache
 from src.world.api import (
     get_arbitration,
     get_cycles,
@@ -106,6 +107,7 @@ async def startup() -> None:
         except Exception:
             logger.warning("드롭 테이블 다운로드 실패", exc_info=True)
     logger.info("드롭 테이블 로드: %d개", drop_count)
+    _build_relic_cache()
 
     # DB 초기화
     init_db()
@@ -277,6 +279,40 @@ async def api_invasions():
 @app.get("/api/world/cycles")
 async def api_cycles():
     return {"data": await get_cycles()}
+
+
+# ── 렐릭 API ──
+
+@app.get("/api/relics/search")
+async def api_relic_search(q: str = Query("")):
+    """렐릭 이름 검색."""
+    return {"data": search_relics(q)}
+
+
+@app.get("/api/relics/value")
+async def api_relic_value(name: str = Query(""), ref: str = Query("Radiant")):
+    """렐릭 기대 수익 계산."""
+    result = await get_relic_value(name, ref)
+    if not result:
+        return {"ok": False, "msg": "렐릭을 찾을 수 없습니다."}
+    return {
+        "ok": True,
+        "data": {
+            "name": result.name,
+            "refinement": result.refinement,
+            "expected_value": result.expected_value,
+            "drops": [
+                {
+                    "item": d.item,
+                    "rarity": d.rarity,
+                    "chance": d.chance,
+                    "price": d.price,
+                    "slug": d.slug,
+                }
+                for d in result.drops
+            ],
+        },
+    }
 
 
 # ── 경매 API ──
