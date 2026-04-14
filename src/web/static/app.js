@@ -538,19 +538,80 @@ async function deleteListing(id) {
     fetchListings();
 }
 
+// ── 거래소 아이템 자동완성 ──
+let _tfSelectedSlug = null;
+let _tfSuggestTimer = null;
+
+function onTradeItemInput() {
+    _tfSelectedSlug = null;
+    clearTimeout(_tfSuggestTimer);
+    const q = document.getElementById("tf-item").value.trim();
+    if (q.length < 2) { hideTfSuggest(); return; }
+    _tfSuggestTimer = setTimeout(() => fetchTfSuggest(q), 300);
+}
+
+async function fetchTfSuggest(q) {
+    const el = document.getElementById("tf-suggest");
+    if (!el) return;
+    try {
+        const res = await fetch(`/api/items/search?q=${encodeURIComponent(q)}&limit=8`);
+        const json = await res.json();
+        const items = json.data || [];
+        if (!items.length) { hideTfSuggest(); return; }
+        el.innerHTML = "";
+        el.style.display = "";
+        items.forEach(item => {
+            const btn = document.createElement("button");
+            btn.className = "wl-suggest-btn";
+            const label = item.ko_name
+                ? `${escapeHtml(item.ko_name)} <span style="opacity:.6;font-size:11px;">${escapeHtml(item.name)}</span>`
+                : escapeHtml(item.name);
+            btn.innerHTML = label;
+            btn.onclick = () => {
+                _tfSelectedSlug = item.slug;
+                document.getElementById("tf-item").value = item.ko_name || item.name;
+                hideTfSuggest();
+                document.getElementById("tf-price").focus();
+            };
+            el.appendChild(btn);
+        });
+    } catch { hideTfSuggest(); }
+}
+
+function hideTfSuggest() {
+    const el = document.getElementById("tf-suggest");
+    if (el) { el.style.display = "none"; el.innerHTML = ""; }
+}
+
 function toggleTradeForm() {
     const form = document.getElementById("trade-new-form");
-    form.style.display = form.style.display === "none" ? "" : "none";
+    const show = form.style.display === "none";
+    form.style.display = show ? "" : "none";
+    if (!show) { _tfSelectedSlug = null; hideTfSuggest(); }
 }
 
 async function submitListing() {
+    const itemRaw = document.getElementById("tf-item").value.trim();
+    if (!itemRaw) { alert("아이템을 입력해주세요."); return; }
+
+    // 자동완성에서 선택한 slug 우선, 없으면 검색
+    let slug = _tfSelectedSlug;
+    let itemName = itemRaw;
+    if (!slug) {
+        const r = await fetch(`/api/items/search?q=${encodeURIComponent(itemRaw)}&limit=1`);
+        const j = await r.json();
+        const first = (j.data || [])[0];
+        if (first) { slug = first.slug; itemName = first.ko_name || first.name; }
+        else { slug = itemRaw.toLowerCase().replace(/ /g, "_"); }
+    }
+
     const res = await fetch("/api/trade/listings", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             user_name: localStorage.getItem("tradeName") || "",
             trade_type: document.getElementById("tf-type").value,
-            item_slug: document.getElementById("tf-item").value.toLowerCase().replace(/ /g, "_"),
-            item_name: document.getElementById("tf-item").value,
+            item_slug: slug,
+            item_name: itemName,
             price: parseInt(document.getElementById("tf-price").value) || 0,
             quantity: parseInt(document.getElementById("tf-qty").value) || 1,
             memo: document.getElementById("tf-memo").value,

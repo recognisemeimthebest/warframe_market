@@ -176,9 +176,12 @@
                         <label>유형</label>
                         <select id="tf-type"><option value="buy">삽니다</option><option value="sell">팝니다</option></select>
                     </div>
-                    <div class="form-row">
+                    <div class="form-row" style="position:relative;">
                         <label>아이템</label>
-                        <input type="text" id="tf-item" placeholder="아이템 이름 검색..." autocomplete="off">
+                        <div style="flex:1;position:relative;">
+                            <input type="text" id="tf-item" placeholder="아이템 이름 검색..." autocomplete="off" oninput="onTradeItemInput()" style="width:100%;">
+                            <div id="tf-suggest" style="display:none;position:absolute;left:0;right:0;top:100%;z-index:200;background:var(--surface);border:1px solid var(--border);border-radius:8px;max-height:160px;overflow-y:auto;"></div>
+                        </div>
                     </div>
                     <div class="market-ref-hint" id="tf-market-ref"></div>
                     <div class="form-row">
