@@ -1266,7 +1266,7 @@ function buildFarmingCard(item) {
     const card = document.createElement("div");
     card.className = "farming-card";
 
-    const typeLabels = { prime: "프라임", mod: "모드", frame: "워프레임", weapon: "무기", other: "" };
+    const typeLabels = { prime: "프라임", mod: "모드", frame: "워프레임", weapon: "무기", resource: "소재", other: "" };
     const typeCls = item.type || "other";
 
     let dropsHtml = "";
@@ -1276,24 +1276,27 @@ function buildFarmingCard(item) {
                 <div class="farming-drop-source">
                     ${escapeHtml(d.source)}
                     ${d.rarity ? `<span class="farming-relic-rarity ${d.rarity.toLowerCase()}">${escapeHtml(d.rarity)}</span>` : ""}
+                    ${d.mission ? `<span class="farming-mission-tag">${escapeHtml(d.mission)}</span>` : ""}
                 </div>
-                <div class="farming-drop-rate">${escapeHtml(d.rate)}</div>
+                ${d.rate ? `<div class="farming-drop-rate">${escapeHtml(d.rate)}</div>` : ""}
+                ${d.tip ? `<div class="farming-drop-tip">${escapeHtml(d.tip)}</div>` : ""}
             </div>
         `).join("");
     } else {
         dropsHtml = '<div class="surge-empty">드롭 정보가 없습니다.</div>';
     }
 
+    const nameDisplay = item.name_ko ? `${escapeHtml(item.name)} <span class="farming-name-ko">${escapeHtml(item.name_ko)}</span>` : escapeHtml(item.name);
     const wikiHref = item.wiki_url
         || "https://warframe.fandom.com/wiki/" + encodeURIComponent(item.name.replace(/ /g, "_"));
 
     card.innerHTML = `
         <div class="farming-card-title">
-            ${typeCls !== "other" ? `<span class="farming-card-type ${typeCls}">${typeLabels[typeCls]}</span>` : ""}
-            ${escapeHtml(item.name)}
+            ${typeCls !== "other" ? `<span class="farming-card-type ${typeCls}">${typeLabels[typeCls] || typeCls}</span>` : ""}
+            ${nameDisplay}
         </div>
         ${item.description ? `<div class="farming-card-desc">${escapeHtml(item.description)}</div>` : ""}
-        <div class="farming-card-sub">${item.drops ? item.drops.length + "개 드롭 소스" : ""}</div>
+        <div class="farming-card-sub">${item.drops ? item.drops.length + "개 파밍 위치" : ""}</div>
         ${dropsHtml}
     `;
 

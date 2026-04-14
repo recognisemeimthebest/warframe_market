@@ -56,7 +56,7 @@ from src.modding.share import (
     init_modding_db,
     save_image,
 )
-from src.wiki.drops import fetch_item_description, load_drop_table, refresh_drop_table, search_farming
+from src.wiki.drops import fetch_item_description, load_drop_table, refresh_drop_table, search_farming, search_resources
 from src.market.relic import get_relic_value, search_relics, _build_relic_cache
 from src.world.api import (
     get_arbitration,
@@ -443,16 +443,28 @@ async def api_lich_items():
 
 @app.get("/api/farming")
 async def api_farming(q: str = "", limit: int = 5):
-    """파밍 정보 검색."""
+    """파밍 정보 검색. 드롭 테이블 + 소재 DB 통합 검색."""
     if not q.strip():
         return {"data": []}
+
+    # 드롭 테이블 검색
     results = search_farming(q, limit=limit)
-    # 각 아이템 설명 병렬 조회
+
+    # 결과 없거나 적으면 소재 DB도 검색
+    if len(results) < limit:
+        resource_results = search_resources(q, limit=limit - len(results))
+        # 이미 드롭 테이블에 있는 이름 제외
+        existing_names = {r["name"].lower() for r in results}
+        resource_results = [r for r in resource_results if r["name"].lower() not in existing_names]
+        results = results + resource_results
+
+    # 소재 타입이 아닌 것만 설명 API 조회 (소재는 description 이미 있음)
+    non_resource = [r for r in results if r.get("type") != "resource"]
     descs = await asyncio.gather(
-        *[fetch_item_description(r["name"]) for r in results],
+        *[fetch_item_description(r["name"]) for r in non_resource],
         return_exceptions=True,
     )
-    for r, result in zip(results, descs):
+    for r, result in zip(non_resource, descs):
         if isinstance(result, Exception):
             continue
         desc, wiki = result

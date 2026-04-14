@@ -23,6 +23,10 @@ logger = logging.getLogger(__name__)
 _DROP_TABLE_URL = "https://drops.warframestat.us/data/all.slim.json"
 _CACHE_PATH = DATA_DIR / "drop_table.json"
 
+# 소재 파밍 DB
+_RESOURCE_PATH = DATA_DIR / "resources.json"
+_resource_cache: list[dict] = []
+
 # 메모리 캐시: item_name(lower) → FarmingInfo
 _farming_cache: dict[str, "FarmingInfo"] = {}
 
@@ -361,3 +365,94 @@ def _parse_rate(rate_str: str) -> float:
         return float(rate_str.rstrip("%"))
     except (ValueError, AttributeError):
         return 0.0
+
+
+# ── 소재 파밍 DB ──
+
+def _load_resource_cache() -> None:
+    """resources.json 로드."""
+    global _resource_cache
+    if _resource_cache:
+        return
+    if not _RESOURCE_PATH.exists():
+        logger.warning("resources.json 없음: %s", _RESOURCE_PATH)
+        return
+    try:
+        _resource_cache = json.loads(_RESOURCE_PATH.read_text(encoding="utf-8"))
+        # 중복 제거 (같은 name 중 첫 번째만 유지)
+        seen: set[str] = set()
+        deduped = []
+        for r in _resource_cache:
+            key = r.get("name", "").lower()
+            if key not in seen:
+                seen.add(key)
+                deduped.append(r)
+        _resource_cache = deduped
+        logger.info("소재 DB 로드: %d개", len(_resource_cache))
+    except Exception:
+        logger.exception("resources.json 로드 실패")
+
+
+def search_resources(query: str, limit: int = 5) -> list[dict]:
+    """소재 파밍 정보 검색. 영문/한글 모두 지원."""
+    _load_resource_cache()
+    if not _resource_cache:
+        return []
+
+    q = query.strip().lower()
+    if not q:
+        return []
+
+    candidates = []
+    for r in _resource_cache:
+        name_en = r.get("name", "").lower()
+        name_ko = r.get("name_ko", "").lower()
+
+        # 정확 매칭
+        if q == name_en or q == name_ko:
+            candidates.append((r, 1.0))
+            continue
+
+        # 부분 매칭
+        if q in name_en or q in name_ko:
+            score = max(
+                SequenceMatcher(None, q, name_en).ratio(),
+                SequenceMatcher(None, q, name_ko).ratio(),
+            )
+            candidates.append((r, max(score, 0.7)))
+            continue
+
+        # 퍼지 매칭
+        score = max(
+            SequenceMatcher(None, q, name_en).ratio(),
+            SequenceMatcher(None, q, name_ko).ratio(),
+        )
+        if score >= 0.55:
+            candidates.append((r, score))
+
+    candidates.sort(key=lambda x: x[1], reverse=True)
+    return [_format_resource_result(r, score) for r, score in candidates[:limit]]
+
+
+def _format_resource_result(r: dict, score: float) -> dict:
+    """resource dict → farming API 응답 형식으로 변환."""
+    drops = [
+        {
+            "source": loc.get("source", ""),
+            "rate": "",
+            "rarity": "",
+            "mission": loc.get("mission", ""),
+            "tip": loc.get("tip", ""),
+        }
+        for loc in r.get("locations", [])
+    ]
+    return {
+        "name": r.get("name", ""),
+        "name_ko": r.get("name_ko", ""),
+        "type": "resource",
+        "score": round(score, 3),
+        "vaulted": None,
+        "description": r.get("description", ""),
+        "wiki_url": "",
+        "drops": drops,
+    }

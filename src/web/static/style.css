@@ -330,6 +330,10 @@ footer { padding: 12px 16px; background: var(--surface); border-top: 1px solid v
 .farming-card-type.mod { background: rgba(77,184,255,0.2); color: var(--primary); }
 .farming-card-type.frame { background: rgba(156,39,176,0.2); color: #ce93d8; }
 .farming-card-type.weapon { background: rgba(76,175,80,0.2); color: var(--green); }
+.farming-card-type.resource { background: rgba(76,175,80,0.15); color: #81c784; }
+.farming-name-ko { font-size: 13px; font-weight: 400; color: var(--text-muted); margin-left: 4px; }
+.farming-mission-tag { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: rgba(255,255,255,0.07); color: var(--text-muted); margin-left: 4px; }
+.farming-drop-tip { font-size: 12px; color: var(--text-muted); margin-top: 3px; padding-left: 2px; line-height: 1.4; }
 .farming-drop { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
 .farming-drop:last-child { border-bottom: none; }
 .farming-drop-source { color: var(--text); flex: 1; }
