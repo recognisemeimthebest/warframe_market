@@ -3,11 +3,17 @@
 import asyncio
 import json
 import logging
+import re
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from pathlib import Path
 
 import httpx
+
+
+def _strip_html(text: str) -> str:
+    """HTML 태그 제거."""
+    return re.sub(r"<[^>]+>", "", text).strip()
 
 from src.config import DATA_DIR
 
@@ -154,7 +160,7 @@ def _build_cache(data: list | dict) -> int:
             chance = entry.get("chance", 0)
             rate_str = f"{chance:.2f}%" if isinstance(chance, (int, float)) and chance > 0 else ""
             rarity = entry.get("rarity", "")
-            place = entry.get("place", "")
+            place = _strip_html(entry.get("place", ""))
 
             info.drops.append(DropSource(
                 source=place,
