@@ -1,0 +1,2876 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>워프봇 — UI 미리보기</title>
+    <style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+    --bg: #1a1a2e; --surface: #16213e; --primary: #4db8ff;
+    --text: #e0e0e0; --text-muted: #888; --user-bubble: #0f3460;
+    --price-bg: #0a1628; --green: #4caf50; --red: #ff6b6b; --border: #2a2a4a;
+    --orange: #ff9800;
+}
+html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+#app { display: flex; flex-direction: column; height: 100%; max-width: 600px; margin: 0 auto; }
+header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
+header h1 { font-size: 18px; color: var(--primary); }
+.status { font-size: 12px; padding: 4px 8px; border-radius: 12px; }
+.status.online { background: rgba(76,175,80,0.2); color: var(--green); }
+
+#tabs { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); }
+.tab { flex: 1; padding: 10px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-muted); font-size: 13px; font-weight: 600; cursor: pointer; }
+.tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+.tab-content { display: none; }
+.tab-content.active { display: flex; flex-direction: column; }
+
+main { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+#messages { flex: 1; overflow-y: auto; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.message { display: flex; max-width: 85%; }
+.message.user { align-self: flex-end; }
+.message.bot { align-self: flex-start; }
+.bubble { padding: 10px 14px; border-radius: 16px; line-height: 1.5; font-size: 14px; word-break: break-word; }
+.message.user .bubble { background: var(--user-bubble); border-bottom-right-radius: 4px; }
+.message.bot .bubble { background: var(--surface); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+.bubble small { color: var(--text-muted); font-size: 12px; }
+
+.price-card { background: var(--price-bg); border: 1px solid var(--border); border-radius: 12px; padding: 14px; min-width: 260px; }
+.price-card .title { font-size: 15px; font-weight: 600; color: var(--primary); margin-bottom: 10px; }
+.price-card .title a { color: var(--primary); text-decoration: none; }
+.price-card .row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
+.price-card .label { color: var(--text-muted); }
+.price-card .value { font-weight: 600; }
+.price-card .footer { margin-top: 8px; font-size: 11px; color: var(--text-muted); text-align: right; }
+.price-card .rank-divider { border-top: 1px solid var(--border); margin: 8px 0 6px; }
+.price-card .rank-label { font-size: 12px; font-weight: 600; color: var(--primary); margin: 6px 0 2px; }
+
+.suggest-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; min-width: 260px; }
+.suggest-card .suggest-title { font-size: 14px; color: var(--text-muted); margin-bottom: 8px; }
+.suggest-card .suggest-item { display: block; padding: 8px 12px; margin: 4px 0; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--primary); font-size: 13px; cursor: pointer; text-decoration: none; }
+.suggest-card .suggest-item:hover { border-color: var(--primary); background: rgba(77,184,255,0.1); }
+.suggest-card .suggest-sub { color: var(--text-muted); font-size: 11px; }
+
+footer { padding: 12px 16px; background: var(--surface); border-top: 1px solid var(--border); }
+#chat-form { display: flex; gap: 8px; }
+#chat-input { flex: 1; padding: 10px 14px; border: 1px solid var(--border); border-radius: 20px; background: var(--bg); color: var(--text); font-size: 14px; outline: none; }
+#chat-input:focus { border-color: var(--primary); }
+#chat-form button { padding: 10px 18px; background: var(--primary); color: #000; border: none; border-radius: 20px; font-size: 14px; font-weight: 600; cursor: pointer; }
+#chat-form button:active { opacity: 0.8; }
+
+/* 급등 */
+#surge-filters { display: flex; gap: 8px; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.surge-filter { padding: 6px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 16px; color: var(--text-muted); font-size: 12px; cursor: pointer; }
+.surge-filter.active { background: rgba(77,184,255,0.15); border-color: var(--primary); color: var(--primary); }
+#surge-list { flex: 1; overflow-y: auto; padding: 12px 16px; }
+.surge-empty { text-align: center; color: var(--text-muted); padding: 40px 16px; font-size: 14px; }
+.surge-card { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; margin-bottom: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
+.surge-card:hover { border-color: var(--primary); }
+.surge-info { flex: 1; }
+.surge-name { font-size: 14px; font-weight: 600; color: var(--text); }
+.surge-name-sub { font-size: 11px; color: var(--text-muted); margin-left: 6px; }
+.surge-detail { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.surge-pct { font-size: 16px; font-weight: 700; color: var(--green); white-space: nowrap; margin-left: 12px; }
+.surge-period { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; margin-right: 6px; }
+.surge-period.p-1d { background: rgba(76,175,80,0.2); color: var(--green); }
+.surge-period.p-7d { background: rgba(77,184,255,0.2); color: var(--primary); }
+.surge-period.p-30d { background: rgba(255,152,0,0.2); color: var(--orange); }
+
+/* 거래소 */
+#trade-filters { display: flex; gap: 8px; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.trade-filter { padding: 6px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 16px; color: var(--text-muted); font-size: 12px; cursor: pointer; }
+.trade-filter.active { background: rgba(77,184,255,0.15); border-color: var(--primary); color: var(--primary); }
+.trade-filter.buy-active { background: rgba(76,175,80,0.15); border-color: var(--green); color: var(--green); }
+.trade-filter.sell-active { background: rgba(255,107,107,0.15); border-color: var(--red); color: var(--red); }
+
+#trade-list { flex: 1; overflow-y: auto; padding: 12px 16px; }
+
+.trade-card { padding: 12px 14px; margin-bottom: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.trade-card:hover { border-color: var(--primary); }
+.trade-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.trade-type { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; }
+.trade-type.buy { background: rgba(76,175,80,0.2); color: var(--green); }
+.trade-type.sell { background: rgba(255,107,107,0.2); color: var(--red); }
+.trade-user { font-size: 12px; color: var(--text-muted); }
+.trade-item { font-size: 14px; font-weight: 600; color: var(--text); }
+.trade-item-sub { font-size: 11px; color: var(--text-muted); margin-left: 4px; }
+.trade-price-row { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
+.trade-price { font-size: 16px; font-weight: 700; color: var(--primary); }
+.trade-market-ref { font-size: 11px; color: var(--text-muted); }
+.trade-memo { font-size: 12px; color: var(--text-muted); margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--border); }
+.trade-delete { background: none; border: 1px solid var(--border); color: var(--text-muted); border-radius: 6px; padding: 2px 8px; font-size: 11px; cursor: pointer; }
+.trade-delete:hover { border-color: var(--red); color: var(--red); }
+.trade-rank { font-size: 11px; color: var(--orange); margin-left: 6px; }
+.trade-qty { font-size: 12px; color: var(--text-muted); }
+
+/* 거래소 등록 폼 */
+#trade-register { padding: 16px; text-align: center; }
+#trade-register p { color: var(--text-muted); font-size: 14px; margin-bottom: 12px; }
+#trade-register input { padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); font-size: 14px; outline: none; width: 200px; }
+#trade-register input:focus { border-color: var(--primary); }
+#trade-register button { margin-top: 8px; padding: 8px 20px; background: var(--primary); color: #000; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.trade-status-msg { padding: 40px 16px; text-align: center; color: var(--text-muted); font-size: 14px; }
+
+/* 매물 등록 폼 */
+#trade-form-area { padding: 12px 16px; background: var(--surface); border-top: 1px solid var(--border); }
+#trade-new-btn { width: 100%; padding: 10px; background: var(--primary); color: #000; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
+#trade-new-form { display: none; }
+#trade-new-form .form-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+#trade-new-form .form-row label { font-size: 12px; color: var(--text-muted); min-width: 50px; }
+#trade-new-form .form-row input, #trade-new-form .form-row select {
+    flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg); color: var(--text); font-size: 13px; outline: none;
+}
+#trade-new-form .form-row input:focus, #trade-new-form .form-row select:focus { border-color: var(--primary); }
+.market-ref-hint { font-size: 11px; color: var(--orange); padding: 4px 0 8px; }
+#trade-new-form .form-actions { display: flex; gap: 8px; }
+#trade-new-form .form-actions button { flex: 1; padding: 8px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.btn-submit { background: var(--primary); color: #000; }
+
+/* 시세 감시 */
+#chat-mode-bar { display: flex; gap: 8px; padding: 8px 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.chat-mode { padding: 5px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 16px; color: var(--text-muted); font-size: 12px; cursor: pointer; }
+.chat-mode.active { background: rgba(77,184,255,0.15); border-color: var(--primary); color: var(--primary); }
+.chat-mode[data-mode="watchlist"].active { background: rgba(255,152,0,0.15); border-color: var(--orange); color: var(--orange); }
+.chat-mode[data-mode="auction"].active { background: rgba(156,39,176,0.15); border-color: #ce93d8; color: #ce93d8; }
+#chat-watchlist { flex: 1; overflow-y: auto; padding: 12px 16px; }
+.watchlist-card { padding: 12px 14px; margin-bottom: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; display: flex; justify-content: space-between; align-items: center; }
+.watchlist-card:hover { border-color: var(--orange); }
+.watchlist-info { flex: 1; }
+.watchlist-item { font-size: 14px; font-weight: 600; color: var(--text); }
+.watchlist-item-sub { font-size: 11px; color: var(--text-muted); margin-left: 4px; }
+.watchlist-price-row { display: flex; gap: 12px; align-items: center; margin-top: 4px; }
+.watchlist-target { font-size: 13px; color: var(--orange); font-weight: 700; }
+.watchlist-market { font-size: 11px; color: var(--text-muted); }
+.watchlist-status { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+.watchlist-status.waiting { background: rgba(255,152,0,0.15); color: var(--orange); }
+.watchlist-status.hit { background: rgba(76,175,80,0.2); color: var(--green); }
+.watchlist-actions { display: flex; align-items: center; gap: 6px; margin-left: 10px; }
+.watchlist-delete { background: none; border: 1px solid var(--border); color: var(--text-muted); border-radius: 6px; padding: 2px 8px; font-size: 11px; cursor: pointer; }
+.watchlist-delete:hover { border-color: var(--red); color: var(--red); }
+.watchlist-add-form { padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; }
+.watchlist-add-form .form-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+.watchlist-add-form .form-row label { font-size: 12px; color: var(--text-muted); min-width: 50px; }
+.watchlist-add-form .form-row input { flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 13px; outline: none; }
+.watchlist-add-form .form-row input:focus { border-color: var(--orange); }
+.watchlist-empty { text-align: center; color: var(--text-muted); font-size: 13px; padding: 30px 16px; }
+.watchlist-hint { font-size: 11px; color: var(--text-muted); margin-bottom: 12px; }
+.btn-cancel { background: var(--bg); color: var(--text-muted); border: 1px solid var(--border) !important; }
+
+/* 알림 설정 */
+.alert-setup { padding: 16px; }
+.alert-setup h3 { font-size: 14px; color: var(--primary); margin-bottom: 10px; }
+.alert-category-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+.alert-category-tab { padding: 6px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--text-muted); font-size: 12px; cursor: pointer; font-weight: 600; }
+.alert-category-tab.active { background: rgba(77,184,255,0.15); border-color: var(--primary); color: var(--primary); }
+.alert-section { margin-bottom: 14px; }
+.alert-section-label { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+.alert-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.alert-chip { padding: 6px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 16px; color: var(--text-muted); font-size: 12px; cursor: pointer; user-select: none; transition: all 0.15s; }
+.alert-chip.selected { background: rgba(77,184,255,0.15); border-color: var(--primary); color: var(--primary); }
+.alert-chip.selected.lith { background: rgba(76,175,80,0.15); border-color: var(--green); color: var(--green); }
+.alert-chip.selected.meso { background: rgba(77,184,255,0.15); border-color: var(--primary); color: var(--primary); }
+.alert-chip.selected.neo { background: rgba(255,152,0,0.15); border-color: var(--orange); color: var(--orange); }
+.alert-chip.selected.axi { background: rgba(255,107,107,0.15); border-color: var(--red); color: var(--red); }
+.alert-chip.selected.requiem { background: rgba(156,39,176,0.15); border-color: #ce93d8; color: #ce93d8; }
+.alert-chip.selected.orange { background: rgba(255,152,0,0.15); border-color: var(--orange); color: var(--orange); }
+.alert-save-btn { margin-top: 12px; width: 100%; padding: 10px; background: var(--primary); color: #000; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.alert-save-btn:active { opacity: 0.8; }
+.alert-current { margin-top: 12px; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.alert-current-title { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+.alert-current-item { font-size: 13px; color: var(--text); padding: 4px 0; }
+.alert-divider { border: none; border-top: 1px solid var(--border); margin: 16px 0 12px; }
+.cycle-config { margin-bottom: 10px; padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.cycle-config-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.cycle-config-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.cycle-config-remove { font-size: 11px; color: var(--red); cursor: pointer; }
+.cycle-repeat-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.cycle-repeat-row label { font-size: 12px; color: var(--text-muted); }
+.cycle-repeat-row input[type="number"] { width: 60px; padding: 4px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 12px; }
+.cycle-add-btn { display: flex; align-items: center; justify-content: center; gap: 4px; width: 100%; padding: 8px; margin-top: 6px; background: transparent; border: 1px dashed var(--border); border-radius: 10px; color: var(--text-muted); font-size: 12px; cursor: pointer; }
+.cycle-add-btn:hover { border-color: var(--primary); color: var(--primary); }
+.alert-notify { position: fixed; top: 60px; left: 50%; transform: translateX(-50%); max-width: 560px; width: calc(100% - 32px); padding: 12px 16px; background: rgba(77,184,255,0.15); border: 1px solid var(--primary); border-radius: 10px; color: var(--primary); font-size: 13px; font-weight: 600; z-index: 100; display: none; animation: slideDown 0.3s; }
+@keyframes slideDown { from { opacity: 0; transform: translateX(-50%) translateY(-10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
+/* 월드 상태 */
+#world-filters { display: flex; gap: 8px; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.world-filter { padding: 6px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 16px; color: var(--text-muted); font-size: 12px; cursor: pointer; }
+.world-filter.active { background: rgba(77,184,255,0.15); border-color: var(--primary); color: var(--primary); }
+#world-list { flex: 1; overflow-y: auto; padding: 12px 16px; }
+
+.world-card { padding: 12px 14px; margin-bottom: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.world-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.world-card-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.world-card-timer { font-size: 13px; font-weight: 600; color: var(--orange); }
+.world-card-detail { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.world-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; margin-right: 6px; }
+.world-tag.lith { background: rgba(76,175,80,0.2); color: var(--green); }
+.world-tag.meso { background: rgba(77,184,255,0.2); color: var(--primary); }
+.world-tag.neo { background: rgba(255,152,0,0.2); color: var(--orange); }
+.world-tag.axi { background: rgba(255,107,107,0.2); color: var(--red); }
+.world-tag.requiem { background: rgba(156,39,176,0.2); color: #ce93d8; }
+.world-tag.omnia { background: rgba(255,215,0,0.2); color: #ffd700; }
+.world-tag.enemy { background: rgba(255,255,255,0.08); color: var(--text-muted); }
+.world-tag.hard { background: rgba(255,107,107,0.15); color: var(--red); }
+
+.cycle-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; margin-bottom: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.cycle-name { font-size: 13px; font-weight: 600; color: var(--text); min-width: 70px; }
+.cycle-state { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 4px; }
+.cycle-state.day { background: rgba(255,215,0,0.2); color: #ffd700; }
+.cycle-state.night { background: rgba(77,100,180,0.2); color: #7986cb; }
+.cycle-state.warm { background: rgba(255,107,107,0.2); color: var(--red); }
+.cycle-state.cold { background: rgba(77,184,255,0.2); color: var(--primary); }
+.cycle-timer { font-size: 12px; color: var(--orange); margin-left: auto; }
+
+.invasion-bar { height: 6px; border-radius: 3px; background: var(--border); margin-top: 6px; overflow: hidden; }
+.invasion-bar-fill { height: 100%; border-radius: 3px; }
+.invasion-bar-fill.corpus { background: var(--primary); }
+.invasion-bar-fill.grineer { background: var(--red); }
+.invasion-bar-fill.infested { background: var(--green); }
+.invasion-rewards { display: flex; justify-content: space-between; margin-top: 4px; font-size: 11px; }
+.invasion-rewards .atk { color: var(--primary); }
+.invasion-rewards .def { color: var(--red); }
+
+/* 설정 */
+#settings-btn { background: none; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer; padding: 2px; line-height: 1; }
+#settings-btn:hover { color: var(--primary); }
+#settings-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; }
+#settings-panel { position: fixed; top: 0; right: 0; width: 320px; max-width: 85vw; height: 100%; background: var(--bg); border-left: 1px solid var(--border); z-index: 201; overflow-y: auto; display: flex; flex-direction: column; animation: slideRight 0.2s; }
+@keyframes slideRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.settings-header { display: flex; justify-content: space-between; align-items: center; padding: 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.settings-title { font-size: 16px; font-weight: 700; color: var(--text); }
+.settings-close { background: none; border: none; color: var(--text-muted); font-size: 22px; cursor: pointer; }
+.settings-body { padding: 16px; flex: 1; overflow-y: auto; }
+.settings-section { margin-bottom: 20px; }
+.settings-section-title { font-size: 13px; font-weight: 700; color: var(--primary); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+.settings-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.settings-row span { font-size: 13px; color: var(--text); }
+.settings-row select { padding: 5px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 12px; outline: none; }
+.settings-hint { font-size: 11px; color: var(--text-muted); padding: 4px 0 6px; }
+.settings-sub-label { font-size: 12px; color: var(--text-muted); margin: 10px 0 8px; }
+.toggle-switch { position: relative; width: 44px; height: 24px; display: inline-block; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider { position: absolute; inset: 0; background: var(--border); border-radius: 24px; cursor: pointer; transition: 0.2s; }
+.toggle-slider::before { content: ""; position: absolute; width: 18px; height: 18px; left: 3px; bottom: 3px; background: var(--text-muted); border-radius: 50%; transition: 0.2s; }
+.toggle-switch input:checked + .toggle-slider { background: var(--primary); }
+.toggle-switch input:checked + .toggle-slider::before { transform: translateX(20px); background: #fff; }
+.mode-toggle { display: flex; gap: 4px; }
+.mode-btn { padding: 5px 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); font-size: 12px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+.mode-btn.active { background: var(--primary); color: #000; border-color: var(--primary); }
+.palette-grid { display: flex; flex-direction: column; gap: 8px; }
+.palette-option { display: flex; align-items: center; gap: 10px; padding: 10px; background: var(--surface); border: 2px solid var(--border); border-radius: 10px; cursor: pointer; transition: 0.15s; }
+.palette-option:hover { border-color: var(--text-muted); }
+.palette-option.active { border-color: var(--primary); }
+.palette-colors { display: flex; gap: 4px; }
+.palette-swatch { width: 24px; height: 24px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); }
+.palette-name { font-size: 12px; color: var(--text); font-weight: 600; }
+
+/* 경매 */
+#chat-auction { flex: 1; overflow-y: auto; padding: 12px 16px; }
+.auction-search { display: flex; gap: 8px; margin-bottom: 10px; }
+.auction-search input { flex: 1; padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); font-size: 13px; outline: none; }
+.auction-search input:focus { border-color: #ce93d8; }
+.auction-search button { padding: 10px 16px; background: #ce93d8; color: #000; border: none; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.auction-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+.auction-tab { padding: 5px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 16px; color: var(--text-muted); font-size: 12px; cursor: pointer; }
+.auction-tab.active { background: rgba(156,39,176,0.15); border-color: #ce93d8; color: #ce93d8; }
+.auction-card { padding: 12px 14px; margin-bottom: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.auction-card:hover { border-color: #ce93d8; }
+.auction-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+.auction-card-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.auction-card-title a { color: #ce93d8; text-decoration: none; }
+.auction-card-price { font-size: 16px; font-weight: 700; color: #ce93d8; }
+.auction-card-price .buyout { font-size: 11px; color: var(--text-muted); font-weight: 400; }
+.auction-stats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.auction-stat { display: inline-block; padding: 2px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; font-size: 11px; color: var(--text-muted); }
+.auction-stat.positive { color: var(--green); border-color: rgba(76,175,80,0.3); }
+.auction-stat.negative { color: var(--red); border-color: rgba(255,107,107,0.3); }
+.auction-seller { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+.auction-seller .online { color: var(--green); }
+.auction-empty { text-align: center; padding: 30px 16px; color: var(--text-muted); font-size: 13px; }
+.auction-hint { font-size: 11px; color: var(--text-muted); margin-bottom: 10px; }
+.auction-filters { margin-bottom: 10px; }
+.auction-filter-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; flex-wrap: wrap; }
+.auction-filter-label { font-size: 11px; color: var(--text-muted); min-width: 50px; }
+.auction-filter-chip { padding: 4px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; color: var(--text-muted); font-size: 11px; cursor: pointer; }
+.auction-filter-chip.active { background: rgba(156,39,176,0.15); border-color: #ce93d8; color: #ce93d8; }
+.auction-bonus-input { width: 60px; padding: 4px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 11px; outline: none; }
+.auction-bonus-input:focus { border-color: #ce93d8; }
+.auction-sort-btn { padding: 4px 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; color: var(--text-muted); font-size: 11px; cursor: pointer; display: flex; align-items: center; gap: 3px; }
+.auction-sort-btn.active { background: rgba(156,39,176,0.15); border-color: #ce93d8; color: #ce93d8; }
+.auction-sort-arrow { font-size: 10px; }
+.auction-ephemera-tag { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: rgba(156,39,176,0.15); color: #ce93d8; font-weight: 600; }
+.riven-grade { display: inline-block; font-size: 10px; padding: 1px 7px; border-radius: 4px; font-weight: 700; letter-spacing: 0.5px; }
+.riven-grade.grade-S { background: rgba(255,215,0,0.18); color: #ffd700; border: 1px solid rgba(255,215,0,0.35); }
+.riven-grade.grade-A { background: rgba(76,175,80,0.15); color: #66bb6a; border: 1px solid rgba(76,175,80,0.3); }
+.riven-grade.grade-B { background: rgba(66,165,245,0.15); color: #42a5f5; border: 1px solid rgba(66,165,245,0.3); }
+.riven-grade.grade-C { background: rgba(158,158,158,0.12); color: #9e9e9e; border: 1px solid rgba(158,158,158,0.25); }
+.riven-grade-detail { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+.riven-grade-detail .good { color: var(--green); }
+.riven-grade-detail .bad { color: #ef5350; }
+
+/* 파밍 정보 */
+#farming-results { flex: 1; overflow-y: auto; padding: 12px 16px; }
+#farming-footer form { display: flex; gap: 8px; padding: 12px 16px; background: var(--surface); border-top: 1px solid var(--border); }
+#farming-footer input { flex: 1; padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); font-size: 14px; outline: none; }
+#farming-footer input:focus { border-color: var(--primary); }
+#farming-footer button { padding: 10px 18px; background: var(--primary); color: #000; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.farming-welcome { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 13px; line-height: 1.8; }
+.farming-suggest { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 12px; }
+.farming-suggest-chip { padding: 6px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; color: var(--text); font-size: 12px; cursor: pointer; }
+.farming-suggest-chip:hover { border-color: var(--primary); color: var(--primary); }
+.farming-card { padding: 14px; margin-bottom: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.farming-card-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.farming-card-title a { color: var(--primary); text-decoration: none; }
+.farming-card-sub { font-size: 11px; color: var(--text-muted); margin-bottom: 10px; }
+.farming-card-type { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-right: 6px; }
+.farming-card-type.prime { background: rgba(255,152,0,0.2); color: var(--orange); }
+.farming-card-type.mod { background: rgba(77,184,255,0.2); color: var(--primary); }
+.farming-card-type.frame { background: rgba(156,39,176,0.2); color: #ce93d8; }
+.farming-card-type.weapon { background: rgba(76,175,80,0.2); color: var(--green); }
+.farming-drop { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.farming-drop:last-child { border-bottom: none; }
+.farming-drop-source { color: var(--text); flex: 1; }
+.farming-drop-detail { font-size: 11px; color: var(--text-muted); }
+.farming-drop-rate { color: var(--orange); font-weight: 600; font-size: 12px; min-width: 55px; text-align: right; }
+.farming-relic-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.farming-relic-row:last-child { border-bottom: none; }
+.farming-relic-name { font-weight: 600; color: var(--text); min-width: 100px; }
+.farming-relic-rarity { font-size: 11px; padding: 1px 6px; border-radius: 4px; font-weight: 600; }
+.farming-relic-rarity.common { background: rgba(76,175,80,0.2); color: var(--green); }
+.farming-relic-rarity.uncommon { background: rgba(77,184,255,0.2); color: var(--primary); }
+.farming-relic-rarity.rare { background: rgba(255,152,0,0.2); color: var(--orange); }
+.farming-relic-status { font-size: 11px; color: var(--text-muted); }
+.farming-section-label { font-size: 12px; color: var(--text-muted); margin: 10px 0 6px; font-weight: 600; }
+.farming-candidates { margin-bottom: 8px; }
+.farming-candidates .suggest-card { margin: 0; }
+
+/* 모딩 공유 */
+#modding-content { flex: 1; overflow-y: auto; padding: 12px 16px; }
+.modding-cats { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.modding-cat-btn { padding: 6px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; color: var(--text-muted); font-size: 12px; cursor: pointer; }
+.modding-cat-btn.active { background: rgba(156,39,176,0.15); border-color: #ce93d8; color: #ce93d8; }
+.modding-item-header { display: flex; justify-content: space-between; align-items: center; margin: 14px 0 8px; }
+.modding-item-name { font-size: 15px; font-weight: 700; color: var(--text); }
+.modding-item-count { font-size: 11px; color: var(--text-muted); }
+.modding-card { padding: 12px; margin-bottom: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.modding-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.modding-card-author { font-size: 13px; font-weight: 600; color: var(--primary); }
+.modding-card-date { font-size: 11px; color: var(--text-muted); }
+.modding-card-memo { font-size: 13px; color: var(--text); line-height: 1.5; margin-bottom: 8px; white-space: pre-wrap; word-break: break-word; }
+.modding-images { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+.modding-images img { height: 120px; border-radius: 6px; border: 1px solid var(--border); object-fit: cover; cursor: pointer; }
+.modding-images img:hover { border-color: var(--primary); }
+.modding-item-card { display: flex; align-items: center; gap: 12px; padding: 12px; margin-bottom: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
+.modding-item-card:hover { border-color: var(--primary); }
+.modding-item-thumb { width: 56px; height: 56px; border-radius: 8px; object-fit: cover; border: 1px solid var(--border); flex-shrink: 0; }
+.modding-item-thumb-empty { width: 56px; height: 56px; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); flex-shrink: 0; }
+.modding-item-info { flex: 1; min-width: 0; }
+.modding-item-info .modding-item-name { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+.modding-item-meta { font-size: 11px; color: var(--text-muted); }
+.modding-item-arrow { font-size: 20px; color: var(--text-muted); flex-shrink: 0; }
+.modding-detail-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.modding-back-btn { padding: 4px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text-muted); font-size: 12px; cursor: pointer; }
+.modding-back-btn:hover { border-color: var(--primary); color: var(--primary); }
+.modding-detail-title { font-size: 16px; font-weight: 700; color: var(--text); flex: 1; }
+.modding-empty { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 13px; }
+.modding-add-btn { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 8px 16px; background: var(--primary); color: #000; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.modding-add-btn:hover { opacity: 0.85; }
+.modding-form { padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; }
+.modding-form .form-row { margin-bottom: 10px; }
+.modding-form .form-row label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+.modding-form .form-row input, .modding-form .form-row textarea, .modding-form .form-row select { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 13px; outline: none; box-sizing: border-box; }
+.modding-form .form-row input:focus, .modding-form .form-row textarea:focus, .modding-form .form-row select:focus { border-color: var(--primary); }
+.modding-form textarea { resize: vertical; min-height: 80px; font-family: inherit; }
+.modding-form-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.modding-form-actions button { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; }
+.modding-form-actions .btn-submit { background: var(--primary); color: #000; }
+.modding-form-actions .btn-cancel { background: var(--surface); color: var(--text-muted); border: 1px solid var(--border); }
+.modding-upload-area { border: 1px dashed var(--border); border-radius: 8px; padding: 12px; text-align: center; color: var(--text-muted); font-size: 12px; cursor: pointer; }
+.modding-upload-area:hover { border-color: var(--primary); color: var(--primary); }
+.modding-upload-preview { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.modding-upload-preview .thumb { position: relative; display: inline-block; }
+.modding-upload-preview .thumb img { height: 64px; border-radius: 4px; border: 1px solid var(--border); object-fit: cover; }
+.modding-upload-preview .thumb-remove { position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; background: #ef5350; color: #fff; border: none; border-radius: 50%; font-size: 10px; line-height: 16px; text-align: center; cursor: pointer; padding: 0; }
+.modding-lightbox { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 9999; cursor: pointer; }
+.modding-lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 8px; }
+
+main::-webkit-scrollbar, #messages::-webkit-scrollbar, #surge-list::-webkit-scrollbar, #trade-list::-webkit-scrollbar, #world-list::-webkit-scrollbar, #chat-watchlist::-webkit-scrollbar, #chat-auction::-webkit-scrollbar, #farming-results::-webkit-scrollbar, #modding-content::-webkit-scrollbar { width: 4px; }
+main::-webkit-scrollbar-thumb, #messages::-webkit-scrollbar-thumb, #surge-list::-webkit-scrollbar-thumb, #trade-list::-webkit-scrollbar-thumb, #world-list::-webkit-scrollbar-thumb, #chat-watchlist::-webkit-scrollbar-thumb, #chat-auction::-webkit-scrollbar-thumb, #farming-results::-webkit-scrollbar-thumb, #modding-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <header>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <h1>워프봇</h1>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span class="status online">온라인</span>
+                <button id="settings-btn" onclick="toggleSettings()" title="설정">&#9881;</button>
+            </div>
+        </header>
+
+        <!-- 설정 패널 -->
+        <div id="settings-overlay" style="display:none;" onclick="toggleSettings()"></div>
+        <div id="settings-panel" style="display:none;">
+            <div class="settings-header">
+                <span class="settings-title">설정</span>
+                <button class="settings-close" onclick="toggleSettings()">&times;</button>
+            </div>
+            <div class="settings-body">
+                <!-- 알림 설정 -->
+                <div class="settings-section">
+                    <div class="settings-section-title">알림</div>
+                    <div class="settings-row">
+                        <span>방해 금지 모드</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="set-dnd" onchange="saveSettings()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="settings-hint">활성화하면 모든 알림이 일시 중단됩니다.</div>
+                    <div class="settings-row">
+                        <span>알림 방식</span>
+                        <select id="set-notify-style" onchange="saveSettings()">
+                            <option value="popup">상단 팝업</option>
+                            <option value="badge">뱃지만 표시</option>
+                            <option value="sound">소리 + 팝업</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- 테마 설정 -->
+                <div class="settings-section">
+                    <div class="settings-section-title">테마</div>
+                    <div class="settings-row">
+                        <span>모드</span>
+                        <div class="mode-toggle">
+                            <button class="mode-btn active" data-mode="dark" onclick="switchMode('dark')">다크</button>
+                            <button class="mode-btn" data-mode="light" onclick="switchMode('light')">라이트</button>
+                        </div>
+                    </div>
+                    <div class="settings-sub-label" id="palette-label">다크 팔레트</div>
+                    <div class="palette-grid" id="palette-grid"></div>
+                </div>
+            </div>
+        </div>
+
+        <nav id="tabs">
+            <button class="tab active" data-tab="chat">시세 조회</button>
+            <button class="tab" data-tab="surges">급등 알림</button>
+            <button class="tab" data-tab="trade">거래소</button>
+            <button class="tab" data-tab="world">월드</button>
+            <button class="tab" data-tab="farming">파밍</button>
+            <button class="tab" data-tab="modding">모딩 공유</button>
+        </nav>
+
+        <!-- 시세 조회 탭 -->
+        <main id="tab-chat" class="tab-content active">
+            <div id="chat-mode-bar">
+                <button class="chat-mode active" data-mode="chat">채팅</button>
+                <button class="chat-mode" data-mode="watchlist">시세 감시</button>
+                <button class="chat-mode" data-mode="auction">경매</button>
+            </div>
+            <div id="messages">
+                <div class="message bot">
+                    <div class="bubble">
+                        안녕! 워프레임 시세 봇이야.<br>
+                        아이템 이름을 입력하면 시세를 알려줄게!<br>
+                        <small>예: "라이노 프라임 세트" 또는 "rhino prime set"</small>
+                    </div>
+                </div>
+                <div class="message user"><div class="bubble">라이노 프라임 세트</div></div>
+                <div class="message bot">
+                    <div class="price-card">
+                        <div class="title"><a href="#">라이노 프라임 세트 Rhino Prime Set</a></div>
+                        <div class="row"><span class="label">판매 최저가</span><span class="value">85p (41건)</span></div>
+                        <div class="row"><span class="label">구매 최고가</span><span class="value">70p (9건)</span></div>
+                        <div class="row"><span class="label">48시간 평균</span><span class="value">87.5p (거래 3건)</span></div>
+                        <div class="footer">warframe.market · 온라인/인게임 유저 기준</div>
+                    </div>
+                </div>
+                <div class="message user"><div class="bubble">아케인 에너자이즈</div></div>
+                <div class="message bot">
+                    <div class="price-card">
+                        <div class="title"><a href="#">아케인 에너자이즈 Arcane Energize</a></div>
+                        <div class="row"><span class="label">판매 최저가</span><span class="value">7p (230건)</span></div>
+                        <div class="row"><span class="label">구매 최고가</span><span class="value">3p (45건)</span></div>
+                        <div class="row"><span class="label">48시간 평균</span><span class="value">8.2p (거래 189건)</span></div>
+                        <div class="rank-divider"></div>
+                        <div class="rank-label">랭크 0</div>
+                        <div class="row"><span class="label">판매 최저가</span><span class="value">7p (185건)</span></div>
+                        <div class="row"><span class="label">구매 최고가</span><span class="value">3p (32건)</span></div>
+                        <div class="rank-label">랭크 MAX (5)</div>
+                        <div class="row"><span class="label">판매 최저가</span><span class="value">35p (45건)</span></div>
+                        <div class="row"><span class="label">구매 최고가</span><span class="value">28p (13건)</span></div>
+                        <div class="footer">warframe.market · 온라인/인게임 유저 기준</div>
+                    </div>
+                </div>
+            </div>
+            <div id="chat-watchlist" style="display:none;"></div>
+            <div id="chat-auction" style="display:none;"></div>
+        </main>
+
+        <!-- 급등 알림 탭 -->
+        <main id="tab-surges" class="tab-content">
+            <div id="surge-filters">
+                <button class="surge-filter active" data-period="">전체</button>
+                <button class="surge-filter" data-period="1d">1일</button>
+                <button class="surge-filter" data-period="7d">1주</button>
+                <button class="surge-filter" data-period="30d">1달</button>
+            </div>
+            <div id="surge-list"></div>
+        </main>
+
+        <!-- 거래소 탭 -->
+        <main id="tab-trade" class="tab-content">
+            <!-- 미등록 상태 -->
+            <div id="trade-register" style="display:none;">
+                <p>거래소를 이용하려면 등록이 필요합니다.</p>
+                <input type="text" id="trade-name-input" placeholder="닉네임 입력" maxlength="20">
+                <br>
+                <button onclick="demoRegister()">등록 요청</button>
+            </div>
+            <!-- 승인 대기 -->
+            <div id="trade-pending" style="display:none;">
+                <div class="trade-status-msg">승인 대기 중입니다.<br>관리자가 승인하면 거래소를 이용할 수 있어요.</div>
+            </div>
+            <!-- 승인 완료 — 매물 목록 -->
+            <div id="trade-approved" style="display:none;">
+                <div id="trade-filters">
+                    <button class="trade-filter active" data-type="">전체</button>
+                    <button class="trade-filter" data-type="buy">삽니다</button>
+                    <button class="trade-filter" data-type="sell">팝니다</button>
+                </div>
+                <div id="trade-list"></div>
+            </div>
+        </main>
+
+        <!-- 월드 상태 탭 -->
+        <main id="tab-world" class="tab-content">
+            <div id="world-filters">
+                <button class="world-filter active" data-section="fissures">균열</button>
+                <button class="world-filter" data-section="arbitration">중재</button>
+                <button class="world-filter" data-section="invasions">침공</button>
+                <button class="world-filter" data-section="cycles">오픈월드</button>
+                <button class="world-filter" data-section="alerts" style="margin-left:auto;border-color:var(--orange);color:var(--orange);">알림</button>
+            </div>
+            <div id="world-list"></div>
+            <!-- 알림 팝업 -->
+            <div class="alert-notify" id="alert-notify"></div>
+        </main>
+
+        <!-- 파밍 정보 탭 -->
+        <main id="tab-farming" class="tab-content">
+            <div id="farming-results"></div>
+        </main>
+
+        <!-- 모딩 공유 탭 -->
+        <main id="tab-modding" class="tab-content">
+            <div id="modding-content"></div>
+        </main>
+
+        <footer id="farming-footer" style="display:none;">
+            <form id="farming-form" onsubmit="return false;">
+                <input type="text" id="farming-input" placeholder="아이템/모드/워프레임 이름 검색..." autocomplete="off">
+                <button type="submit">검색</button>
+            </form>
+        </footer>
+
+        <footer id="chat-footer">
+            <form id="chat-form" onsubmit="return false;">
+                <input type="text" id="chat-input" placeholder="아이템 이름을 입력하세요..." autocomplete="off">
+                <button type="submit">전송</button>
+            </form>
+        </footer>
+
+        <!-- 거래소 등록 폼 (승인된 유저용) -->
+        <footer id="trade-footer" style="display:none;">
+            <div id="trade-form-area">
+                <button id="trade-new-btn" onclick="toggleTradeForm()">+ 매물 등록</button>
+                <div id="trade-new-form">
+                    <div class="form-row">
+                        <label>유형</label>
+                        <select id="tf-type">
+                            <option value="buy">삽니다</option>
+                            <option value="sell">팝니다</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <label>아이템</label>
+                        <input type="text" id="tf-item" placeholder="아이템 이름 검색..." autocomplete="off">
+                    </div>
+                    <div class="market-ref-hint" id="tf-market-ref"></div>
+                    <div class="form-row">
+                        <label>가격</label>
+                        <input type="number" id="tf-price" placeholder="플래티넘" min="1">
+                        <span style="color:var(--text-muted);font-size:13px;">p</span>
+                    </div>
+                    <div class="form-row">
+                        <label>수량</label>
+                        <input type="number" id="tf-qty" value="1" min="1" max="999" style="width:60px;flex:none;">
+                    </div>
+                    <div class="form-row">
+                        <label>메모</label>
+                        <input type="text" id="tf-memo" placeholder="(선택) 한마디" maxlength="100">
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn-cancel" onclick="toggleTradeForm()">취소</button>
+                        <button class="btn-submit" onclick="demoSubmitListing()">등록</button>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+// ── 데모 데이터 ──
+const MOCK_SURGES = [
+    { ko_name: "아케인 에너자이즈", en_name: "Arcane Energize", period: "1d", rank: 5, old_price: 28, new_price: 52, change_pct: 85.7 },
+    { ko_name: "아케인 에너자이즈", en_name: "Arcane Energize", period: "1d", rank: 0, old_price: 5, new_price: 7, change_pct: 40.0 },
+    { ko_name: "라이노 프라임 세트", en_name: "Rhino Prime Set", period: "1d", rank: null, old_price: 38, new_price: 48, change_pct: 26.3 },
+    { ko_name: "메사 프라임 세트", en_name: "Mesa Prime Set", period: "1d", rank: null, old_price: 60, new_price: 78, change_pct: 30.0 },
+    { ko_name: "사린 프라임 세트", en_name: "Saryn Prime Set", period: "7d", rank: null, old_price: 85, new_price: 130, change_pct: 52.9 },
+    { ko_name: "아케인 그레이스", en_name: "Arcane Grace", period: "7d", rank: 5, old_price: 15, new_price: 29, change_pct: 93.3 },
+    { ko_name: "네크로스 프라임 세트", en_name: "Nekros Prime Set", period: "30d", rank: null, old_price: 25, new_price: 55, change_pct: 120.0 },
+];
+
+const MOCK_LISTINGS = [
+    { id: 1, user_name: "텐노마스터", trade_type: "sell", item_name: "라이노 프라임 세트", item_slug: "rhino_prime_set", price: 80, rank: null, quantity: 1, memo: "급처합니다", market_min: 85 },
+    { id: 2, user_name: "보이드헌터", trade_type: "sell", item_name: "아케인 에너자이즈", item_slug: "arcane_energize", price: 30, rank: 5, quantity: 3, memo: "풀랭 3개 묶음", market_min: 35 },
+    { id: 3, user_name: "프라임농부", trade_type: "buy", item_name: "사린 프라임 세트", item_slug: "saryn_prime_set", price: 120, rank: null, quantity: 1, memo: "", market_min: 130 },
+    { id: 4, user_name: "텐노마스터", trade_type: "buy", item_name: "아케인 그레이스", item_slug: "arcane_grace", price: 12, rank: 0, quantity: 10, memo: "0랭 10개 구합니다", market_min: 15 },
+    { id: 5, user_name: "보이드헌터", trade_type: "sell", item_name: "메사 프라임 세트", item_slug: "mesa_prime_set", price: 70, rank: null, quantity: 2, memo: "", market_min: 78 },
+];
+
+let demoUser = null; // null, "pending", {name, status:"approved"}
+
+function escapeHtml(str) {
+    const el = document.createElement("span");
+    el.textContent = str;
+    return el.innerHTML;
+}
+
+// ── 탭 전환 ──
+const tabs = document.querySelectorAll(".tab");
+const chatFooter = document.getElementById("chat-footer");
+const tradeFooter = document.getElementById("trade-footer");
+const farmingFooter = document.getElementById("farming-footer");
+let activeTab = "chat";
+
+tabs.forEach((btn) => {
+    btn.addEventListener("click", () => {
+        const tab = btn.dataset.tab;
+        if (tab === activeTab) return;
+
+        tabs.forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+
+        document.getElementById("tab-" + activeTab).classList.remove("active");
+        document.getElementById("tab-" + tab).classList.add("active");
+
+        chatFooter.style.display = "none";
+        tradeFooter.style.display = "none";
+        farmingFooter.style.display = "none";
+        if (tab === "chat") {
+            chatFooter.style.display = chatMode === "chat" ? "" : "none";
+        }
+        if (tab === "trade" && demoUser && demoUser.status === "approved") tradeFooter.style.display = "";
+        if (tab === "farming") {
+            farmingFooter.style.display = "";
+            renderFarmingWelcome();
+        }
+
+        activeTab = tab;
+
+        if (tab === "surges") renderSurgeList(MOCK_SURGES);
+        if (tab === "trade") renderTradeTab();
+        if (tab === "world") renderWorldTab();
+        if (tab === "modding") renderModdingTab();
+    });
+});
+
+// ── 시세 조회 모드 전환 (채팅 / 시세 감시 / 경매) ──
+let chatMode = "chat";
+document.querySelectorAll(".chat-mode").forEach((btn) => {
+    btn.addEventListener("click", () => {
+        const mode = btn.dataset.mode;
+        if (mode === chatMode) return;
+
+        document.querySelectorAll(".chat-mode").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        chatMode = mode;
+
+        const messages = document.getElementById("messages");
+        const watchlist = document.getElementById("chat-watchlist");
+        const auction = document.getElementById("chat-auction");
+
+        messages.style.display = "none";
+        watchlist.style.display = "none";
+        auction.style.display = "none";
+        chatFooter.style.display = "none";
+
+        if (mode === "chat") {
+            messages.style.display = "";
+            chatFooter.style.display = "";
+        } else if (mode === "watchlist") {
+            watchlist.style.display = "";
+            renderWatchlist();
+        } else if (mode === "auction") {
+            auction.style.display = "";
+            renderAuctionView();
+        }
+    });
+});
+
+// ── 급등 탭 ──
+const surgeFilters = document.querySelectorAll(".surge-filter");
+let currentPeriod = "";
+surgeFilters.forEach((btn) => {
+    btn.addEventListener("click", () => {
+        surgeFilters.forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        currentPeriod = btn.dataset.period;
+        const filtered = currentPeriod ? MOCK_SURGES.filter((s) => s.period === currentPeriod) : MOCK_SURGES;
+        renderSurgeList(filtered);
+    });
+});
+
+function renderSurgeList(items) {
+    const surgeList = document.getElementById("surge-list");
+    if (!items.length) { surgeList.innerHTML = '<div class="surge-empty">감지된 급등 아이템이 없습니다.</div>'; return; }
+    surgeList.innerHTML = "";
+    items.forEach((s) => {
+        const name = s.ko_name || s.en_name;
+        const sub = s.ko_name ? s.en_name : "";
+        const rankTag = s.rank != null ? (s.rank === 0 ? " (랭크0)" : " (랭크" + s.rank + ")") : "";
+        const periodLabel = { "1d": "1일", "7d": "1주", "30d": "1달" }[s.period] || s.period;
+        const card = document.createElement("div");
+        card.className = "surge-card";
+        card.innerHTML =
+            '<div class="surge-info"><div class="surge-name">' +
+            '<span class="surge-period p-' + escapeHtml(s.period) + '">' + escapeHtml(periodLabel) + '</span>' +
+            escapeHtml(name + rankTag) +
+            (sub ? '<span class="surge-name-sub">' + escapeHtml(sub) + '</span>' : '') +
+            '</div><div class="surge-detail">' + s.old_price + 'p → ' + s.new_price + 'p</div></div>' +
+            '<div class="surge-pct">+' + s.change_pct.toFixed(1) + '%</div>';
+        surgeList.appendChild(card);
+    });
+}
+
+// ── 거래소 탭 ──
+function renderTradeTab() {
+    document.getElementById("trade-register").style.display = "none";
+    document.getElementById("trade-pending").style.display = "none";
+    document.getElementById("trade-approved").style.display = "none";
+
+    if (!demoUser) {
+        document.getElementById("trade-register").style.display = "";
+    } else if (demoUser.status === "pending") {
+        document.getElementById("trade-pending").style.display = "";
+    } else if (demoUser.status === "approved") {
+        document.getElementById("trade-approved").style.display = "";
+        tradeFooter.style.display = "";
+        renderTradeList(MOCK_LISTINGS);
+    }
+}
+
+function demoRegister() {
+    const name = document.getElementById("trade-name-input").value.trim();
+    if (!name) return;
+    // 데모: 바로 승인 상태로 전환
+    demoUser = { name: name, status: "approved" };
+    renderTradeTab();
+}
+
+let tradeTypeFilter = "";
+document.querySelectorAll(".trade-filter").forEach((btn) => {
+    btn.addEventListener("click", () => {
+        document.querySelectorAll(".trade-filter").forEach((b) => {
+            b.classList.remove("active", "buy-active", "sell-active");
+        });
+        btn.classList.add("active");
+        tradeTypeFilter = btn.dataset.type;
+        if (tradeTypeFilter === "buy") btn.classList.add("buy-active");
+        else if (tradeTypeFilter === "sell") btn.classList.add("sell-active");
+        const filtered = tradeTypeFilter ? MOCK_LISTINGS.filter((l) => l.trade_type === tradeTypeFilter) : MOCK_LISTINGS;
+        renderTradeList(filtered);
+    });
+});
+
+function renderTradeList(items) {
+    const list = document.getElementById("trade-list");
+    if (!items.length) { list.innerHTML = '<div class="surge-empty">등록된 매물이 없습니다.</div>'; return; }
+    list.innerHTML = "";
+    items.forEach((l) => {
+        const card = document.createElement("div");
+        card.className = "trade-card";
+
+        const typeLabel = l.trade_type === "buy" ? "삽니다" : "팝니다";
+        const typeCls = l.trade_type;
+        const rankStr = l.rank != null ? (l.rank === 0 ? '<span class="trade-rank">랭크0</span>' : '<span class="trade-rank">랭크' + l.rank + '</span>') : '';
+        const qtyStr = l.quantity > 1 ? '<span class="trade-qty"> x' + l.quantity + '</span>' : '';
+        const isOwner = demoUser && demoUser.name === l.user_name;
+
+        card.innerHTML =
+            '<div class="trade-card-header">' +
+                '<div><span class="trade-type ' + typeCls + '">' + typeLabel + '</span></div>' +
+                '<div style="display:flex;align-items:center;gap:6px;">' +
+                    '<span class="trade-user">' + escapeHtml(l.user_name) + '</span>' +
+                    (isOwner ? '<button class="trade-delete" onclick="demoDelete(' + l.id + ')">삭제</button>' : '') +
+                '</div>' +
+            '</div>' +
+            '<div class="trade-item">' + escapeHtml(l.item_name) + rankStr + qtyStr + '</div>' +
+            '<div class="trade-price-row">' +
+                '<span class="trade-price">' + l.price + 'p</span>' +
+                '<span class="trade-market-ref">마켓 최저가 ' + l.market_min + 'p</span>' +
+            '</div>' +
+            (l.memo ? '<div class="trade-memo">' + escapeHtml(l.memo) + '</div>' : '');
+
+        list.appendChild(card);
+    });
+}
+
+function demoDelete(id) {
+    const idx = MOCK_LISTINGS.findIndex((l) => l.id === id);
+    if (idx !== -1) {
+        MOCK_LISTINGS.splice(idx, 1);
+        const filtered = tradeTypeFilter ? MOCK_LISTINGS.filter((l) => l.trade_type === tradeTypeFilter) : MOCK_LISTINGS;
+        renderTradeList(filtered);
+    }
+}
+
+function toggleTradeForm() {
+    const form = document.getElementById("trade-new-form");
+    const btn = document.getElementById("trade-new-btn");
+    if (form.style.display === "none" || !form.style.display) {
+        form.style.display = "block";
+        btn.style.display = "none";
+        document.getElementById("tf-market-ref").textContent = "";
+    } else {
+        form.style.display = "none";
+        btn.style.display = "";
+    }
+}
+
+// 아이템 입력 시 마켓 참고가 표시 (데모)
+document.getElementById("tf-item").addEventListener("input", function() {
+    const v = this.value.trim();
+    const hint = document.getElementById("tf-market-ref");
+    if (v.length >= 2) {
+        hint.textContent = "현재 마켓 최저가: 85p (Rhino Prime Set)";
+    } else {
+        hint.textContent = "";
+    }
+});
+
+function demoSubmitListing() {
+    const type = document.getElementById("tf-type").value;
+    const item = document.getElementById("tf-item").value.trim();
+    const price = parseInt(document.getElementById("tf-price").value) || 0;
+    const qty = parseInt(document.getElementById("tf-qty").value) || 1;
+    const memo = document.getElementById("tf-memo").value.trim();
+
+    if (!item || !price) { alert("아이템과 가격을 입력해주세요."); return; }
+
+    MOCK_LISTINGS.unshift({
+        id: Date.now(), user_name: demoUser.name, trade_type: type,
+        item_name: item, item_slug: "demo", price: price,
+        rank: null, quantity: qty, memo: memo, market_min: 85,
+    });
+
+    toggleTradeForm();
+    document.getElementById("tf-item").value = "";
+    document.getElementById("tf-price").value = "";
+    document.getElementById("tf-qty").value = "1";
+    document.getElementById("tf-memo").value = "";
+
+    const filtered = tradeTypeFilter ? MOCK_LISTINGS.filter((l) => l.trade_type === tradeTypeFilter) : MOCK_LISTINGS;
+    renderTradeList(filtered);
+}
+
+// ── 경매 (Auction) ──
+const MOCK_RIVEN_AUCTIONS = [
+    {
+        id: 1, weapon: "Rubico", name: "Rubico Criti-Toxiata",
+        stats: [
+            { name: "치명타 확률", value: "+187.2%", positive: true },
+            { name: "독성 피해", value: "+114.5%", positive: true },
+            { name: "공격 속도", value: "-32.1%", positive: false },
+        ],
+        mastery: 16, rerolls: 9, polarity: "madurai",
+        startingPrice: 200, buyoutPrice: 500, topBid: 280,
+        seller: "TennoTrader", sellerStatus: "ingame",
+    },
+    {
+        id: 2, weapon: "Ignis Wraith", name: "Ignis Wraith Visi-Critacan",
+        stats: [
+            { name: "치명타 확률", value: "+152.8%", positive: true },
+            { name: "치명타 피해", value: "+98.3%", positive: true },
+            { name: "멀티샷", value: "+112.4%", positive: true },
+            { name: "매거진 용량", value: "-44.7%", positive: false },
+        ],
+        mastery: 14, rerolls: 22, polarity: "naramon",
+        startingPrice: 800, buyoutPrice: null, topBid: 1250,
+        seller: "RivenKing", sellerStatus: "online",
+    },
+    {
+        id: 3, weapon: "Gram Prime", name: "Gram Prime Acri-Gelides",
+        stats: [
+            { name: "근접 치명타 확률", value: "+201.4%", positive: true },
+            { name: "냉기 피해", value: "+88.6%", positive: true },
+        ],
+        mastery: 16, rerolls: 3, polarity: "vazarin",
+        startingPrice: 150, buyoutPrice: 300, topBid: null,
+        seller: "VoidHunter", sellerStatus: "offline",
+    },
+];
+
+const MOCK_LICH_AUCTIONS = [
+    {
+        id: 101, weapon: "Kuva Zarr", source: "lich", element: "toxin", bonus: 54.2,
+        ephemera: true, quirk: "비겁한",
+        buyoutPrice: 120, topBid: 80,
+        seller: "LichDealer", sellerStatus: "ingame",
+    },
+    {
+        id: 102, weapon: "Kuva Bramma", source: "lich", element: "radiation", bonus: 58.7,
+        ephemera: false, quirk: null,
+        buyoutPrice: 200, topBid: 150,
+        seller: "QueenPin99", sellerStatus: "online",
+    },
+    {
+        id: 103, weapon: "Tenet Arca Plasmor", source: "sister", element: "magnetic", bonus: 51.3,
+        ephemera: true, quirk: "장난스러운",
+        buyoutPrice: null, topBid: 90,
+        seller: "SisterTrader", sellerStatus: "ingame",
+    },
+    {
+        id: 104, weapon: "Kuva Ogris", source: "lich", element: "heat", bonus: 47.8,
+        ephemera: false, quirk: "공격적인",
+        buyoutPrice: 60, topBid: 40,
+        seller: "VoidRunner", sellerStatus: "online",
+    },
+    {
+        id: 105, weapon: "Tenet Envoy", source: "sister", element: "electricity", bonus: 60.0,
+        ephemera: true, quirk: null,
+        buyoutPrice: 350, topBid: 280,
+        seller: "CorpusBoss", sellerStatus: "ingame",
+    },
+    {
+        id: 106, weapon: "Kuva Hek", source: "lich", element: "cold", bonus: 55.1,
+        ephemera: true, quirk: "겁쟁이",
+        buyoutPrice: 180, topBid: null,
+        seller: "GrineerHunt", sellerStatus: "offline",
+    },
+];
+
+const ELEMENT_KO = {
+    toxin: "독성", cold: "냉기", electricity: "전기", heat: "열",
+    magnetic: "자기", radiation: "방사능", impact: "충격",
+};
+const EPHEMERA_BY_ELEMENT = {
+    toxin: "Toxin Ephemera", cold: "Cold Ephemera", electricity: "Electricity Ephemera",
+    heat: "Heat Ephemera", magnetic: "Magnetic Ephemera", radiation: "Radiation Ephemera",
+    impact: "Impact Ephemera",
+};
+const ALL_ELEMENTS = ["toxin", "cold", "electricity", "heat", "magnetic", "radiation", "impact"];
+
+// 리벤 추천 옵션 (마켓 데이터 분석 결과 — 데모)
+const RIVEN_META = {
+    "Rubico": {
+        good: ["치명타 확률", "치명타 피해", "멀티샷", "독성 피해", "전기 피해"],
+        goodNeg: ["줌", "관통", "충격", "마무리 피해"],
+        badNeg: ["치명타 확률", "치명타 피해", "멀티샷", "피해량"],
+    },
+    "Ignis Wraith": {
+        good: ["치명타 확률", "치명타 피해", "멀티샷", "상태이상 확률"],
+        goodNeg: ["줌", "관통", "충격", "마무리 피해"],
+        badNeg: ["멀티샷", "피해량", "사거리"],
+    },
+    "Gram Prime": {
+        good: ["근접 치명타 확률", "치명타 피해", "공격 속도", "범위"],
+        goodNeg: ["내구력 소모", "마무리 피해", "충격"],
+        badNeg: ["공격 속도", "치명타 확률", "범위"],
+    },
+};
+
+function gradeRiven(auction) {
+    const meta = RIVEN_META[auction.weapon];
+    if (!meta) return { grade: null, details: [] };
+
+    let score = 0;
+    const details = [];
+    const positives = auction.stats.filter((s) => s.positive);
+    const negatives = auction.stats.filter((s) => !s.positive);
+
+    // 긍정 옵션 평가
+    positives.forEach((s) => {
+        const statBase = s.name.replace(/피해$/, "피해"); // normalize
+        if (meta.good.some((g) => s.name.includes(g) || g.includes(s.name))) {
+            score += 2;
+            details.push({ text: s.name, type: "good" });
+        }
+    });
+
+    // 부정 옵션 평가
+    negatives.forEach((s) => {
+        const negName = s.name;
+        if (meta.goodNeg.some((g) => negName.includes(g))) {
+            score += 1;
+            details.push({ text: "-" + negName + " (좋은 마이너스)", type: "good" });
+        } else if (meta.badNeg.some((b) => negName.includes(b))) {
+            score -= 2;
+            details.push({ text: "-" + negName + " (치명적)", type: "bad" });
+        }
+    });
+
+    // 긍정 옵션이 없으면 마이너스
+    if (positives.length === 0) score -= 3;
+
+    let grade;
+    if (score >= 5) grade = "S";
+    else if (score >= 3) grade = "A";
+    else if (score >= 1) grade = "B";
+    else grade = "C";
+
+    return { grade, score, details };
+}
+
+let auctionType = "riven"; // "riven" or "lich"
+let auctionQuery = "";
+let rivenFilterGrade = ""; // "" = 전체, "S", "A", "recommended" (S+A)
+// 리치/시스터 필터
+let lichFilterSource = ""; // "", "lich", "sister"
+let lichFilterEphemera = ""; // "", "yes", "no"
+let lichFilterElement = ""; // "" or element key
+let lichFilterMinBonus = 0; // 0이면 필터 없음
+// 복합 정렬: [{key, dir}, ...] 순서대로 적용
+let lichSorts = []; // e.g. [{key:"price",dir:"asc"},{key:"bonus",dir:"desc"}]
+let rivenSorts = [];
+
+function buildMultiSortRow(options, sorts, onUpdate) {
+    const row = document.createElement("div");
+    row.className = "auction-filter-row";
+    row.innerHTML = '<span class="auction-filter-label">정렬</span>';
+
+    options.forEach((opt) => {
+        const existing = sorts.find((s) => s.key === opt.key);
+        const order = existing ? sorts.indexOf(existing) + 1 : 0;
+        const arrow = existing ? (existing.dir === "asc" ? "\u25B2" : "\u25BC") : "";
+        const badge = order > 0 && sorts.length > 1 ? order : "";
+
+        const btn = document.createElement("div");
+        btn.className = "auction-sort-btn" + (existing ? " active" : "");
+        btn.innerHTML = opt.label +
+            (badge ? '<span style="font-size:9px;margin-left:2px;opacity:0.7;">' + badge + '</span>' : '') +
+            (arrow ? ' <span class="auction-sort-arrow">' + arrow + '</span>' : '');
+        btn.addEventListener("click", () => {
+            const newSorts = [...sorts];
+            const idx = newSorts.findIndex((s) => s.key === opt.key);
+            if (idx >= 0) {
+                // 이미 있으면: asc → desc → 제거
+                if (newSorts[idx].dir === "asc") {
+                    newSorts[idx].dir = "desc";
+                } else {
+                    newSorts.splice(idx, 1);
+                }
+            } else {
+                // 새로 추가 (오름차순부터)
+                newSorts.push({ key: opt.key, dir: "asc" });
+            }
+            onUpdate(newSorts);
+        });
+        row.appendChild(btn);
+    });
+
+    // 초기화 버튼 (정렬이 1개 이상일 때)
+    if (sorts.length > 0) {
+        const clearBtn = document.createElement("div");
+        clearBtn.className = "auction-sort-btn";
+        clearBtn.style.cssText = "font-size:10px;padding:4px 8px;";
+        clearBtn.textContent = "초기화";
+        clearBtn.addEventListener("click", () => onUpdate([]));
+        row.appendChild(clearBtn);
+    }
+
+    return row;
+}
+
+function applyMultiSort(items, sorts, getValue) {
+    if (!sorts.length) return items;
+    return items.sort((a, b) => {
+        for (const s of sorts) {
+            const va = getValue(a, s.key);
+            const vb = getValue(b, s.key);
+            const diff = va - vb;
+            if (diff !== 0) return s.dir === "asc" ? diff : -diff;
+        }
+        return 0;
+    });
+}
+
+function renderAuctionView() {
+    const container = document.getElementById("chat-auction");
+    container.innerHTML = "";
+
+    // 검색바
+    const search = document.createElement("div");
+    search.className = "auction-search";
+    search.innerHTML =
+        '<input type="text" id="auction-search-input" placeholder="무기 이름으로 검색..." value="' + escapeHtml(auctionQuery) + '" autocomplete="off">' +
+        '<button onclick="doAuctionSearch()">검색</button>';
+    container.appendChild(search);
+
+    // 검색 인풋 엔터 처리
+    setTimeout(() => {
+        const inp = document.getElementById("auction-search-input");
+        if (inp) inp.addEventListener("keydown", (e) => { if (e.key === "Enter") doAuctionSearch(); });
+    }, 0);
+
+    // 리벤 / 리치·시스터 탭
+    const tabs = document.createElement("div");
+    tabs.className = "auction-tabs";
+    [{ key: "riven", label: "리벤 모드" }, { key: "lich", label: "리치 / 시스터 무기" }].forEach((t) => {
+        const btn = document.createElement("div");
+        btn.className = "auction-tab" + (auctionType === t.key ? " active" : "");
+        btn.textContent = t.label;
+        btn.addEventListener("click", () => { auctionType = t.key; renderAuctionView(); });
+        tabs.appendChild(btn);
+    });
+    container.appendChild(tabs);
+
+    // 리치/시스터 필터
+    if (auctionType === "lich") {
+        const filters = document.createElement("div");
+        filters.className = "auction-filters";
+
+        // 소스: 전체/리치/시스터
+        const sourceRow = document.createElement("div");
+        sourceRow.className = "auction-filter-row";
+        sourceRow.innerHTML = '<span class="auction-filter-label">종류</span>';
+        [{ key: "", label: "전체" }, { key: "lich", label: "리치" }, { key: "sister", label: "시스터" }].forEach((s) => {
+            const chip = document.createElement("div");
+            chip.className = "auction-filter-chip" + (lichFilterSource === s.key ? " active" : "");
+            chip.textContent = s.label;
+            chip.addEventListener("click", () => { lichFilterSource = s.key; renderAuctionView(); });
+            sourceRow.appendChild(chip);
+        });
+        filters.appendChild(sourceRow);
+
+        // 에페메라
+        const ephRow = document.createElement("div");
+        ephRow.className = "auction-filter-row";
+        ephRow.innerHTML = '<span class="auction-filter-label">에페메라</span>';
+        [{ key: "", label: "전체" }, { key: "yes", label: "있음" }, { key: "no", label: "없음" }].forEach((e) => {
+            const chip = document.createElement("div");
+            chip.className = "auction-filter-chip" + (lichFilterEphemera === e.key ? " active" : "");
+            chip.textContent = e.label;
+            chip.addEventListener("click", () => { lichFilterEphemera = e.key; renderAuctionView(); });
+            ephRow.appendChild(chip);
+        });
+        filters.appendChild(ephRow);
+
+        // 속성
+        const elemRow = document.createElement("div");
+        elemRow.className = "auction-filter-row";
+        elemRow.innerHTML = '<span class="auction-filter-label">속성</span>';
+        const allChip = document.createElement("div");
+        allChip.className = "auction-filter-chip" + (lichFilterElement === "" ? " active" : "");
+        allChip.textContent = "전체";
+        allChip.addEventListener("click", () => { lichFilterElement = ""; renderAuctionView(); });
+        elemRow.appendChild(allChip);
+        ALL_ELEMENTS.forEach((el) => {
+            const chip = document.createElement("div");
+            chip.className = "auction-filter-chip" + (lichFilterElement === el ? " active" : "");
+            chip.textContent = ELEMENT_KO[el];
+            chip.addEventListener("click", () => { lichFilterElement = el; renderAuctionView(); });
+            elemRow.appendChild(chip);
+        });
+        filters.appendChild(elemRow);
+
+        // 최소 보너스%
+        const bonusRow = document.createElement("div");
+        bonusRow.className = "auction-filter-row";
+        bonusRow.innerHTML = '<span class="auction-filter-label">보너스</span>';
+        const bonusInput = document.createElement("input");
+        bonusInput.type = "number";
+        bonusInput.className = "auction-bonus-input";
+        bonusInput.placeholder = "최소 %";
+        bonusInput.min = "0";
+        bonusInput.max = "60";
+        bonusInput.value = lichFilterMinBonus || "";
+        bonusInput.addEventListener("change", () => {
+            lichFilterMinBonus = parseInt(bonusInput.value) || 0;
+            renderAuctionView();
+        });
+        bonusRow.appendChild(bonusInput);
+        const bonusHint = document.createElement("span");
+        bonusHint.style.cssText = "font-size:11px;color:var(--text-muted);";
+        bonusHint.textContent = "% 이상";
+        bonusRow.appendChild(bonusHint);
+        filters.appendChild(bonusRow);
+
+        // 정렬
+        filters.appendChild(buildMultiSortRow(
+            [{ key: "price", label: "가격" }, { key: "bonus", label: "보너스%" }],
+            lichSorts,
+            (newSorts) => { lichSorts = newSorts; renderAuctionView(); }
+        ));
+
+        container.appendChild(filters);
+    } else {
+        const hint = document.createElement("div");
+        hint.className = "auction-hint";
+        hint.textContent = "warframe.market 경매에서 리벤 모드를 검색합니다. 무기 이름으로 필터링할 수 있어요.";
+        container.appendChild(hint);
+    }
+
+    // 목록
+    if (auctionType === "riven") {
+        renderRivenAuctions(container);
+    } else {
+        renderLichAuctions(container);
+    }
+}
+
+function doAuctionSearch() {
+    auctionQuery = (document.getElementById("auction-search-input")?.value || "").trim();
+    renderAuctionView();
+}
+
+function renderRivenAuctions(container) {
+    let items = MOCK_RIVEN_AUCTIONS;
+    if (auctionQuery) {
+        const q = auctionQuery.toLowerCase();
+        items = items.filter((a) => a.weapon.toLowerCase().includes(q) || a.name.toLowerCase().includes(q));
+    }
+
+    // 등급 필터 UI
+    const gradeRow = document.createElement("div");
+    gradeRow.className = "auction-filter-row";
+    gradeRow.innerHTML = '<span class="auction-filter-label">등급</span>';
+    [
+        { val: "", label: "전체" },
+        { val: "recommended", label: "추천 (S+A)" },
+        { val: "S", label: "S" },
+        { val: "A", label: "A" },
+        { val: "B", label: "B" },
+        { val: "C", label: "C" },
+    ].forEach((opt) => {
+        const chip = document.createElement("button");
+        chip.className = "auction-filter-chip" + (rivenFilterGrade === opt.val ? " active" : "");
+        chip.textContent = opt.label;
+        chip.onclick = () => { rivenFilterGrade = opt.val; renderAuctionView(); };
+        gradeRow.appendChild(chip);
+    });
+    container.appendChild(gradeRow);
+
+    // 정렬 UI
+    container.appendChild(buildMultiSortRow(
+        [{ key: "price", label: "가격" }, { key: "mastery", label: "MR" }, { key: "rerolls", label: "리롤" }, { key: "grade", label: "등급" }],
+        rivenSorts,
+        (newSorts) => { rivenSorts = newSorts; renderAuctionView(); }
+    ));
+
+    // 등급 계산
+    items = items.map((a) => ({ ...a, _grade: gradeRiven(a) }));
+
+    // 등급 필터 적용
+    if (rivenFilterGrade === "recommended") {
+        items = items.filter((a) => a._grade.grade === "S" || a._grade.grade === "A");
+    } else if (rivenFilterGrade) {
+        items = items.filter((a) => a._grade.grade === rivenFilterGrade);
+    }
+
+    // 정렬 적용
+    const gradeOrder = { S: 4, A: 3, B: 2, C: 1 };
+    items = applyMultiSort([...items], rivenSorts, (item, key) => {
+        if (key === "price") return item.buyoutPrice || item.topBid || item.startingPrice || 0;
+        if (key === "mastery") return item.mastery;
+        if (key === "rerolls") return item.rerolls;
+        if (key === "grade") return gradeOrder[item._grade.grade] || 0;
+        return 0;
+    });
+
+    if (!items.length) {
+        container.innerHTML += '<div class="auction-empty">검색 결과가 없습니다.</div>';
+        return;
+    }
+
+    items.forEach((a) => {
+        const card = document.createElement("div");
+        card.className = "auction-card";
+
+        const priceText = a.topBid ? a.topBid + "p" : (a.startingPrice + "p 시작");
+        const buyoutText = a.buyoutPrice ? '<span class="buyout">즉시 구매 ' + a.buyoutPrice + 'p</span>' : "";
+        const statusCls = a.sellerStatus === "offline" ? "" : " online";
+
+        // 등급 뱃지
+        const g = a._grade;
+        let gradeBadge = "";
+        if (g.grade) {
+            gradeBadge = ' <span class="riven-grade grade-' + g.grade + '">' + g.grade + '</span>';
+        }
+
+        // 등급 상세 (좋은/나쁜 옵션 표시)
+        let gradeDetail = "";
+        if (g.details && g.details.length) {
+            gradeDetail = '<div class="riven-grade-detail">' +
+                g.details.map((d) => '<span class="' + d.type + '">' + escapeHtml(d.text) + '</span>').join(" · ") +
+                '</div>';
+        }
+
+        card.innerHTML =
+            '<div class="auction-card-header">' +
+                '<div class="auction-card-title"><a href="#">' + escapeHtml(a.name) + '</a>' + gradeBadge + '</div>' +
+                '<div class="auction-card-price">' + priceText + ' ' + buyoutText + '</div>' +
+            '</div>' +
+            '<div class="auction-stats">' +
+                a.stats.map((s) =>
+                    '<span class="auction-stat ' + (s.positive ? "positive" : "negative") + '">' +
+                    escapeHtml(s.name) + ' ' + escapeHtml(s.value) + '</span>'
+                ).join("") +
+            '</div>' +
+            gradeDetail +
+            '<div class="auction-stats" style="margin-top:4px;">' +
+                '<span class="auction-stat">MR ' + a.mastery + '</span>' +
+                '<span class="auction-stat">리롤 ' + a.rerolls + '회</span>' +
+            '</div>' +
+            '<div class="auction-seller">' +
+                escapeHtml(a.seller) +
+                ' · <span class="' + statusCls.trim() + '">' +
+                (a.sellerStatus === "ingame" ? "인게임" : a.sellerStatus === "online" ? "온라인" : "오프라인") +
+                '</span>' +
+            '</div>';
+
+        container.appendChild(card);
+    });
+}
+
+function renderLichAuctions(container) {
+    let items = MOCK_LICH_AUCTIONS;
+
+    // 이름 검색
+    if (auctionQuery) {
+        const q = auctionQuery.toLowerCase();
+        items = items.filter((a) => a.weapon.toLowerCase().includes(q));
+    }
+    // 소스 필터
+    if (lichFilterSource) {
+        items = items.filter((a) => a.source === lichFilterSource);
+    }
+    // 에페메라 필터
+    if (lichFilterEphemera === "yes") items = items.filter((a) => a.ephemera);
+    else if (lichFilterEphemera === "no") items = items.filter((a) => !a.ephemera);
+    // 속성 필터
+    if (lichFilterElement) {
+        items = items.filter((a) => a.element === lichFilterElement);
+    }
+    // 최소 보너스 필터
+    if (lichFilterMinBonus > 0) {
+        items = items.filter((a) => a.bonus >= lichFilterMinBonus);
+    }
+
+    // 정렬
+    items = applyMultiSort([...items], lichSorts, (item, key) => {
+        if (key === "price") return item.buyoutPrice || item.topBid || 0;
+        if (key === "bonus") return item.bonus;
+        return 0;
+    });
+
+    if (!items.length) {
+        container.innerHTML += '<div class="auction-empty">조건에 맞는 경매가 없습니다.</div>';
+        return;
+    }
+
+    items.forEach((a) => {
+        const card = document.createElement("div");
+        card.className = "auction-card";
+
+        const priceText = a.topBid ? a.topBid + "p" : "-";
+        const buyoutText = a.buyoutPrice ? '<span class="buyout">즉시 구매 ' + a.buyoutPrice + 'p</span>' : '<span class="buyout">즉구 없음</span>';
+        const statusCls = a.sellerStatus === "offline" ? "" : " online";
+        const sourceLabel = a.source === "lich" ? "리치" : "시스터";
+        const elementLabel = ELEMENT_KO[a.element] || a.element;
+        const ephemeraName = a.ephemera && EPHEMERA_BY_ELEMENT[a.element] ? EPHEMERA_BY_ELEMENT[a.element] : "";
+
+        card.innerHTML =
+            '<div class="auction-card-header">' +
+                '<div class="auction-card-title"><a href="#">' + escapeHtml(a.weapon) + '</a>' +
+                    ' <span class="auction-stat" style="vertical-align:middle;">' + sourceLabel + '</span>' +
+                '</div>' +
+                '<div class="auction-card-price">' + priceText + ' ' + buyoutText + '</div>' +
+            '</div>' +
+            '<div class="auction-stats">' +
+                '<span class="auction-stat">' + escapeHtml(elementLabel) + ' ' + a.bonus.toFixed(1) + '%</span>' +
+                (a.ephemera
+                    ? '<span class="auction-ephemera-tag">' + escapeHtml(ephemeraName || "에페메라") + '</span>'
+                    : '<span class="auction-stat">에페메라 없음</span>') +
+                (a.quirk ? '<span class="auction-stat">' + escapeHtml(a.quirk) + '</span>' : '') +
+            '</div>' +
+            '<div class="auction-seller">' +
+                escapeHtml(a.seller) +
+                ' · <span class="' + statusCls.trim() + '">' +
+                (a.sellerStatus === "ingame" ? "인게임" : a.sellerStatus === "online" ? "온라인" : "오프라인") +
+                '</span>' +
+            '</div>';
+
+        container.appendChild(card);
+    });
+}
+
+// ── 시세 감시 (Watchlist) ──
+let watchItems = JSON.parse(localStorage.getItem("watchItems") || "[]");
+// 각 항목: { id, item_name, item_slug, target_price, market_price (데모) }
+
+// 데모 데이터
+if (!watchItems.length) {
+    watchItems = [
+        { id: 1, item_name: "Rhino Prime Set", item_slug: "rhino_prime_set", target_price: 120, market_price: 135 },
+        { id: 2, item_name: "Arcane Energize", item_slug: "arcane_energize", target_price: 30, market_price: 28 },
+        { id: 3, item_name: "Adaptation", item_slug: "adaptation", target_price: 15, market_price: 18 },
+    ];
+}
+
+function renderWatchlist() {
+    const container = document.getElementById("chat-watchlist");
+    container.innerHTML = "";
+
+    // 설명
+    const hint = document.createElement("div");
+    hint.className = "watchlist-hint";
+    hint.textContent = "warframe.market에서 지정 가격 이하 매물이 올라오면 알림을 보내드립니다.";
+    container.appendChild(hint);
+
+    // 추가 폼
+    const form = document.createElement("div");
+    form.className = "watchlist-add-form";
+    form.innerHTML =
+        '<div class="form-row"><label>아이템</label><input type="text" id="wl-item" placeholder="아이템 이름 검색..." autocomplete="off"></div>' +
+        '<div class="form-row"><label>목표가</label><input type="number" id="wl-price" placeholder="이 가격 이하 시 알림" min="1"><span style="color:var(--text-muted);font-size:13px;margin-left:4px;">p</span></div>' +
+        '<div style="display:flex;gap:8px;margin-top:8px;">' +
+            '<button class="btn-cancel" style="flex:1;padding:8px;border:1px solid var(--border);background:none;color:var(--text-muted);border-radius:8px;font-size:13px;cursor:pointer;" onclick="clearWatchForm()">초기화</button>' +
+            '<button style="flex:1;padding:8px;background:var(--orange);color:#000;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;" onclick="addWatchItem()">추가</button>' +
+        '</div>';
+    container.appendChild(form);
+
+    // 감시 목록
+    if (!watchItems.length) {
+        const empty = document.createElement("div");
+        empty.className = "watchlist-empty";
+        empty.textContent = "등록된 감시 아이템이 없습니다.";
+        container.appendChild(empty);
+        return;
+    }
+
+    watchItems.forEach((w) => {
+        const card = document.createElement("div");
+        card.className = "watchlist-card";
+
+        const isHit = w.market_price != null && w.market_price <= w.target_price;
+
+        card.innerHTML =
+            '<div class="watchlist-info">' +
+                '<div class="watchlist-item">' + escapeHtml(w.item_name) + '</div>' +
+                '<div class="watchlist-price-row">' +
+                    '<span class="watchlist-target">목표 ' + w.target_price + 'p 이하</span>' +
+                    (w.market_price != null ? '<span class="watchlist-market">마켓 최저가 ' + w.market_price + 'p</span>' : '') +
+                '</div>' +
+            '</div>' +
+            '<div class="watchlist-actions">' +
+                '<span class="watchlist-status ' + (isHit ? "hit" : "waiting") + '">' + (isHit ? "도달!" : "대기") + '</span>' +
+                '<button class="watchlist-delete" onclick="removeWatchItem(' + w.id + ')">삭제</button>' +
+            '</div>';
+
+        container.appendChild(card);
+    });
+}
+
+function addWatchItem() {
+    const itemInput = document.getElementById("wl-item");
+    const priceInput = document.getElementById("wl-price");
+    const name = itemInput.value.trim();
+    const price = parseInt(priceInput.value) || 0;
+
+    if (!name) { alert("아이템 이름을 입력해주세요."); return; }
+    if (price < 1) { alert("목표 가격을 입력해주세요."); return; }
+
+    watchItems.push({
+        id: Date.now(),
+        item_name: name,
+        item_slug: name.toLowerCase().replace(/\s+/g, "_"),
+        target_price: price,
+        market_price: Math.floor(Math.random() * 40) + 10, // 데모용 랜덤
+    });
+    localStorage.setItem("watchItems", JSON.stringify(watchItems));
+
+    itemInput.value = "";
+    priceInput.value = "";
+    renderWatchlist();
+
+    // 데모: 즉시 매칭 체크
+    checkWatchAlerts();
+}
+
+function removeWatchItem(id) {
+    watchItems = watchItems.filter((w) => w.id !== id);
+    localStorage.setItem("watchItems", JSON.stringify(watchItems));
+    renderWatchlist();
+}
+
+function clearWatchForm() {
+    document.getElementById("wl-item").value = "";
+    document.getElementById("wl-price").value = "";
+}
+
+function checkWatchAlerts() {
+    for (const w of watchItems) {
+        if (w.market_price != null && w.market_price <= w.target_price) {
+            showAlertNotify("시세 감시: " + w.item_name + " — 마켓 최저가 " + w.market_price + "p (목표 " + w.target_price + "p 이하)");
+            return;
+        }
+    }
+}
+
+// ── 파밍 정보 탭 ──
+const MOCK_FARMING_DB = [
+    {
+        name: "Rhino Prime Set", ko_name: "라이노 프라임 세트", type: "prime",
+        parts: [
+            { part: "블루프린트", relic: "Lith B4", rarity: "rare", vaulted: false },
+            { part: "뉴로옵틱스", relic: "Meso N6", rarity: "common", vaulted: false },
+            { part: "시스템", relic: "Neo R1", rarity: "uncommon", vaulted: false },
+            { part: "섀시", relic: "Axi R1", rarity: "common", vaulted: true },
+        ],
+    },
+    {
+        name: "Rhino", ko_name: "라이노", type: "frame",
+        drops: [
+            { source: "Jackal (금성 보스)", detail: "포비 미션 클리어", rate: "각 부품 25.81%" },
+            { source: "뉴로옵틱스", detail: "Jackal 드롭", rate: "25.81%" },
+            { source: "섀시", detail: "Jackal 드롭", rate: "25.81%" },
+            { source: "시스템", detail: "Jackal 드롭", rate: "25.81%" },
+        ],
+        note: "블루프린트는 마켓에서 35,000 크레딧으로 구매",
+    },
+    {
+        name: "Condition Overload", ko_name: "컨디션 오버로드", type: "mod",
+        drops: [
+            { source: "감염체 납골당 (데이모스)", detail: "드레드풀 엑시무스", rate: "0.02%" },
+            { source: "Cambion Drift 바운티", detail: "Tier 5 보상", rate: "4.17%" },
+            { source: "Deimos 동굴 드롭", detail: "감염된 적", rate: "0.067%" },
+        ],
+        note: "매우 낮은 드롭률 — 마켓 구매 추천",
+    },
+    {
+        name: "Adaptation", ko_name: "어댑테이션", type: "mod",
+        drops: [
+            { source: "중재 미션 보상", detail: "AABC 로테이션 C", rate: "5.43%" },
+        ],
+        note: "중재 미션 전용 드롭",
+    },
+    {
+        name: "Arcane Energize", ko_name: "아케인 에너자이즈", type: "mod",
+        drops: [
+            { source: "에이돌론 테랄리스트", detail: "3단계 (해리)", rate: "5.0%" },
+            { source: "에이돌론 가르고일", detail: "3단계 (해리)", rate: "7.5%" },
+            { source: "에이돌론 하이드롤리스트", detail: "3단계 (해리)", rate: "12.5%" },
+            { source: "오르피스의 아버", detail: "데이모스 아케인 보상", rate: "3.33%" },
+        ],
+    },
+    {
+        name: "Ignis Wraith", ko_name: "이그니스 레이스", type: "weapon",
+        drops: [
+            { source: "도장 연구", detail: "에너지 연구실 리서치", rate: "-" },
+            { source: "강철의 길 쿠바 보상", detail: "로테이션 보상", rate: "희귀" },
+            { source: "유저 무료 배포", detail: "거래로 무료 획득 가능", rate: "-" },
+        ],
+        note: "절대 플래티넘으로 사지 마세요! 무료로 구할 수 있습니다.",
+    },
+    {
+        name: "Soma Prime", ko_name: "소마 프라임", type: "prime",
+        parts: [
+            { part: "블루프린트", relic: "Neo S1", rarity: "uncommon", vaulted: true },
+            { part: "배럴", relic: "Axi S2", rarity: "common", vaulted: true },
+            { part: "리시버", relic: "Meso S3", rarity: "rare", vaulted: true },
+            { part: "스톡", relic: "Lith S1", rarity: "common", vaulted: true },
+        ],
+    },
+    {
+        name: "Mesa Prime Set", ko_name: "메사 프라임 세트", type: "prime",
+        parts: [
+            { part: "블루프린트", relic: "Neo M3", rarity: "rare", vaulted: false },
+            { part: "뉴로옵틱스", relic: "Lith M6", rarity: "uncommon", vaulted: false },
+            { part: "시스템", relic: "Axi H5", rarity: "common", vaulted: false },
+            { part: "섀시", relic: "Meso Z4", rarity: "common", vaulted: false },
+        ],
+    },
+];
+
+function farmingSearch(query) {
+    query = query.toLowerCase().trim();
+    if (!query) return [];
+
+    // 정확 매칭
+    const exact = MOCK_FARMING_DB.find((item) =>
+        item.name.toLowerCase() === query ||
+        item.ko_name === query ||
+        item.ko_name.replace(/ /g, "") === query.replace(/ /g, "")
+    );
+    if (exact) return [{ item: exact, score: 1 }];
+
+    // 부분 매칭 + 점수
+    const results = [];
+    for (const item of MOCK_FARMING_DB) {
+        const targets = [item.name.toLowerCase(), item.ko_name.toLowerCase()];
+        let bestScore = 0;
+        for (const t of targets) {
+            if (t.includes(query)) {
+                bestScore = Math.max(bestScore, query.length / t.length);
+            } else if (query.includes(t)) {
+                bestScore = Math.max(bestScore, 0.5);
+            } else {
+                // 글자 단위 유사도 (오타 대응)
+                const score = similarityScore(query, t);
+                if (score > 0.4) bestScore = Math.max(bestScore, score);
+            }
+        }
+        if (bestScore > 0) results.push({ item, score: bestScore });
+    }
+
+    results.sort((a, b) => b.score - a.score);
+    return results.slice(0, 5);
+}
+
+function similarityScore(a, b) {
+    // 간단한 bigram 유사도
+    const bigrams = (s) => {
+        const set = new Set();
+        for (let i = 0; i < s.length - 1; i++) set.add(s.slice(i, i + 2));
+        return set;
+    };
+    const setA = bigrams(a);
+    const setB = bigrams(b);
+    if (!setA.size || !setB.size) return 0;
+    let intersection = 0;
+    setA.forEach((bg) => { if (setB.has(bg)) intersection++; });
+    return (2 * intersection) / (setA.size + setB.size);
+}
+
+function renderFarmingWelcome() {
+    const container = document.getElementById("farming-results");
+    container.innerHTML = "";
+    const welcome = document.createElement("div");
+    welcome.className = "farming-welcome";
+    welcome.innerHTML =
+        '아이템, 모드, 워프레임 이름을 검색하면<br>파밍 위치와 드롭 정보를 알려드릴게요!' +
+        '<div class="farming-suggest"></div>';
+    const suggestions = ["라이노 프라임", "컨디션 오버로드", "어댑테이션", "이그니스 레이스", "메사 프라임"];
+    const chipContainer = welcome.querySelector(".farming-suggest");
+    suggestions.forEach((s) => {
+        const chip = document.createElement("div");
+        chip.className = "farming-suggest-chip";
+        chip.textContent = s;
+        chip.addEventListener("click", () => {
+            document.getElementById("farming-input").value = s;
+            doFarmingSearch(s);
+        });
+        chipContainer.appendChild(chip);
+    });
+    container.appendChild(welcome);
+}
+
+function doFarmingSearch(query) {
+    const container = document.getElementById("farming-results");
+    container.innerHTML = "";
+
+    const results = farmingSearch(query);
+
+    if (!results.length) {
+        container.innerHTML = '<div class="farming-welcome">"' + escapeHtml(query) + '"에 대한 파밍 정보를 찾지 못했어요.<br>다른 이름으로 시도해보세요!</div>';
+        return;
+    }
+
+    // 정확 매칭 (score === 1) → 바로 결과 표시
+    if (results[0].score === 1) {
+        renderFarmingCard(container, results[0].item);
+        return;
+    }
+
+    // 후보 제안
+    const suggestCard = document.createElement("div");
+    suggestCard.className = "suggest-card";
+    const title = document.createElement("div");
+    title.className = "suggest-title";
+    title.textContent = "이 아이템을 찾으셨나요?";
+    suggestCard.appendChild(title);
+
+    results.forEach((r) => {
+        const a = document.createElement("a");
+        a.className = "suggest-item";
+        a.textContent = r.item.ko_name;
+        const sub = document.createElement("span");
+        sub.className = "suggest-sub";
+        sub.textContent = " " + r.item.name;
+        a.appendChild(sub);
+        a.addEventListener("click", () => {
+            document.getElementById("farming-input").value = r.item.ko_name;
+            container.innerHTML = "";
+            renderFarmingCard(container, r.item);
+        });
+        suggestCard.appendChild(a);
+    });
+
+    container.appendChild(suggestCard);
+}
+
+function renderFarmingCard(container, item) {
+    const card = document.createElement("div");
+    card.className = "farming-card";
+
+    const typeLabels = { prime: "프라임", mod: "모드", frame: "워프레임", weapon: "무기" };
+
+    card.innerHTML =
+        '<div class="farming-card-title">' +
+            '<span class="farming-card-type ' + item.type + '">' + (typeLabels[item.type] || item.type) + '</span>' +
+            escapeHtml(item.ko_name) +
+        '</div>' +
+        '<div class="farming-card-sub">' + escapeHtml(item.name) + '</div>';
+
+    if (item.type === "prime" && item.parts) {
+        // 프라임: 렐릭 정보
+        const label = document.createElement("div");
+        label.className = "farming-section-label";
+        label.textContent = "렐릭 드롭 정보";
+        card.appendChild(label);
+
+        item.parts.forEach((p) => {
+            const row = document.createElement("div");
+            row.className = "farming-relic-row";
+
+            const rarityLabels = { common: "커먼", uncommon: "언커먼", rare: "레어" };
+
+            row.innerHTML =
+                '<span class="farming-relic-name">' + escapeHtml(p.part) + '</span>' +
+                '<span>' + escapeHtml(p.relic) + '</span>' +
+                '<span class="farming-relic-rarity ' + p.rarity + '">' + rarityLabels[p.rarity] + '</span>' +
+                (p.vaulted ? '<span class="farming-relic-status" style="color:var(--red);">볼트</span>' : '<span class="farming-relic-status" style="color:var(--green);">획득 가능</span>');
+            card.appendChild(row);
+        });
+
+        const allVaulted = item.parts.every((p) => p.vaulted);
+        if (allVaulted) {
+            const note = document.createElement("div");
+            note.style.cssText = "margin-top:8px;font-size:12px;color:var(--red);";
+            note.textContent = "모든 렐릭이 볼트 상태입니다 — 거래로만 획득 가능";
+            card.appendChild(note);
+        }
+    }
+
+    if (item.drops) {
+        // 모드/프레임/무기: 드롭 소스
+        const label = document.createElement("div");
+        label.className = "farming-section-label";
+        label.textContent = "드롭 위치";
+        card.appendChild(label);
+
+        item.drops.forEach((d) => {
+            const row = document.createElement("div");
+            row.className = "farming-drop";
+            row.innerHTML =
+                '<div class="farming-drop-source">' + escapeHtml(d.source) +
+                    '<div class="farming-drop-detail">' + escapeHtml(d.detail) + '</div>' +
+                '</div>' +
+                '<span class="farming-drop-rate">' + escapeHtml(d.rate) + '</span>';
+            card.appendChild(row);
+        });
+    }
+
+    if (item.note) {
+        const note = document.createElement("div");
+        note.style.cssText = "margin-top:10px;padding:8px 10px;background:rgba(255,152,0,0.1);border-radius:8px;font-size:12px;color:var(--orange);";
+        note.textContent = item.note;
+        card.appendChild(note);
+    }
+
+    // 위키 링크
+    const wiki = document.createElement("div");
+    wiki.style.cssText = "margin-top:8px;font-size:11px;color:var(--text-muted);text-align:right;";
+    wiki.innerHTML = '출처: <a href="https://warframe.fandom.com/wiki/' + encodeURIComponent(item.name.replace(/ /g, "_")) + '" target="_blank" style="color:var(--primary);">Warframe Wiki</a> · warframestat.us';
+    card.appendChild(wiki);
+
+    container.appendChild(card);
+}
+
+// 파밍 검색 폼 이벤트
+document.getElementById("farming-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const input = document.getElementById("farming-input");
+    const query = input.value.trim();
+    if (!query) return;
+    doFarmingSearch(query);
+});
+
+// ── 월드 상태 탭 ──
+// 한글 번역 사전
+const TIER_KO = { Lith: "리스", Meso: "메소", Neo: "네오", Axi: "엑시", Requiem: "레퀴엠", Omnia: "옴니아" };
+const MISSION_KO = {
+    Capture: "포획", Survival: "생존", Defense: "방어", Exterminate: "섬멸",
+    Sabotage: "파괴공작", Rescue: "구출", Spy: "첩보", "Mobile Defense": "이동 방어",
+    Interception: "감청", Excavation: "발굴", Disruption: "교란",
+    Assassination: "암살", Hijack: "탈취", Defection: "탈주", Volatile: "변동",
+    "Alchemy": "연금술", Conjunction: "회합"
+};
+const PLANET_KO = {
+    Mercury: "수성", Venus: "금성", Earth: "지구", Mars: "화성", Phobos: "포보스",
+    Ceres: "세레스", Jupiter: "목성", Europa: "유로파", Saturn: "토성",
+    Uranus: "천왕성", Neptune: "해왕성", Pluto: "명왕성", Sedna: "세드나",
+    Eris: "에리스", Void: "보이드", "Kuva Fortress": "쿠바 요새", Lua: "루아",
+    Deimos: "데이모스", "Zariman Ten Zero": "자리만"
+};
+const ENEMY_KO = { Grineer: "그리니어", Corpus: "코퍼스", Infested: "인페스티드", Corrupted: "커럽티드", Narmer: "나르메르" };
+
+function koNode(node) {
+    // "Ares (Mars)" → "Ares (화성)"
+    const m = node.match(/^(.+)\s\((.+)\)$/);
+    if (!m) return node;
+    return m[1] + " (" + (PLANET_KO[m[2]] || m[2]) + ")";
+}
+function koMission(type) { return MISSION_KO[type] || type; }
+function koEnemy(enemy) { return ENEMY_KO[enemy] || enemy; }
+function koTier(tier) { return TIER_KO[tier] || tier; }
+
+const MOCK_FISSURES = [
+    { node: "Ares (Mars)", missionType: "Sabotage", enemy: "Grineer", tier: "Lith", isHard: false, timeLeft: "42m" },
+    { node: "Solium (Eris)", missionType: "Mobile Defense", enemy: "Infested", tier: "Axi", isHard: true, timeLeft: "38m" },
+    { node: "Hepit (Void)", missionType: "Capture", enemy: "Corrupted", tier: "Lith", isHard: false, timeLeft: "1h 12m" },
+    { node: "Ukko (Void)", missionType: "Capture", enemy: "Corrupted", tier: "Meso", isHard: false, timeLeft: "55m" },
+    { node: "Mot (Void)", missionType: "Survival", enemy: "Corrupted", tier: "Axi", isHard: false, timeLeft: "1h 02m" },
+    { node: "Cassini (Saturn)", missionType: "Capture", enemy: "Grineer", tier: "Neo", isHard: false, timeLeft: "27m" },
+    { node: "Stöfler (Lua)", missionType: "Defense", enemy: "Grineer", tier: "Requiem", isHard: false, timeLeft: "49m" },
+    { node: "Olympus (Mars)", missionType: "Disruption", enemy: "Corpus", tier: "Meso", isHard: true, timeLeft: "33m" },
+    { node: "Pago (Kuva Fortress)", missionType: "Spy", enemy: "Grineer", tier: "Requiem", isHard: false, timeLeft: "51m" },
+    { node: "Sao (Neptune)", missionType: "Sabotage", enemy: "Corpus", tier: "Neo", isHard: true, timeLeft: "44m" },
+];
+
+const MOCK_ARBITRATION = { node: "Hydron (Sedna)", missionType: "Defense", enemy: "Grineer", timeLeft: "22m" };
+
+const MOCK_INVASIONS = [
+    { node: "Casta (Ceres)", attacker: "Corpus", defender: "Grineer", atkReward: "Fieldron x3", defReward: "Detonite Injector x3", completion: 62.5 },
+    { node: "Paimon (Europa)", attacker: "Corpus", defender: "Infested", atkReward: "Orokin Reactor Blueprint", defReward: "", completion: 78.3, vsInfestation: true },
+    { node: "Valefor (Europa)", attacker: "Grineer", defender: "Corpus", atkReward: "Detonite Injector x3", defReward: "Orokin Catalyst Blueprint", completion: 34.1 },
+    { node: "Alator (Mars)", attacker: "Grineer", defender: "Corpus", atkReward: "Forma Blueprint", defReward: "Fieldron x3", completion: 51.2 },
+    { node: "Shear (Ceres)", attacker: "Corpus", defender: "Grineer", atkReward: "Wraith Twin Vipers Barrel", defReward: "Detonite Injector x3", completion: 15.8 },
+];
+
+const MOCK_CYCLES = [
+    { name: "시터스", state: "night", stateLabel: "밤", timeLeft: "20m 35s" },
+    { name: "포르투나 협곡", state: "cold", stateLabel: "추위", timeLeft: "8m 12s" },
+    { name: "캠비온 퇴적지", state: "fass", stateLabel: "파스", timeLeft: "45m 00s" },
+];
+
+let worldSection = "fissures";
+let fissureMode = "normal"; // "normal" or "hard"
+
+document.querySelectorAll(".world-filter").forEach((btn) => {
+    btn.addEventListener("click", () => {
+        document.querySelectorAll(".world-filter").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        worldSection = btn.dataset.section;
+        fissureMode = "normal";
+        renderWorldTab();
+    });
+});
+
+function renderWorldTab() {
+    const list = document.getElementById("world-list");
+    list.innerHTML = "";
+
+    if (worldSection === "fissures") {
+        // 일반/강철 토글
+        const toggle = document.createElement("div");
+        toggle.style.cssText = "display:flex;gap:8px;margin-bottom:10px;";
+        ["normal", "hard"].forEach((mode) => {
+            const btn = document.createElement("button");
+            btn.className = "surge-filter" + (fissureMode === mode ? " active" : "");
+            btn.textContent = mode === "normal" ? "일반" : "강철의 길";
+            btn.addEventListener("click", () => { fissureMode = mode; renderWorldTab(); });
+            toggle.appendChild(btn);
+        });
+        list.appendChild(toggle);
+
+        const filtered = MOCK_FISSURES.filter((f) => fissureMode === "hard" ? f.isHard : !f.isHard);
+        if (!filtered.length) {
+            list.innerHTML += '<div class="surge-empty">현재 ' + (fissureMode === "hard" ? "강철의 길" : "일반") + ' 균열이 없습니다.</div>';
+        }
+        filtered.forEach((f) => {
+            const tierCls = f.tier.toLowerCase();
+            const card = document.createElement("div");
+            card.className = "world-card";
+            if (f.isHard) card.style.borderColor = "rgba(255,107,107,0.4)";
+            card.innerHTML =
+                '<div class="world-card-header">' +
+                    '<div class="world-card-title">' +
+                        '<span class="world-tag ' + tierCls + '">' + escapeHtml(koTier(f.tier)) + '</span>' +
+                        escapeHtml(koMission(f.missionType)) +
+                    '</div>' +
+                    '<span class="world-card-timer">' + f.timeLeft + '</span>' +
+                '</div>' +
+                '<div class="world-card-detail">' +
+                    escapeHtml(koNode(f.node)) + ' · ' +
+                    '<span class="world-tag enemy">' + escapeHtml(koEnemy(f.enemy)) + '</span>' +
+                '</div>';
+            list.appendChild(card);
+        });
+    } else if (worldSection === "arbitration") {
+        const a = MOCK_ARBITRATION;
+        const card = document.createElement("div");
+        card.className = "world-card";
+        card.style.borderColor = "var(--orange)";
+        card.innerHTML =
+            '<div class="world-card-header">' +
+                '<div class="world-card-title">현재 중재 미션</div>' +
+                '<span class="world-card-timer">' + a.timeLeft + '</span>' +
+            '</div>' +
+            '<div style="font-size:15px;font-weight:600;color:var(--text);margin:8px 0;">' + escapeHtml(koMission(a.missionType)) + '</div>' +
+            '<div class="world-card-detail">' + escapeHtml(koNode(a.node)) + ' · ' +
+            '<span class="world-tag enemy">' + escapeHtml(koEnemy(a.enemy)) + '</span></div>';
+        list.appendChild(card);
+
+        const hint = document.createElement("div");
+        hint.className = "surge-empty";
+        hint.textContent = "중재 미션은 1시간마다 교체됩니다.";
+        list.appendChild(hint);
+    } else if (worldSection === "invasions") {
+        MOCK_INVASIONS.forEach((inv) => {
+            const card = document.createElement("div");
+            card.className = "world-card";
+            const pct = Math.min(inv.completion, 100);
+            const barCls = inv.attacker.toLowerCase();
+            card.innerHTML =
+                '<div class="world-card-header">' +
+                    '<div class="world-card-title">' + escapeHtml(koNode(inv.node)) + '</div>' +
+                    '<span style="font-size:12px;color:var(--text-muted);">' + pct.toFixed(1) + '%</span>' +
+                '</div>' +
+                '<div class="invasion-rewards">' +
+                    '<span class="atk">' + escapeHtml(koEnemy(inv.attacker)) + ': ' + escapeHtml(inv.atkReward) + '</span>' +
+                    (inv.defReward ? '<span class="def">' + escapeHtml(koEnemy(inv.defender)) + ': ' + escapeHtml(inv.defReward) + '</span>' : '') +
+                '</div>' +
+                '<div class="invasion-bar"><div class="invasion-bar-fill ' + barCls + '" style="width:' + pct + '%;"></div></div>';
+            list.appendChild(card);
+        });
+    } else if (worldSection === "cycles") {
+        MOCK_CYCLES.forEach((c) => {
+            const row = document.createElement("div");
+            row.className = "cycle-row";
+            row.innerHTML =
+                '<span class="cycle-name">' + escapeHtml(c.name) + '</span>' +
+                '<span class="cycle-state ' + c.state + '">' + escapeHtml(c.stateLabel) + '</span>' +
+                '<span class="cycle-timer">' + c.timeLeft + '</span>';
+            list.appendChild(row);
+        });
+    } else if (worldSection === "alerts") {
+        renderAlertSetup();
+    }
+}
+
+// ── 알림 설정 (전체) ──
+let alertCategory = "fissures"; // fissures, arbitration, invasions, cycles
+
+// 균열 알림
+let alertTiers = JSON.parse(localStorage.getItem("alertTiers") || "[]");
+let alertMissions = JSON.parse(localStorage.getItem("alertMissions") || "[]");
+let alertHard = JSON.parse(localStorage.getItem("alertHard") || "false");
+
+// 중재 알림
+let alertArbEnemies = JSON.parse(localStorage.getItem("alertArbEnemies") || "[]");
+let alertArbMissions = JSON.parse(localStorage.getItem("alertArbMissions") || "[]");
+
+// 침공 알림
+let alertInvRewards = JSON.parse(localStorage.getItem("alertInvRewards") || "[]");
+
+// 오픈월드 알림
+let alertCycleConfigs = JSON.parse(localStorage.getItem("alertCycleConfigs") || "[]");
+// 각 항목: { region: "cetus"|"vallis"|"cambion", phases: [...], repeat: 1 }
+
+const ALL_TIERS = [
+    { key: "Lith", label: "리스", cls: "lith" },
+    { key: "Meso", label: "메소", cls: "meso" },
+    { key: "Neo", label: "네오", cls: "neo" },
+    { key: "Axi", label: "엑시", cls: "axi" },
+    { key: "Requiem", label: "레퀴엠", cls: "requiem" },
+];
+const ALL_MISSIONS = [
+    "Capture", "Survival", "Exterminate", "Defense", "Sabotage",
+    "Rescue", "Spy", "Mobile Defense", "Interception", "Excavation", "Disruption",
+];
+const ALL_ENEMIES = [
+    { key: "Grineer", label: "그리니어" },
+    { key: "Corpus", label: "코퍼스" },
+    { key: "Infested", label: "인페스티드" },
+    { key: "Corrupted", label: "커럽티드" },
+];
+const ALL_INV_REWARDS = [
+    { key: "reactor", label: "오로킨 리액터", match: "Orokin Reactor" },
+    { key: "catalyst", label: "오로킨 카탈리스트", match: "Orokin Catalyst" },
+    { key: "forma", label: "포르마", match: "Forma" },
+    { key: "weapon_part", label: "무기 부품", match: "Wraith|Vandal|Miter|Twin Vipers|Strun|Karak|Dera|Snipetron|Gorgon|Latron|Boar" },
+];
+const CYCLE_REGIONS = [
+    { key: "cetus", name: "시터스", phases: [
+        { key: "day", label: "낮" }, { key: "night", label: "밤" },
+    ]},
+    { key: "vallis", name: "포르투나 협곡", phases: [
+        { key: "warm", label: "따뜻함" }, { key: "cold", label: "추위" },
+    ]},
+    { key: "cambion", name: "캠비온 퇴적지", phases: [
+        { key: "fass", label: "파스" }, { key: "vome", label: "봄" },
+    ]},
+];
+
+const ALERT_CATEGORIES = [
+    { key: "fissures", label: "균열" },
+    { key: "arbitration", label: "중재" },
+    { key: "invasions", label: "침공" },
+    { key: "cycles", label: "오픈월드" },
+];
+
+function renderAlertSetup() {
+    const list = document.getElementById("world-list");
+    list.innerHTML = "";
+
+    const wrap = document.createElement("div");
+    wrap.className = "alert-setup";
+    wrap.innerHTML = '<h3>알림 설정</h3>';
+
+    // 카테고리 탭
+    const tabRow = document.createElement("div");
+    tabRow.className = "alert-category-tabs";
+    ALERT_CATEGORIES.forEach((cat) => {
+        const btn = document.createElement("div");
+        btn.className = "alert-category-tab" + (alertCategory === cat.key ? " active" : "");
+        btn.textContent = cat.label;
+        btn.addEventListener("click", () => { alertCategory = cat.key; renderAlertSetup(); });
+        tabRow.appendChild(btn);
+    });
+    wrap.appendChild(tabRow);
+
+    // 카테고리별 설정 렌더링
+    if (alertCategory === "fissures") renderFissureAlert(wrap);
+    else if (alertCategory === "arbitration") renderArbAlert(wrap);
+    else if (alertCategory === "invasions") renderInvAlert(wrap);
+    else if (alertCategory === "cycles") renderCycleAlert(wrap);
+
+    list.appendChild(wrap);
+}
+
+// ── 균열 알림 ──
+function renderFissureAlert(wrap) {
+    // 티어
+    wrap.appendChild(makeChipSection("티어 (복수 선택)", ALL_TIERS.map((t) => ({
+        label: t.label, selected: alertTiers.includes(t.key), cls: t.cls,
+        onClick: () => { toggleArr(alertTiers, t.key); renderAlertSetup(); },
+    }))));
+
+    // 미션 타입
+    wrap.appendChild(makeChipSection("미션 타입 (복수 선택)", ALL_MISSIONS.map((m) => ({
+        label: koMission(m), selected: alertMissions.includes(m),
+        onClick: () => { toggleArr(alertMissions, m); renderAlertSetup(); },
+    }))));
+
+    // 난이도
+    wrap.appendChild(makeChipSection("난이도", [false, true].map((h) => ({
+        label: h ? "강철의 길" : "일반", selected: alertHard === h,
+        onClick: () => { alertHard = h; renderAlertSetup(); },
+    }))));
+
+    // 저장
+    wrap.appendChild(makeSaveBtn(() => {
+        localStorage.setItem("alertTiers", JSON.stringify(alertTiers));
+        localStorage.setItem("alertMissions", JSON.stringify(alertMissions));
+        localStorage.setItem("alertHard", JSON.stringify(alertHard));
+        showAlertNotify("균열 알림 설정 저장!");
+        checkFissureAlerts();
+    }));
+
+    // 요약
+    if (alertTiers.length || alertMissions.length) {
+        const hardText = alertHard ? "강철의 길" : "일반";
+        const tierText = alertTiers.map((t) => koTier(t)).join(", ") || "전체";
+        const missionText = alertMissions.map((m) => koMission(m)).join(", ") || "전체";
+        wrap.appendChild(makeSummary("균열 알림 조건", [hardText + " · " + tierText + " · " + missionText]));
+    }
+}
+
+// ── 중재 알림 ──
+function renderArbAlert(wrap) {
+    // 적 종류
+    wrap.appendChild(makeChipSection("적 종류 (복수 선택)", ALL_ENEMIES.map((e) => ({
+        label: e.label, selected: alertArbEnemies.includes(e.key),
+        onClick: () => { toggleArr(alertArbEnemies, e.key); renderAlertSetup(); },
+    }))));
+
+    // 미션 타입
+    wrap.appendChild(makeChipSection("미션 타입 (복수 선택)", ALL_MISSIONS.map((m) => ({
+        label: koMission(m), selected: alertArbMissions.includes(m),
+        onClick: () => { toggleArr(alertArbMissions, m); renderAlertSetup(); },
+    }))));
+
+    // 저장
+    wrap.appendChild(makeSaveBtn(() => {
+        localStorage.setItem("alertArbEnemies", JSON.stringify(alertArbEnemies));
+        localStorage.setItem("alertArbMissions", JSON.stringify(alertArbMissions));
+        showAlertNotify("중재 알림 설정 저장!");
+        checkArbAlerts();
+    }));
+
+    // 요약
+    if (alertArbEnemies.length || alertArbMissions.length) {
+        const enemyText = alertArbEnemies.map((e) => koEnemy(e)).join(", ") || "전체";
+        const missionText = alertArbMissions.map((m) => koMission(m)).join(", ") || "전체";
+        wrap.appendChild(makeSummary("중재 알림 조건", [enemyText + " · " + missionText]));
+    }
+}
+
+// ── 침공 알림 ──
+function renderInvAlert(wrap) {
+    wrap.appendChild(makeChipSection("알림 받을 보상 (복수 선택)", ALL_INV_REWARDS.map((r) => ({
+        label: r.label, selected: alertInvRewards.includes(r.key), cls: "orange",
+        onClick: () => { toggleArr(alertInvRewards, r.key); renderAlertSetup(); },
+    }))));
+
+    // 저장
+    wrap.appendChild(makeSaveBtn(() => {
+        localStorage.setItem("alertInvRewards", JSON.stringify(alertInvRewards));
+        showAlertNotify("침공 알림 설정 저장!");
+        checkInvAlerts();
+    }));
+
+    // 요약
+    if (alertInvRewards.length) {
+        const labels = alertInvRewards.map((k) => ALL_INV_REWARDS.find((r) => r.key === k)?.label || k);
+        wrap.appendChild(makeSummary("침공 알림 조건", [labels.join(", ")]));
+    }
+}
+
+// ── 오픈월드 알림 ──
+function renderCycleAlert(wrap) {
+    const desc = document.createElement("div");
+    desc.className = "alert-section-label";
+    desc.textContent = "원하는 지역 + 시간대를 설정하면 해당 시간대가 시작될 때 알림을 보내드립니다.";
+    desc.style.marginBottom = "12px";
+    wrap.appendChild(desc);
+
+    // 기존 설정 카드들
+    alertCycleConfigs.forEach((cfg, idx) => {
+        const region = CYCLE_REGIONS.find((r) => r.key === cfg.region);
+        if (!region) return;
+
+        const card = document.createElement("div");
+        card.className = "cycle-config";
+
+        // 헤더
+        const header = document.createElement("div");
+        header.className = "cycle-config-header";
+        header.innerHTML = '<span class="cycle-config-name">' + escapeHtml(region.name) + '</span>';
+        const removeBtn = document.createElement("span");
+        removeBtn.className = "cycle-config-remove";
+        removeBtn.textContent = "삭제";
+        removeBtn.addEventListener("click", () => {
+            alertCycleConfigs.splice(idx, 1);
+            renderAlertSetup();
+        });
+        header.appendChild(removeBtn);
+        card.appendChild(header);
+
+        // 시간대 칩
+        const phaseChips = document.createElement("div");
+        phaseChips.className = "alert-chips";
+        region.phases.forEach((p) => {
+            const chip = document.createElement("div");
+            chip.className = "alert-chip" + (cfg.phases.includes(p.key) ? " selected" : "");
+            chip.textContent = p.label;
+            chip.addEventListener("click", () => {
+                toggleArr(cfg.phases, p.key);
+                renderAlertSetup();
+            });
+            phaseChips.appendChild(chip);
+        });
+        card.appendChild(phaseChips);
+
+        // 반복 횟수
+        const repeatRow = document.createElement("div");
+        repeatRow.className = "cycle-repeat-row";
+        repeatRow.innerHTML = '<label>반복 횟수</label>';
+        const numInput = document.createElement("input");
+        numInput.type = "number";
+        numInput.min = "0";
+        numInput.max = "99";
+        numInput.value = cfg.repeat != null ? cfg.repeat : 1;
+        numInput.addEventListener("change", () => {
+            cfg.repeat = Math.max(0, Math.min(99, parseInt(numInput.value) || 0));
+        });
+        repeatRow.appendChild(numInput);
+        const repeatHint = document.createElement("span");
+        repeatHint.style.cssText = "font-size:11px;color:var(--text-muted);";
+        repeatHint.textContent = "회 (0 = 무제한)";
+        repeatRow.appendChild(repeatHint);
+        card.appendChild(repeatRow);
+
+        wrap.appendChild(card);
+    });
+
+    // 지역 추가 버튼
+    const addBtn = document.createElement("div");
+    addBtn.className = "cycle-add-btn";
+    addBtn.textContent = "+ 지역 추가";
+    addBtn.addEventListener("click", () => {
+        // 아직 추가되지 않은 지역 중 첫 번째, 없으면 첫 지역 (중복 허용)
+        const usedKeys = alertCycleConfigs.map((c) => c.region);
+        const available = CYCLE_REGIONS.find((r) => !usedKeys.includes(r.key)) || CYCLE_REGIONS[0];
+        alertCycleConfigs.push({ region: available.key, phases: [], repeat: 1 });
+        renderAlertSetup();
+    });
+    wrap.appendChild(addBtn);
+
+    // 지역 선택 변경 (각 카드에서)
+    // — 카드 안에 지역 변경 셀렉터 추가
+    const cards = wrap.querySelectorAll(".cycle-config");
+    cards.forEach((card, idx) => {
+        const header = card.querySelector(".cycle-config-header");
+        const nameSpan = header.querySelector(".cycle-config-name");
+        nameSpan.style.cursor = "pointer";
+        nameSpan.title = "클릭하여 지역 변경";
+        nameSpan.addEventListener("click", () => {
+            const currentIdx = CYCLE_REGIONS.findIndex((r) => r.key === alertCycleConfigs[idx].region);
+            const nextIdx = (currentIdx + 1) % CYCLE_REGIONS.length;
+            alertCycleConfigs[idx].region = CYCLE_REGIONS[nextIdx].key;
+            alertCycleConfigs[idx].phases = [];
+            renderAlertSetup();
+        });
+    });
+
+    // 저장
+    wrap.appendChild(makeSaveBtn(() => {
+        localStorage.setItem("alertCycleConfigs", JSON.stringify(alertCycleConfigs));
+        showAlertNotify("오픈월드 알림 설정 저장!");
+        checkCycleAlerts();
+    }));
+
+    // 요약
+    if (alertCycleConfigs.length) {
+        const lines = alertCycleConfigs.filter((c) => c.phases.length > 0).map((cfg) => {
+            const region = CYCLE_REGIONS.find((r) => r.key === cfg.region);
+            const phaseLabels = cfg.phases.map((pk) => region.phases.find((p) => p.key === pk)?.label || pk).join(", ");
+            return region.name + ": " + phaseLabels + " (" + (cfg.repeat || "무제한") + "회)";
+        });
+        if (lines.length) wrap.appendChild(makeSummary("오픈월드 알림 조건", lines));
+    }
+}
+
+// ── 공통 헬퍼 ──
+function toggleArr(arr, val) {
+    const idx = arr.indexOf(val);
+    if (idx >= 0) arr.splice(idx, 1); else arr.push(val);
+}
+
+function makeChipSection(label, chips) {
+    const section = document.createElement("div");
+    section.className = "alert-section";
+    section.innerHTML = '<div class="alert-section-label">' + escapeHtml(label) + '</div>';
+    const row = document.createElement("div");
+    row.className = "alert-chips";
+    chips.forEach((c) => {
+        const chip = document.createElement("div");
+        chip.className = "alert-chip" + (c.selected ? " selected" + (c.cls ? " " + c.cls : "") : "");
+        chip.textContent = c.label;
+        chip.addEventListener("click", c.onClick);
+        row.appendChild(chip);
+    });
+    section.appendChild(row);
+    return section;
+}
+
+function makeSaveBtn(onSave) {
+    const btn = document.createElement("button");
+    btn.className = "alert-save-btn";
+    btn.textContent = "저장";
+    btn.addEventListener("click", onSave);
+    return btn;
+}
+
+function makeSummary(title, lines) {
+    const el = document.createElement("div");
+    el.className = "alert-current";
+    el.innerHTML = '<div class="alert-current-title">' + escapeHtml(title) + '</div>';
+    lines.forEach((line) => {
+        el.innerHTML += '<div class="alert-current-item">' + escapeHtml(line) + '</div>';
+    });
+    return el;
+}
+
+// ── 알림 체크 (데모) ──
+function checkFissureAlerts() {
+    if (!alertTiers.length && !alertMissions.length) return;
+    const matches = MOCK_FISSURES.filter((f) => {
+        if (f.isHard !== alertHard) return false;
+        if (alertTiers.length && !alertTiers.includes(f.tier)) return false;
+        if (alertMissions.length && !alertMissions.includes(f.missionType)) return false;
+        return true;
+    });
+    if (matches.length > 0) {
+        const f = matches[0];
+        showAlertNotify("균열: " + koTier(f.tier) + " " + koMission(f.missionType) + " — " + koNode(f.node) + " (" + f.timeLeft + ")");
+    }
+}
+
+function checkArbAlerts() {
+    const a = MOCK_ARBITRATION;
+    if (alertArbEnemies.length && !alertArbEnemies.includes(a.enemy)) return;
+    if (alertArbMissions.length && !alertArbMissions.includes(a.missionType)) return;
+    if (!alertArbEnemies.length && !alertArbMissions.length) return;
+    showAlertNotify("중재: " + koMission(a.missionType) + " — " + koNode(a.node) + " [" + koEnemy(a.enemy) + "] (" + a.timeLeft + ")");
+}
+
+function checkInvAlerts() {
+    if (!alertInvRewards.length) return;
+    for (const inv of MOCK_INVASIONS) {
+        const allRewards = inv.atkReward + " " + (inv.defReward || "");
+        for (const rk of alertInvRewards) {
+            const def = ALL_INV_REWARDS.find((r) => r.key === rk);
+            if (def && new RegExp(def.match, "i").test(allRewards)) {
+                showAlertNotify("침공: " + koNode(inv.node) + " — " + def.label + " 보상 등장!");
+                return;
+            }
+        }
+    }
+}
+
+function checkCycleAlerts() {
+    for (const cfg of alertCycleConfigs) {
+        if (!cfg.phases.length) continue;
+        const region = CYCLE_REGIONS.find((r) => r.key === cfg.region);
+        const mock = MOCK_CYCLES.find((c) => c.name === region?.name);
+        if (mock && cfg.phases.includes(mock.state)) {
+            showAlertNotify("오픈월드: " + mock.name + " — 현재 " + mock.stateLabel + "!");
+            return;
+        }
+    }
+}
+
+function showAlertNotify(text) {
+    const el = document.getElementById("alert-notify");
+    el.textContent = text;
+    el.style.display = "block";
+    setTimeout(() => { el.style.display = "none"; }, 5000);
+}
+
+// 폼 제출 (데모)
+document.getElementById("chat-form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const input = document.getElementById("chat-input");
+    const text = input.value.trim();
+    if (!text) return;
+    const msg = document.createElement("div");
+    msg.className = "message user";
+    msg.innerHTML = '<div class="bubble">' + escapeHtml(text) + '</div>';
+    document.getElementById("messages").appendChild(msg);
+    document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
+    input.value = "";
+});
+
+// ── 설정 ──
+const PALETTES = {
+    dark: [
+        { name: "기본", colors: ["#1a1a2e", "#16213e", "#4db8ff", "#e0e0e0"], vars: { bg: "#1a1a2e", surface: "#16213e", primary: "#4db8ff", text: "#e0e0e0", "text-muted": "#888", "user-bubble": "#0f3460", "price-bg": "#0a1628", border: "#2a2a4a" } },
+        { name: "사이버펑크", colors: ["#0d0221", "#150734", "#ff2a6d", "#e0e0e0"], vars: { bg: "#0d0221", surface: "#150734", primary: "#ff2a6d", text: "#e0e0e0", "text-muted": "#888", "user-bubble": "#2d1053", "price-bg": "#0a0118", border: "#2a1548" } },
+        { name: "포레스트", colors: ["#1a2e1a", "#1e3e1e", "#66bb6a", "#dce8dc"], vars: { bg: "#1a2e1a", surface: "#1e3e1e", primary: "#66bb6a", text: "#dce8dc", "text-muted": "#8a9e8a", "user-bubble": "#1a3a1a", "price-bg": "#0e1f0e", border: "#2a4a2a" } },
+        { name: "선셋", colors: ["#2e1a1a", "#3e2116", "#ff9800", "#e8dcd0"], vars: { bg: "#2e1a1a", surface: "#3e2116", primary: "#ff9800", text: "#e8dcd0", "text-muted": "#9e8a7a", "user-bubble": "#4a2a10", "price-bg": "#1f140a", border: "#4a3020" } },
+        { name: "미드나잇", colors: ["#1a1a30", "#22224a", "#b388ff", "#d8d0e8"], vars: { bg: "#1a1a30", surface: "#22224a", primary: "#b388ff", text: "#d8d0e8", "text-muted": "#8878a8", "user-bubble": "#2a2060", "price-bg": "#12102a", border: "#3a3060" } },
+    ],
+    light: [
+        { name: "기본", colors: ["#f5f5f5", "#ffffff", "#1976d2", "#222222"], vars: { bg: "#f5f5f5", surface: "#ffffff", primary: "#1976d2", text: "#222222", "text-muted": "#777", "user-bubble": "#bbdefb", "price-bg": "#e8f0fe", border: "#ddd" } },
+        { name: "로즈", colors: ["#fdf2f4", "#ffffff", "#e91e63", "#333333"], vars: { bg: "#fdf2f4", surface: "#ffffff", primary: "#e91e63", text: "#333333", "text-muted": "#888", "user-bubble": "#fce4ec", "price-bg": "#fdf2f6", border: "#f0d0d8" } },
+        { name: "민트", colors: ["#f0faf4", "#ffffff", "#00897b", "#2a2a2a"], vars: { bg: "#f0faf4", surface: "#ffffff", primary: "#00897b", text: "#2a2a2a", "text-muted": "#777", "user-bubble": "#b2dfdb", "price-bg": "#e0f5f0", border: "#c8e6c9" } },
+        { name: "피치", colors: ["#fef6f0", "#ffffff", "#e65100", "#333333"], vars: { bg: "#fef6f0", surface: "#ffffff", primary: "#e65100", text: "#333333", "text-muted": "#888", "user-bubble": "#ffe0b2", "price-bg": "#fff3e0", border: "#eed8c0" } },
+        { name: "라벤더", colors: ["#f4f0fa", "#ffffff", "#7b1fa2", "#2a2a2a"], vars: { bg: "#f4f0fa", surface: "#ffffff", primary: "#7b1fa2", text: "#2a2a2a", "text-muted": "#888", "user-bubble": "#e1bee7", "price-bg": "#f3e5f5", border: "#d8c8e8" } },
+    ],
+};
+
+let currentMode = localStorage.getItem("themeMode") || "dark";
+let currentPalette = parseInt(localStorage.getItem("themePalette") || "0");
+let settingsOpen = false;
+
+function toggleSettings() {
+    settingsOpen = !settingsOpen;
+    document.getElementById("settings-overlay").style.display = settingsOpen ? "" : "none";
+    document.getElementById("settings-panel").style.display = settingsOpen ? "" : "none";
+    if (settingsOpen) {
+        loadSettings();
+        renderPaletteGrid();
+    }
+}
+
+function switchMode(mode) {
+    currentMode = mode;
+    currentPalette = parseInt(localStorage.getItem("themePalette_" + mode) || "0");
+    document.querySelectorAll(".mode-btn").forEach((b) => b.classList.toggle("active", b.dataset.mode === mode));
+    document.getElementById("palette-label").textContent = (mode === "dark" ? "다크" : "라이트") + " 팔레트";
+    applyPalette();
+    renderPaletteGrid();
+    localStorage.setItem("themeMode", mode);
+}
+
+function applyPalette() {
+    const palette = PALETTES[currentMode][currentPalette] || PALETTES[currentMode][0];
+    const root = document.documentElement;
+    for (const [key, val] of Object.entries(palette.vars)) {
+        root.style.setProperty("--" + key, val);
+    }
+    // orange, green, red는 모드별 미세 조정
+    if (currentMode === "light") {
+        root.style.setProperty("--green", "#2e7d32");
+        root.style.setProperty("--red", "#d32f2f");
+        root.style.setProperty("--orange", "#e65100");
+    } else {
+        root.style.setProperty("--green", "#4caf50");
+        root.style.setProperty("--red", "#ff6b6b");
+        root.style.setProperty("--orange", "#ff9800");
+    }
+}
+
+function renderPaletteGrid() {
+    const grid = document.getElementById("palette-grid");
+    grid.innerHTML = "";
+    const palettes = PALETTES[currentMode];
+
+    palettes.forEach((p, idx) => {
+        const opt = document.createElement("div");
+        opt.className = "palette-option" + (idx === currentPalette ? " active" : "");
+        opt.addEventListener("click", () => {
+            currentPalette = idx;
+            localStorage.setItem("themePalette_" + currentMode, idx);
+            applyPalette();
+            renderPaletteGrid();
+        });
+
+        const colors = document.createElement("div");
+        colors.className = "palette-colors";
+        p.colors.forEach((c) => {
+            const swatch = document.createElement("div");
+            swatch.className = "palette-swatch";
+            swatch.style.background = c;
+            colors.appendChild(swatch);
+        });
+
+        const name = document.createElement("span");
+        name.className = "palette-name";
+        name.textContent = p.name;
+
+        opt.appendChild(colors);
+        opt.appendChild(name);
+        grid.appendChild(opt);
+    });
+}
+
+function loadSettings() {
+    document.getElementById("set-dnd").checked = JSON.parse(localStorage.getItem("settingDnd") || "false");
+    document.getElementById("set-notify-style").value = localStorage.getItem("settingNotifyStyle") || "popup";
+    document.querySelectorAll(".mode-btn").forEach((b) => b.classList.toggle("active", b.dataset.mode === currentMode));
+    document.getElementById("palette-label").textContent = (currentMode === "dark" ? "다크" : "라이트") + " 팔레트";
+}
+
+function saveSettings() {
+    localStorage.setItem("settingDnd", JSON.stringify(document.getElementById("set-dnd").checked));
+    localStorage.setItem("settingNotifyStyle", document.getElementById("set-notify-style").value);
+}
+
+// ── 모딩 공유 ──
+const MODDING_CATEGORIES = [
+    { key: "warframe", label: "워프레임" },
+    { key: "primary", label: "주무기" },
+    { key: "secondary", label: "보조무기" },
+    { key: "melee", label: "근접무기" },
+    { key: "archwing", label: "아크윙" },
+    { key: "necramech", label: "네크라메크" },
+    { key: "archgun", label: "아크윙무기" },
+    { key: "companion", label: "동반자" },
+];
+
+// 데모 mock 데이터
+const MOCK_MODDING_SHARES = [
+    {
+        id: 1, category: "warframe", itemName: "Mesa Prime", author: "TennoMaster",
+        memo: "SP 스틸패스 용 세팅입니다.\n\n피스토커 빌드 기반이고 어댑테이션 + 롤링가드 조합으로 생존력 확보했습니다.\n에너지는 제누릭 대시로 해결하면 됩니다.",
+        images: ["https://placehold.co/400x300/1a1a2e/e0e0e0?text=Mesa+Build+1", "https://placehold.co/400x300/1a1a2e/e0e0e0?text=Mesa+Build+2"],
+        createdAt: "2026-04-13T08:30:00Z",
+    },
+    {
+        id: 2, category: "warframe", itemName: "Mesa Prime", author: "VoidHunter",
+        memo: "아비트 메사 세팅. 슈팅갤러리 강화모드 필수.",
+        images: ["https://placehold.co/400x300/1a1a2e/e0e0e0?text=Mesa+Arbi"],
+        createdAt: "2026-04-12T15:20:00Z",
+    },
+    {
+        id: 3, category: "warframe", itemName: "Saryn Prime", author: "SporeQueen",
+        memo: "ESO 포자 확산 빌드. 범위 최대, 위력 200% 이상 세팅.\n레인지+스트렝스 극대화하고 효율은 피흡으로 커버합니다.",
+        images: ["https://placehold.co/400x300/1a1a2e/e0e0e0?text=Saryn+ESO", "https://placehold.co/400x300/1a1a2e/e0e0e0?text=Saryn+Stats", "https://placehold.co/400x300/1a1a2e/e0e0e0?text=Saryn+Mods"],
+        createdAt: "2026-04-11T22:10:00Z",
+    },
+    {
+        id: 4, category: "primary", itemName: "Rubico Prime", author: "TennoMaster",
+        memo: "이돌론 헌트 전용 루비코 세팅. 서핀 필수, 치확 200% 이상 맞추세요.",
+        images: ["https://placehold.co/400x300/1a1a2e/e0e0e0?text=Rubico+Eidolon"],
+        createdAt: "2026-04-10T18:00:00Z",
+    },
+    {
+        id: 5, category: "melee", itemName: "Nikana Prime", author: "BladeRunner",
+        memo: "헤비어택 빌드. CO + 초기콤보 세팅으로 즉사 딜.",
+        images: ["https://placehold.co/400x300/1a1a2e/e0e0e0?text=Nikana+HA", "https://placehold.co/400x300/1a1a2e/e0e0e0?text=Nikana+Stats"],
+        createdAt: "2026-04-09T12:45:00Z",
+    },
+    {
+        id: 6, category: "companion", itemName: "Smeeta Kavat", author: "LootGoblin",
+        memo: "자원 파밍용 스미타 세팅. 참 행운 극대화 + 생존 모드 조합.",
+        images: ["https://placehold.co/400x300/1a1a2e/e0e0e0?text=Smeeta"],
+        createdAt: "2026-04-08T09:30:00Z",
+    },
+];
+
+let moddingCategory = "warframe";
+let moddingSelectedItem = ""; // "" = 아이템 목록 보기, "Mesa Prime" = 해당 아이템 상세
+let moddingFormOpen = false;
+let moddingFormImages = []; // DataURL strings (preview only)
+
+function renderModdingTab() {
+    const container = document.getElementById("modding-content");
+    container.innerHTML = "";
+
+    // 카테고리 버튼
+    const cats = document.createElement("div");
+    cats.className = "modding-cats";
+    MODDING_CATEGORIES.forEach((cat) => {
+        const btn = document.createElement("button");
+        btn.className = "modding-cat-btn" + (moddingCategory === cat.key ? " active" : "");
+        btn.textContent = cat.label;
+        btn.onclick = () => {
+            moddingCategory = cat.key;
+            moddingSelectedItem = "";
+            moddingFormOpen = false;
+            moddingFormImages = [];
+            renderModdingTab();
+        };
+        cats.appendChild(btn);
+    });
+    container.appendChild(cats);
+
+    // 현재 카테고리 공유 목록
+    const shares = MOCK_MODDING_SHARES.filter((s) => s.category === moddingCategory);
+
+    if (moddingSelectedItem) {
+        // ── 아이템 상세 뷰 ──
+        renderModdingDetail(container, shares);
+    } else {
+        // ── 아이템 목록 뷰 ──
+        renderModdingItemList(container, shares);
+    }
+}
+
+function renderModdingItemList(container, shares) {
+    // + 공유하기 버튼
+    const addRow = document.createElement("div");
+    addRow.style.cssText = "display:flex;justify-content:flex-end;margin-bottom:10px;";
+    const addBtn = document.createElement("button");
+    addBtn.className = "modding-add-btn";
+    addBtn.innerHTML = "+ 공유하기";
+    addBtn.onclick = () => { moddingFormOpen = !moddingFormOpen; renderModdingTab(); };
+    addRow.appendChild(addBtn);
+    container.appendChild(addRow);
+
+    // 공유 폼
+    if (moddingFormOpen) {
+        container.appendChild(buildModdingForm());
+    }
+
+    // 아이템별 그룹화
+    const byItem = {};
+    shares.forEach((s) => {
+        if (!byItem[s.itemName]) byItem[s.itemName] = [];
+        byItem[s.itemName].push(s);
+    });
+
+    if (Object.keys(byItem).length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "modding-empty";
+        empty.textContent = "아직 공유된 모딩이 없습니다. 첫 번째로 공유해보세요!";
+        container.appendChild(empty);
+        return;
+    }
+
+    // 아이템 카드 목록 (클릭하면 상세로 이동)
+    Object.keys(byItem).forEach((itemName) => {
+        const group = byItem[itemName];
+        const latest = group[0]; // 가장 최신
+
+        const card = document.createElement("div");
+        card.className = "modding-item-card";
+
+        const dateStr = new Date(latest.createdAt).toLocaleDateString("ko-KR", { month: "short", day: "numeric" });
+        const authors = [...new Set(group.map((s) => s.author))];
+        const authorStr = authors.length <= 2 ? authors.join(", ") : authors.slice(0, 2).join(", ") + " 외 " + (authors.length - 2) + "명";
+
+        // 최신 이미지 썸네일 (있으면)
+        const thumbSrc = latest.images && latest.images.length ? latest.images[0] : "";
+        const thumbHtml = thumbSrc
+            ? '<img class="modding-item-thumb" src="' + escapeHtml(thumbSrc) + '">'
+            : '<div class="modding-item-thumb-empty"></div>';
+
+        card.innerHTML =
+            thumbHtml +
+            '<div class="modding-item-info">' +
+                '<div class="modding-item-name">' + escapeHtml(itemName) + '</div>' +
+                '<div class="modding-item-meta">' +
+                    '<span>' + group.length + '건의 공유</span>' +
+                    '<span> · </span>' +
+                    '<span>' + escapeHtml(authorStr) + '</span>' +
+                '</div>' +
+                '<div class="modding-item-meta">' + dateStr + ' 최신</div>' +
+            '</div>' +
+            '<div class="modding-item-arrow">›</div>';
+
+        card.onclick = () => {
+            moddingSelectedItem = itemName;
+            moddingFormOpen = false;
+            moddingFormImages = [];
+            renderModdingTab();
+        };
+
+        container.appendChild(card);
+    });
+}
+
+function renderModdingDetail(container, shares) {
+    const itemShares = shares.filter((s) => s.itemName === moddingSelectedItem);
+
+    // 뒤로가기 + 아이템명 헤더
+    const header = document.createElement("div");
+    header.className = "modding-detail-header";
+    header.innerHTML =
+        '<button class="modding-back-btn" onclick="moddingSelectedItem=\'\';renderModdingTab();">← 목록</button>' +
+        '<span class="modding-detail-title">' + escapeHtml(moddingSelectedItem) + '</span>' +
+        '<span class="modding-item-count">' + itemShares.length + '건</span>';
+    container.appendChild(header);
+
+    // + 공유하기 버튼
+    const addRow = document.createElement("div");
+    addRow.style.cssText = "display:flex;justify-content:flex-end;margin-bottom:10px;";
+    const addBtn = document.createElement("button");
+    addBtn.className = "modding-add-btn";
+    addBtn.innerHTML = "+ 공유하기";
+    addBtn.onclick = () => { moddingFormOpen = !moddingFormOpen; renderModdingTab(); };
+    addRow.appendChild(addBtn);
+    container.appendChild(addRow);
+
+    // 공유 폼 (아이템 이름 미리 채움)
+    if (moddingFormOpen) {
+        container.appendChild(buildModdingForm(moddingSelectedItem));
+    }
+
+    if (!itemShares.length) {
+        const empty = document.createElement("div");
+        empty.className = "modding-empty";
+        empty.textContent = "이 아이템에 대한 공유가 없습니다.";
+        container.appendChild(empty);
+        return;
+    }
+
+    // 공유 카드들
+    itemShares.forEach((s) => {
+        const card = document.createElement("div");
+        card.className = "modding-card";
+
+        const dateStr = new Date(s.createdAt).toLocaleDateString("ko-KR", { year: "numeric", month: "short", day: "numeric" });
+
+        let imagesHtml = "";
+        if (s.images && s.images.length) {
+            imagesHtml = '<div class="modding-images">' +
+                s.images.map((src) => '<img src="' + escapeHtml(src) + '" alt="모딩 이미지" onclick="openModdingLightbox(this.src)">').join("") +
+                '</div>';
+        }
+
+        let memoHtml = "";
+        if (s.memo) {
+            memoHtml = '<div class="modding-card-memo">' + escapeHtml(s.memo) + '</div>';
+        }
+
+        card.innerHTML =
+            '<div class="modding-card-top">' +
+                '<span class="modding-card-author">' + escapeHtml(s.author) + '</span>' +
+                '<span class="modding-card-date">' + dateStr + '</span>' +
+            '</div>' +
+            memoHtml +
+            imagesHtml;
+
+        container.appendChild(card);
+    });
+}
+
+function buildModdingForm(prefillName) {
+    const form = document.createElement("div");
+    form.className = "modding-form";
+
+    const catLabel = MODDING_CATEGORIES.find((c) => c.key === moddingCategory)?.label || "";
+    const nameValue = prefillName ? escapeHtml(prefillName) : "";
+    const nameReadonly = prefillName ? " readonly" : "";
+
+    form.innerHTML =
+        '<div class="form-row">' +
+            '<label>' + escapeHtml(catLabel) + ' 이름</label>' +
+            '<input type="text" id="modding-f-name" placeholder="예: Mesa Prime" maxlength="50" value="' + nameValue + '"' + nameReadonly + '>' +
+        '</div>' +
+        '<div class="form-row">' +
+            '<label>메모 (운영법, 설명 등 · 최대 1000자)</label>' +
+            '<textarea id="modding-f-memo" maxlength="1000" placeholder="모딩에 대한 설명이나 운영법을 적어주세요..."></textarea>' +
+            '<div style="text-align:right;font-size:11px;color:var(--text-muted);margin-top:2px;" id="modding-memo-count">0 / 1000</div>' +
+        '</div>' +
+        '<div class="form-row">' +
+            '<label>이미지 (최대 5장)</label>' +
+            '<div class="modding-upload-area" id="modding-upload-area">클릭하거나 이미지를 드래그하여 업로드</div>' +
+            '<input type="file" id="modding-file-input" accept="image/*" multiple style="display:none;">' +
+            '<div class="modding-upload-preview" id="modding-upload-preview"></div>' +
+        '</div>' +
+        '<div class="form-row">' +
+            '<label>작성자 이름</label>' +
+            '<input type="text" id="modding-f-author" placeholder="닉네임" maxlength="20">' +
+        '</div>' +
+        '<div class="modding-form-actions">' +
+            '<button class="btn-cancel" onclick="moddingFormOpen=false;moddingFormImages=[];renderModdingTab();">취소</button>' +
+            '<button class="btn-submit" onclick="submitModdingShare()">공유하기</button>' +
+        '</div>';
+
+    // 이벤트 바인딩 (DOM 삽입 후)
+    setTimeout(() => {
+        const uploadArea = document.getElementById("modding-upload-area");
+        const fileInput = document.getElementById("modding-file-input");
+        const memoInput = document.getElementById("modding-f-memo");
+
+        if (memoInput) {
+            memoInput.addEventListener("input", () => {
+                document.getElementById("modding-memo-count").textContent = memoInput.value.length + " / 1000";
+            });
+        }
+
+        if (uploadArea && fileInput) {
+            uploadArea.addEventListener("click", () => fileInput.click());
+            uploadArea.addEventListener("dragover", (e) => { e.preventDefault(); uploadArea.style.borderColor = "var(--primary)"; });
+            uploadArea.addEventListener("dragleave", () => { uploadArea.style.borderColor = "var(--border)"; });
+            uploadArea.addEventListener("drop", (e) => {
+                e.preventDefault();
+                uploadArea.style.borderColor = "var(--border)";
+                handleModdingFiles(e.dataTransfer.files);
+            });
+            fileInput.addEventListener("change", () => {
+                handleModdingFiles(fileInput.files);
+                fileInput.value = "";
+            });
+        }
+
+        renderModdingUploadPreview();
+    }, 0);
+
+    return form;
+}
+
+function handleModdingFiles(files) {
+    const remaining = 5 - moddingFormImages.length;
+    if (remaining <= 0) return;
+
+    const toAdd = Array.from(files).slice(0, remaining);
+    toAdd.forEach((file) => {
+        if (!file.type.startsWith("image/")) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            moddingFormImages.push(e.target.result);
+            renderModdingUploadPreview();
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+function renderModdingUploadPreview() {
+    const preview = document.getElementById("modding-upload-preview");
+    if (!preview) return;
+    preview.innerHTML = "";
+    moddingFormImages.forEach((src, idx) => {
+        const thumb = document.createElement("div");
+        thumb.className = "thumb";
+        thumb.innerHTML =
+            '<img src="' + src + '">' +
+            '<button class="thumb-remove" onclick="removeModdingImage(' + idx + ')">×</button>';
+        preview.appendChild(thumb);
+    });
+
+    const uploadArea = document.getElementById("modding-upload-area");
+    if (uploadArea) {
+        uploadArea.style.display = moddingFormImages.length >= 5 ? "none" : "";
+    }
+}
+
+function removeModdingImage(idx) {
+    moddingFormImages.splice(idx, 1);
+    renderModdingUploadPreview();
+}
+
+function submitModdingShare() {
+    const name = (document.getElementById("modding-f-name")?.value || "").trim();
+    const memo = (document.getElementById("modding-f-memo")?.value || "").trim();
+    const author = (document.getElementById("modding-f-author")?.value || "").trim();
+
+    if (!name) { alert("이름을 입력해주세요."); return; }
+    if (!author) { alert("작성자 이름을 입력해주세요."); return; }
+    if (memo.length > 1000) { alert("메모는 1000자까지 입력 가능합니다."); return; }
+    if (moddingFormImages.length === 0) { alert("이미지를 최소 1장 첨부해주세요."); return; }
+
+    // 데모: mock 데이터에 추가
+    MOCK_MODDING_SHARES.unshift({
+        id: Date.now(),
+        category: moddingCategory,
+        itemName: name,
+        author: author,
+        memo: memo,
+        images: moddingFormImages.slice(),
+        createdAt: new Date().toISOString(),
+    });
+
+    moddingFormOpen = false;
+    moddingFormImages = [];
+    moddingSelectedItem = name; // 등록 후 해당 아이템 상세로 이동
+    renderModdingTab();
+}
+
+function openModdingLightbox(src) {
+    const lb = document.createElement("div");
+    lb.className = "modding-lightbox";
+    lb.innerHTML = '<img src="' + src + '">';
+    lb.onclick = () => lb.remove();
+    document.body.appendChild(lb);
+}
+
+// 시작 시 테마 적용
+currentPalette = parseInt(localStorage.getItem("themePalette_" + currentMode) || "0");
+applyPalette();
+
+// showAlertNotify를 DND 모드 대응하도록 래핑
+const _origShowAlertNotify = showAlertNotify;
+showAlertNotify = function(text) {
+    if (JSON.parse(localStorage.getItem("settingDnd") || "false")) return; // DND 시 알림 차단
+    const style = localStorage.getItem("settingNotifyStyle") || "popup";
+    if (style === "badge") return; // 뱃지만 표시 (데모에서는 무시)
+    _origShowAlertNotify(text);
+};
+
+    </script>
+</body>
+</html>

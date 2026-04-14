@@ -50,9 +50,9 @@ def get_popular_slugs() -> list[str]:
     for item in items:
         tags = set(item.get("tags", []))
         slug = item["slug"]
-        # 프라임 세트, 아케인, 레전더리/레어 모드
-        if tags & _POPULAR_TAGS and slug.endswith("_set"):
-            popular.append(slug)
+        # 프라임 세트 + 부품 (세트/부품 차익 탐지에 필요), 아케인, 레전더리/레어 모드
+        if "prime" in tags:
+            popular.append(slug)  # 세트와 부품 모두 포함
         elif "arcane_enhancement" in tags:
             popular.append(slug)
     return popular
@@ -261,7 +261,7 @@ async def run_monitor(broadcast_fn=None) -> None:
     hourly_count = 0
     while True:
         try:
-            # 매시간 인기 아이템 스캔
+            # 매시간 인기 아이템 스캔 (시작 즉시 첫 스캔)
             await hourly_scan(broadcast_fn)
             hourly_count += 1
 
@@ -272,5 +272,5 @@ async def run_monitor(broadcast_fn=None) -> None:
         except Exception:
             logger.exception("모니터링 루프 오류")
 
-        # 1시간 대기
+        # 1시간 대기 (다음 루프 전)
         await asyncio.sleep(3600)

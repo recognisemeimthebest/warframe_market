@@ -182,14 +182,20 @@ function connect() {
     const wsUrl = `${proto}//${host}/ws`;
     ws = new WebSocket(wsUrl);
 
+    let _wasDisconnected = false;
     ws.onopen = () => {
         statusEl.textContent = "온라인";
         statusEl.className = "status online";
         reconnectDelay = 1000;
+        if (_wasDisconnected) {
+            addMessage("서버에 다시 연결되었습니다.", "bot");
+            _wasDisconnected = false;
+        }
     };
     ws.onclose = (ev) => {
         statusEl.textContent = "오프라인";
         statusEl.className = "status offline";
+        _wasDisconnected = true;
         setTimeout(connect, reconnectDelay);
         reconnectDelay = Math.min(reconnectDelay * 2, 30000);
     };
@@ -307,7 +313,11 @@ function addSuggestCard(query, items) {
 form.addEventListener("submit", (e) => {
     e.preventDefault();
     const text = input.value.trim();
-    if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
+    if (!text) return;
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+        addMessage("서버와 연결이 끊어졌습니다. 잠시 후 자동으로 재연결됩니다...", "bot");
+        return;
+    }
     addMessage(text, "user");
     ws.send(JSON.stringify({ text }));
     input.value = "";
@@ -317,7 +327,6 @@ form.addEventListener("submit", (e) => {
 // ── 탭 전환 ──
 const tabs = document.querySelectorAll(".tab");
 const chatFooter = document.getElementById("chat-footer");
-const tradeFooter = document.getElementById("trade-footer");
 const farmingFooter = document.getElementById("farming-footer");
 let activeTab = "chat";
 
@@ -332,11 +341,9 @@ tabs.forEach((btn) => {
         document.getElementById("tab-" + tab).classList.add("active");
 
         chatFooter.style.display = "none";
-        tradeFooter.style.display = "none";
         farmingFooter.style.display = "none";
 
         if (tab === "chat") chatFooter.style.display = chatMode === "chat" ? "" : "none";
-        if (tab === "trade") { renderTradeTab(); if (tradeUser && tradeUser.status === "approved") tradeFooter.style.display = ""; }
         if (tab === "farming") { farmingFooter.style.display = ""; renderFarmingWelcome(); }
         if (tab === "surges") fetchSurges();
         if (tab === "world") fetchWorldState();
@@ -360,11 +367,15 @@ document.querySelectorAll(".chat-mode").forEach((btn) => {
         document.getElementById("messages").style.display = mode === "chat" ? "" : "none";
         document.getElementById("chat-watchlist").style.display = mode === "watchlist" ? "" : "none";
         document.getElementById("chat-auction").style.display = mode === "auction" ? "" : "none";
+        document.getElementById("chat-skins").style.display = mode === "skins" ? "" : "none";
+        document.getElementById("chat-arbitrage").style.display = mode === "arbitrage" ? "" : "none";
         chatFooter.style.display = mode === "chat" ? "" : "none";
 
         chatMode = mode;
         if (mode === "watchlist") renderWatchlist();
         if (mode === "auction") renderAuctionView();
+        if (mode === "skins") renderSkinsTab();
+        if (mode === "arbitrage") renderArbitrageTab();
     });
 });
 
@@ -434,194 +445,6 @@ function renderSurgeList(items) {
     });
 }
 
-
-// ── 거래소 ──
-let tradeUser = null;
-let tradeFilterType = "";
-
-async function renderTradeTab() {
-    const name = localStorage.getItem("tradeName") || "";
-    if (name) {
-        const res = await fetch(`/api/trade/user?name=${encodeURIComponent(name)}`);
-        const json = await res.json();
-        tradeUser = json.user;
-    }
-
-    document.getElementById("trade-register").style.display = "none";
-    document.getElementById("trade-pending").style.display = "none";
-    document.getElementById("trade-approved").style.display = "none";
-
-    if (!tradeUser) {
-        document.getElementById("trade-register").style.display = "";
-    } else if (tradeUser.status === "pending") {
-        document.getElementById("trade-pending").style.display = "";
-    } else if (tradeUser.status === "approved") {
-        document.getElementById("trade-approved").style.display = "";
-        tradeFooter.style.display = "";
-        fetchListings();
-    }
-}
-
-async function tradeRegister() {
-    const name = document.getElementById("trade-name-input").value.trim();
-    if (!name) return;
-    const res = await fetch("/api/trade/register", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
-    });
-    const json = await res.json();
-    if (json.ok) {
-        localStorage.setItem("tradeName", name);
-        tradeUser = json.user;
-    } else {
-        alert(json.msg);
-    }
-    renderTradeTab();
-}
-
-async function fetchListings() {
-    const params = new URLSearchParams({ limit: "50" });
-    if (tradeFilterType) params.set("trade_type", tradeFilterType);
-    const res = await fetch(`/api/trade/listings?${params}`);
-    const json = await res.json();
-    renderListings(json.data || []);
-}
-
-document.querySelectorAll(".trade-filter").forEach((btn) => {
-    btn.addEventListener("click", () => {
-        document.querySelectorAll(".trade-filter").forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
-        tradeFilterType = btn.dataset.type;
-        fetchListings();
-    });
-});
-
-function renderListings(items) {
-    const el = document.getElementById("trade-list");
-    if (!items.length) {
-        el.innerHTML = '<div class="surge-empty">매물이 없습니다.</div>';
-        return;
-    }
-    el.innerHTML = "";
-    items.forEach((l) => {
-        const card = document.createElement("div");
-        card.className = "trade-card";
-        const myName = localStorage.getItem("tradeName") || "";
-        const delBtn = l.user_name === myName
-            ? `<button class="trade-delete" onclick="deleteListing(${l.id})">삭제</button>` : "";
-        const rankStr = l.rank != null ? (l.rank === 0 ? '<span class="trade-rank">랭크0</span>' : '<span class="trade-rank">랭크' + l.rank + '</span>') : '';
-        const qtyStr = l.quantity > 1 ? '<span class="trade-qty"> x' + l.quantity + '</span>' : '';
-        const marketRef = l.market_min ? '<span class="trade-market-ref">마켓 최저가 ' + l.market_min + 'p</span>' : '';
-
-        card.innerHTML = `
-            <div class="trade-card-header">
-                <div><span class="trade-type ${l.trade_type}">${l.trade_type === "buy" ? "삽니다" : "팝니다"}</span></div>
-                <div style="display:flex;align-items:center;gap:6px;">
-                    <span class="trade-user">${escapeHtml(l.user_name)}</span>
-                    ${delBtn}
-                </div>
-            </div>
-            <div class="trade-item">${escapeHtml(l.item_name)}${rankStr}${qtyStr}</div>
-            <div class="trade-price-row">
-                <span class="trade-price">${l.price}p</span>
-                ${marketRef}
-            </div>
-            ${l.memo ? `<div class="trade-memo">${escapeHtml(l.memo)}</div>` : ""}
-        `;
-        el.appendChild(card);
-    });
-}
-
-async function deleteListing(id) {
-    const name = localStorage.getItem("tradeName") || "";
-    await fetch(`/api/trade/listings/${id}?user_name=${encodeURIComponent(name)}`, { method: "DELETE" });
-    fetchListings();
-}
-
-// ── 거래소 아이템 자동완성 ──
-let _tfSelectedSlug = null;
-let _tfSuggestTimer = null;
-
-function onTradeItemInput() {
-    _tfSelectedSlug = null;
-    clearTimeout(_tfSuggestTimer);
-    const q = document.getElementById("tf-item").value.trim();
-    if (q.length < 2) { hideTfSuggest(); return; }
-    _tfSuggestTimer = setTimeout(() => fetchTfSuggest(q), 300);
-}
-
-async function fetchTfSuggest(q) {
-    const el = document.getElementById("tf-suggest");
-    if (!el) return;
-    try {
-        const res = await fetch(`/api/items/search?q=${encodeURIComponent(q)}&limit=8`);
-        const json = await res.json();
-        const items = json.data || [];
-        if (!items.length) { hideTfSuggest(); return; }
-        el.innerHTML = "";
-        el.style.display = "";
-        items.forEach(item => {
-            const btn = document.createElement("button");
-            btn.className = "wl-suggest-btn";
-            const label = item.ko_name
-                ? `${escapeHtml(item.ko_name)} <span style="opacity:.6;font-size:11px;">${escapeHtml(item.name)}</span>`
-                : escapeHtml(item.name);
-            btn.innerHTML = label;
-            btn.onclick = () => {
-                _tfSelectedSlug = item.slug;
-                document.getElementById("tf-item").value = item.ko_name || item.name;
-                hideTfSuggest();
-                document.getElementById("tf-price").focus();
-            };
-            el.appendChild(btn);
-        });
-    } catch { hideTfSuggest(); }
-}
-
-function hideTfSuggest() {
-    const el = document.getElementById("tf-suggest");
-    if (el) { el.style.display = "none"; el.innerHTML = ""; }
-}
-
-function toggleTradeForm() {
-    const form = document.getElementById("trade-new-form");
-    const show = form.style.display === "none";
-    form.style.display = show ? "" : "none";
-    if (!show) { _tfSelectedSlug = null; hideTfSuggest(); }
-}
-
-async function submitListing() {
-    const itemRaw = document.getElementById("tf-item").value.trim();
-    if (!itemRaw) { alert("아이템을 입력해주세요."); return; }
-
-    // 자동완성에서 선택한 slug 우선, 없으면 검색
-    let slug = _tfSelectedSlug;
-    let itemName = itemRaw;
-    if (!slug) {
-        const r = await fetch(`/api/items/search?q=${encodeURIComponent(itemRaw)}&limit=1`);
-        const j = await r.json();
-        const first = (j.data || [])[0];
-        if (first) { slug = first.slug; itemName = first.ko_name || first.name; }
-        else { slug = itemRaw.toLowerCase().replace(/ /g, "_"); }
-    }
-
-    const res = await fetch("/api/trade/listings", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            user_name: localStorage.getItem("tradeName") || "",
-            trade_type: document.getElementById("tf-type").value,
-            item_slug: slug,
-            item_name: itemName,
-            price: parseInt(document.getElementById("tf-price").value) || 0,
-            quantity: parseInt(document.getElementById("tf-qty").value) || 1,
-            memo: document.getElementById("tf-memo").value,
-        }),
-    });
-    const json = await res.json();
-    if (!json.ok) { alert(json.msg); return; }
-    toggleTradeForm();
-    fetchListings();
-}
 
 
 // ── 월드 상태 ──
@@ -1173,6 +996,224 @@ async function checkCycleAlerts() {
 }
 
 
+// ── 차익 탐지 ──
+
+let arbMode = "spread"; // "spread" | "breakdown" | "assembly"
+
+function renderArbitrageTab() {
+    const el = document.getElementById("chat-arbitrage");
+    el.innerHTML = `
+        <div class="arb-mode-bar">
+            <button class="arb-mode-btn ${arbMode === "spread"    ? "active" : ""}" data-arb="spread">스프레드</button>
+            <button class="arb-mode-btn ${arbMode === "breakdown" ? "active" : ""}" data-arb="breakdown">세트 → 부품</button>
+            <button class="arb-mode-btn ${arbMode === "assembly"  ? "active" : ""}" data-arb="assembly">부품 → 세트</button>
+        </div>
+        <div id="arb-body"></div>
+    `;
+    el.querySelectorAll(".arb-mode-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+            arbMode = btn.dataset.arb;
+            renderArbitrageTab();
+        });
+    });
+    if (arbMode === "spread") _loadSpreadArb();
+    else _loadSetArb(arbMode);
+}
+
+async function _loadSpreadArb() {
+    const body = document.getElementById("arb-body");
+    body.innerHTML = `
+        <div class="arb-hint" style="padding:8px 0 10px;">48시간 평균가보다 현재 판매가가 낮은 아이템입니다. 지금 사면 평균가에 되팔 수 있어요.</div>
+        <div class="surge-empty">불러오는 중...</div>
+    `;
+    try {
+        const res = await fetch("/api/arbitrage?limit=40");
+        const json = await res.json();
+        const items = json.data || [];
+        body.innerHTML = `<div class="arb-hint" style="padding:8px 0 10px;">48시간 평균가보다 현재 판매가가 낮은 아이템입니다. 지금 사면 평균가에 되팔 수 있어요.</div>`;
+        if (!items.length) {
+            body.insertAdjacentHTML("beforeend", `<div class="surge-empty">현재 데이터가 없습니다.<br><span style="font-size:11px;color:var(--text-muted)">가격 모니터링 데이터가 쌓이면 표시됩니다.</span></div>`);
+            return;
+        }
+        const list = document.createElement("div");
+        list.className = "arb-list";
+        items.forEach((item) => {
+            const card = document.createElement("div");
+            card.className = "arb-card";
+            const c = item.discount_pct >= 30 ? "#4caf50" : item.discount_pct >= 20 ? "var(--orange)" : "var(--primary)";
+            const buyText = item.buy_max ? ` · 매수 ${item.buy_max}p` : "";
+            card.innerHTML = `
+                <div class="arb-card-name">${escapeHtml(item.name)}</div>
+                <div class="arb-prices">
+                    <span class="arb-buy">현재 ${item.sell_min}p</span>
+                    <span class="arb-arrow">vs</span>
+                    <span class="arb-sell">평균 ${item.avg_price}p</span>
+                    <span class="arb-spread" style="color:${c}">-${item.discount_pct}% 저렴</span>
+                </div>
+                <div class="arb-meta">48h 거래량 ${item.volume || "-"}건${buyText}</div>
+            `;
+            card.addEventListener("click", () => window.open(`https://warframe.market/items/${item.slug}`, "_blank"));
+            list.appendChild(card);
+        });
+        body.appendChild(list);
+        body.insertAdjacentHTML("beforeend", `<div class="arb-footer">warframe.market 48h 평균가 기준 · 실시간 시세와 다를 수 있음</div>`);
+    } catch {
+        body.innerHTML = `<div class="surge-empty">데이터를 불러오지 못했습니다.</div>`;
+    }
+}
+
+async function _loadSetArb(mode) {
+    const body = document.getElementById("arb-body");
+    const hintText = mode === "breakdown"
+        ? "세트 판매가보다 부품 합산 판매가가 높은 경우 — 세트를 사서 부품으로 따로 팔면 수익이 납니다."
+        : "부품 합산 판매가보다 세트 구매 희망가가 높은 경우 — 부품들을 각각 사서 세트로 팔면 수익이 납니다.";
+    body.innerHTML = `
+        <div class="arb-hint" style="padding:8px 0 10px;">${hintText}</div>
+        <div class="surge-empty">불러오는 중...</div>
+    `;
+    try {
+        const res = await fetch("/api/set-arbitrage?min_profit=10&limit=40");
+        const json = await res.json();
+        const items = json[mode] || [];
+        body.innerHTML = `<div class="arb-hint" style="padding:8px 0 10px;">${hintText}</div>`;
+        if (!items.length) {
+            body.insertAdjacentHTML("beforeend", `<div class="surge-empty">현재 해당하는 세트가 없습니다.<br><span style="font-size:11px;color:var(--text-muted)">가격 모니터링 데이터가 쌓이면 표시됩니다.</span></div>`);
+            return;
+        }
+        const list = document.createElement("div");
+        list.className = "arb-list";
+        items.forEach((item) => {
+            const card = document.createElement("div");
+            card.className = "arb-card arb-card-set";
+            const c = item.profit_pct >= 30 ? "#4caf50" : item.profit_pct >= 15 ? "var(--orange)" : "var(--primary)";
+
+            let priceRow = "";
+            if (mode === "breakdown") {
+                priceRow = `<span class="arb-buy">세트 ${item.set_sell}p</span><span class="arb-arrow">→</span><span class="arb-sell">부품 합산 ${item.parts_sell_sum}p</span>`;
+            } else {
+                priceRow = `<span class="arb-buy">부품 합산 ${item.parts_sell_sum}p</span><span class="arb-arrow">→</span><span class="arb-sell">세트 매수가 ${item.set_buy}p</span>`;
+            }
+
+            const partsHtml = item.parts.map((p) =>
+                `<span class="arb-part-chip">${escapeHtml(p.name)}${p.sell_min ? " " + p.sell_min + "p" : ""}</span>`
+            ).join("");
+
+            card.innerHTML = `
+                <div class="arb-card-name">${escapeHtml(item.set_name)}</div>
+                <div class="arb-prices">
+                    ${priceRow}
+                    <span class="arb-spread" style="color:${c}">+${item.profit}p (${item.profit_pct}%)</span>
+                </div>
+                <div class="arb-parts">${partsHtml}</div>
+            `;
+            card.addEventListener("click", () => window.open(`https://warframe.market/items/${item.set_slug}`, "_blank"));
+            list.appendChild(card);
+        });
+        body.appendChild(list);
+        body.insertAdjacentHTML("beforeend", `<div class="arb-footer">warframe.market 최근 스냅샷 기준 · 실시간 시세와 다를 수 있음</div>`);
+    } catch {
+        body.innerHTML = `<div class="surge-empty">데이터를 불러오지 못했습니다.</div>`;
+    }
+}
+
+
+// ── 스킨 브라우저 ──
+
+let activeSkinType = "warframe";
+
+function renderSkinsTab() {
+    // 타입 버튼 이벤트 바인딩 (한 번만)
+    document.querySelectorAll(".skin-type-btn").forEach((btn) => {
+        btn.onclick = () => {
+            document.querySelectorAll(".skin-type-btn").forEach((b) => b.classList.remove("active"));
+            btn.classList.add("active");
+            activeSkinType = btn.dataset.stype;
+            document.getElementById("skin-results").innerHTML = "";
+        };
+    });
+
+    const input = document.getElementById("skin-input");
+    if (input) {
+        input.onkeydown = (e) => { if (e.key === "Enter") fetchSkins(); };
+    }
+}
+
+async function fetchSkins() {
+    const q = (document.getElementById("skin-input")?.value || "").trim();
+    if (!q) return;
+
+    const resultsDiv = document.getElementById("skin-results");
+
+    // 한글 입력 감지
+    if (/[\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F]/.test(q)) {
+        resultsDiv.innerHTML = '<div class="skin-empty">스킨 검색은 영문으로 입력해주세요.<br><small>예: Rhino, Mesa, Arca Plasmor</small></div>';
+        return;
+    }
+
+    resultsDiv.innerHTML = '<div class="skin-loading">검색 중...</div>';
+
+    try {
+        const res = await fetch(`/api/skins/search?q=${encodeURIComponent(q)}&skin_type=${activeSkinType}`);
+        const json = await res.json();
+        renderSkinCards(json.data || []);
+    } catch {
+        resultsDiv.innerHTML = '<div class="skin-empty">데이터를 불러오지 못했습니다.</div>';
+    }
+}
+
+function renderSkinCards(skins) {
+    const resultsDiv = document.getElementById("skin-results");
+    if (!skins.length) {
+        resultsDiv.innerHTML = '<div class="skin-empty">검색 결과가 없습니다.<br><small>영문으로 검색해보세요 (예: Rhino, Saryn)</small></div>';
+        return;
+    }
+
+    resultsDiv.innerHTML = "";
+    const grid = document.createElement("div");
+    grid.className = "skin-grid";
+
+    skins.forEach((skin) => {
+        const card = document.createElement("div");
+        card.className = "skin-card";
+
+        const imgSrc = escapeHtml(skin.image || "");
+        const imgHtml = skin.image
+            ? `<img class="skin-img" src="${imgSrc}" alt="${escapeHtml(skin.name)}" loading="lazy"
+                onclick="openSkinLightbox('${imgSrc}','${escapeHtml(skin.name).replace(/'/g,"&#39;")}')"
+                onerror="this.parentElement.querySelector('.skin-img-placeholder').style.display='flex';this.style.display='none';">`
+            : "";
+        const placeholderStyle = skin.image ? "display:none;" : "";
+
+        card.innerHTML = `
+            ${imgHtml}
+            <div class="skin-img-placeholder" style="${placeholderStyle}">이미지 없음</div>
+            <div class="skin-card-footer">
+                <span class="skin-card-name">${escapeHtml(skin.name)}</span>
+                <a class="skin-wiki-btn" href="${escapeHtml(skin.page)}" target="_blank" rel="noopener noreferrer">위키 ↗</a>
+            </div>
+        `;
+        grid.appendChild(card);
+    });
+
+    resultsDiv.appendChild(grid);
+}
+
+
+function openSkinLightbox(imgSrc, name) {
+    const overlay = document.createElement("div");
+    overlay.className = "skin-lightbox";
+    overlay.innerHTML = `
+        <div class="skin-lightbox-inner" onclick="event.stopPropagation()">
+            <button class="skin-lightbox-close" onclick="this.closest('.skin-lightbox').remove()">×</button>
+            <img src="${imgSrc}" alt="${name}">
+            <div class="skin-lightbox-name">${name}</div>
+        </div>
+    `;
+    overlay.onclick = () => overlay.remove();
+    document.body.appendChild(overlay);
+}
+
+
 // ── 파밍 정보 ──
 function renderFarmingWelcome() {
     const container = document.getElementById("farming-results");
@@ -1314,18 +1355,25 @@ function buildFarmingCard(item) {
 
 
 // ── 워치리스트 (시세 감시) ──
+function _getWlUserId() {
+    let id = localStorage.getItem("wlDeviceId");
+    if (!id) {
+        id = "d_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+        localStorage.setItem("wlDeviceId", id);
+    }
+    return id;
+}
+
 async function renderWatchlist() {
     const el = document.getElementById("chat-watchlist");
-    const name = localStorage.getItem("tradeName") || "";
+    const userId = _getWlUserId();
 
     let items = [];
-    if (name) {
-        try {
-            const res = await fetch(`/api/watchlist?user_name=${encodeURIComponent(name)}`);
-            const json = await res.json();
-            items = json.data || [];
-        } catch {}
-    }
+    try {
+        const res = await fetch(`/api/watchlist?user_name=${encodeURIComponent(userId)}`);
+        const json = await res.json();
+        items = json.data || [];
+    } catch {}
 
     el.innerHTML = "";
 
@@ -1342,18 +1390,12 @@ async function renderWatchlist() {
         <div class="form-row"><label>아이템</label><input type="text" id="wl-item" placeholder="아이템 이름 검색..." autocomplete="off" oninput="onWlItemInput(this)"></div>
         <div id="wl-suggest" style="display:none;"></div>
         <div class="form-row"><label>목표가</label><input type="number" id="wl-price" placeholder="이 가격 이하면 알림" min="1"><span style="color:var(--text-muted);font-size:13px;margin-left:4px;">p</span></div>
+        <div id="wl-error" style="display:none;" class="wl-error-msg"></div>
         <div style="display:flex;gap:8px;justify-content:flex-end;">
             <button class="btn-submit" onclick="addWatchItem()" style="padding:6px 14px;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;background:var(--orange);color:#000;">추가</button>
         </div>
     `;
     el.appendChild(addForm);
-
-    if (!name) {
-        const noUser = document.createElement("div");
-        noUser.className = "watchlist-hint";
-        noUser.textContent = "거래소에서 먼저 닉네임을 등록해주세요.";
-        el.appendChild(noUser);
-    }
 
     if (!items.length) {
         const empty = document.createElement("div");
@@ -1429,14 +1471,21 @@ function hideWlSuggest() {
     if (el) { el.style.display = "none"; el.innerHTML = ""; }
 }
 
+function _showWlError(msg) {
+    const el = document.getElementById("wl-error");
+    if (!el) return;
+    el.textContent = msg;
+    el.style.display = "";
+    setTimeout(() => { if (el) el.style.display = "none"; }, 4000);
+}
+
 async function addWatchItem() {
-    const name = localStorage.getItem("tradeName") || "";
-    if (!name) { alert("거래소에서 먼저 닉네임을 등록해주세요."); return; }
+    const name = _getWlUserId();
 
     const itemInput = document.getElementById("wl-item").value.trim();
     const price = parseInt(document.getElementById("wl-price").value) || 0;
-    if (!itemInput) { alert("아이템을 입력해주세요."); return; }
-    if (price < 1) { alert("목표가를 입력해주세요."); return; }
+    if (!itemInput) { _showWlError("아이템을 입력해주세요."); return; }
+    if (price < 1) { _showWlError("목표가를 입력해주세요."); return; }
 
     let slug = _wlSelectedSlug;
     let itemName = _wlSelectedName;
@@ -1446,7 +1495,7 @@ async function addWatchItem() {
         const searchRes = await fetch(`/api/items/search?q=${encodeURIComponent(itemInput)}&limit=8`);
         const searchJson = await searchRes.json();
         const items = searchJson.data || [];
-        if (!items.length) { alert("아이템을 찾을 수 없습니다."); return; }
+        if (!items.length) { _showWlError("아이템을 찾을 수 없습니다."); return; }
         if (items.length > 1) {
             // 여러 결과 — 리스트 보여주고 선택 유도
             const suggestEl = document.getElementById("wl-suggest");
@@ -1483,14 +1532,14 @@ async function addWatchItem() {
         }),
     });
     const json = await res.json();
-    if (!json.ok) { alert(json.msg); return; }
+    if (!json.ok) { _showWlError(json.msg || "추가에 실패했습니다."); return; }
     _wlSelectedSlug = null;
     _wlSelectedName = null;
     renderWatchlist();
 }
 
 async function removeWatchItem(id) {
-    const name = localStorage.getItem("tradeName") || "";
+    const name = _getWlUserId();
     await fetch(`/api/watchlist/${id}?user_name=${encodeURIComponent(name)}`, { method: "DELETE" });
     renderWatchlist();
 }
@@ -1667,7 +1716,8 @@ async function fetchRivenAuctions(container) {
     if (_auctionAbortCtrl) _auctionAbortCtrl.abort();
     _auctionAbortCtrl = new AbortController();
     const renderId = ++_auctionRenderId;
-    const params = new URLSearchParams({ limit: "30", sort_by: "price_asc" });
+    // 온라인 필터는 클라이언트에서 적용 — 충분한 결과를 가져와야 함
+    const params = new URLSearchParams({ limit: auctionOnlineOnly ? "300" : "30", sort_by: "price_asc" });
     // 검색어를 그대로 전달 (한글/영문 모두 백엔드에서 resolve)
     if (auctionQuery) params.set("weapon", auctionQuery.trim());
     // 카테고리 필터를 백엔드로 전달 (해당 카테고리 인기 무기로 조회)
@@ -1849,7 +1899,8 @@ async function fetchLichAuctions(container) {
     if (_auctionAbortCtrl) _auctionAbortCtrl.abort();
     _auctionAbortCtrl = new AbortController();
     const renderId = ++_auctionRenderId;
-    const params = new URLSearchParams({ limit: "50", sort_by: "price_asc" });
+    // 온라인 필터는 클라이언트에서 적용 — 충분한 결과를 가져와야 함
+    const params = new URLSearchParams({ limit: auctionOnlineOnly ? "300" : "50", sort_by: "price_asc" });
     if (auctionQuery) params.set("weapon", auctionQuery.toLowerCase().replace(/ /g, "_"));
     // 에페메라 + 속성 필터를 백엔드로도 전달 (API가 지원하므로)
     if (lichFilterEphemera === "yes") params.set("ephemera", "yes");
@@ -2001,7 +2052,7 @@ async function renderModdingItemList(container) {
         const items = json.data || [];
 
         if (!items.length) {
-            container.innerHTML += '<div class="modding-empty">아직 공유된 모딩이 없습니다. 첫 번째로 공유해보세요!</div>';
+            container.insertAdjacentHTML('beforeend', '<div class="modding-empty">아직 공유된 모딩이 없습니다. 첫 번째로 공유해보세요!</div>');
             return;
         }
 
@@ -2021,7 +2072,7 @@ async function renderModdingItemList(container) {
             container.appendChild(card);
         });
     } catch {
-        container.innerHTML += '<div class="modding-empty">데이터를 불러오지 못했습니다.</div>';
+        container.insertAdjacentHTML('beforeend', '<div class="modding-empty">데이터를 불러오지 못했습니다.</div>');
     }
 }
 
@@ -2053,7 +2104,7 @@ async function renderModdingDetail(container) {
         const shares = json.data || [];
 
         if (!shares.length) {
-            container.innerHTML += '<div class="modding-empty">이 아이템에 대한 공유가 없습니다.</div>';
+            container.insertAdjacentHTML('beforeend', '<div class="modding-empty">이 아이템에 대한 공유가 없습니다.</div>');
             return;
         }
 
@@ -2067,20 +2118,58 @@ async function renderModdingDetail(container) {
                     s.images.map((src) => `<img src="${escapeHtml(src)}" alt="모딩 이미지" onclick="openModdingLightbox(this.src)">`).join("") +
                     '</div>';
             }
+            const subTypeTag = s.sub_type ? `<span class="modding-subtype-tag">${escapeHtml(s.sub_type)}</span>` : "";
+            const lockIcon = s.has_password ? ' <span style="font-size:10px;opacity:0.5;" title="비밀번호 보호">🔒</span>' : "";
             card.innerHTML = `
                 <div class="modding-card-top">
-                    <span class="modding-card-author">${escapeHtml(s.author)}</span>
+                    <span class="modding-card-author">${escapeHtml(s.author)}${lockIcon}</span>
+                    ${subTypeTag}
                     <span class="modding-card-date">${dateStr}</span>
+                    <div class="modding-card-actions">
+                        <button class="modding-action-btn modding-edit-btn" title="수정">✏️</button>
+                        <button class="modding-action-btn modding-delete-btn" title="삭제">🗑️</button>
+                    </div>
                 </div>
-                ${s.memo ? `<div class="modding-card-memo">${escapeHtml(s.memo)}</div>` : ""}
+                <div class="modding-card-memo" id="modding-memo-${s.id}">${s.memo ? escapeHtml(s.memo) : ""}</div>
                 ${imagesHtml}
             `;
+            // 파일명 목록을 카드에 저장 (수정 모달에서 참조)
+            card.dataset.imageFilenames = JSON.stringify(
+                (s.images || []).map((url) => url.split("/").pop())
+            );
+            card.querySelector(".modding-edit-btn").addEventListener("click", () => openModdingAuthModal(s.id, s.author, "edit", card));
+            card.querySelector(".modding-delete-btn").addEventListener("click", () => openModdingAuthModal(s.id, s.author, "delete", card));
             container.appendChild(card);
         });
     } catch {
-        container.innerHTML += '<div class="modding-empty">데이터를 불러오지 못했습니다.</div>';
+        container.insertAdjacentHTML('beforeend', '<div class="modding-empty">데이터를 불러오지 못했습니다.</div>');
     }
 }
+
+// 카테고리별 서브타입
+const MODDING_SUBTYPES = {
+    warframe: [],
+    primary: ["소총", "샷건", "저격총", "활", "런처"],
+    secondary: ["보조무기", "투척"],
+    melee: ["단검", "쌍단검", "검", "쌍검", "대검", "폴암", "해머", "건블레이드", "니카나", "레이피어", "클로", "주먹", "채찍", "톤파", "스태프"],
+    archwing: [],
+    necramech: [],
+    archgun: ["소총", "런처"],
+    companion: ["센티넬", "쿠브로우", "카밧", "MOA", "하운드", "프레데사이트", "불파파일라"],
+};
+
+// warframe.market 카테고리 → 모딩 카테고리 매핑
+const WFM_CAT_MAP = {
+    warframes: "warframe",
+    primary_weapons: "primary",
+    secondary_weapons: "secondary",
+    melee_weapons: "melee",
+    arch_guns: "archgun",
+    sentinels: "companion",
+    companions: "companion",
+};
+
+let _moddingCategoryHintTimer = null;
 
 function buildModdingForm(prefillName) {
     const form = document.createElement("div");
@@ -2089,8 +2178,23 @@ function buildModdingForm(prefillName) {
     const nameVal = prefillName ? escapeHtml(prefillName) : "";
     const nameRo = prefillName ? " readonly" : "";
 
+    const subtypes = MODDING_SUBTYPES[moddingCategory] || [];
+    const subtypeHtml = subtypes.length ? `
+        <div class="form-row">
+            <label>무기 종류</label>
+            <select id="modding-f-subtype">
+                <option value="">선택 안 함</option>
+                ${subtypes.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("")}
+            </select>
+        </div>` : "";
+
     form.innerHTML = `
-        <div class="form-row"><label>${escapeHtml(catLabel)} 이름</label><input type="text" id="modding-f-name" placeholder="예: Mesa Prime" maxlength="50" value="${nameVal}"${nameRo}></div>
+        <div class="form-row">
+            <label>${escapeHtml(catLabel)} 이름</label>
+            <input type="text" id="modding-f-name" placeholder="예: Mesa Prime" maxlength="50" value="${nameVal}"${nameRo}>
+        </div>
+        <div id="modding-cat-warning" style="display:none;" class="modding-cat-warning"></div>
+        ${subtypeHtml}
         <div class="form-row">
             <label>메모 (최대 1000자)</label>
             <textarea id="modding-f-memo" maxlength="1000" placeholder="모딩에 대한 설명이나 운영법을 적어주세요..."></textarea>
@@ -2103,6 +2207,10 @@ function buildModdingForm(prefillName) {
             <div class="modding-upload-preview" id="modding-upload-preview"></div>
         </div>
         <div class="form-row"><label>작성자</label><input type="text" id="modding-f-author" placeholder="닉네임" maxlength="20" value="${escapeHtml(localStorage.getItem("tradeName") || "")}"></div>
+        <div class="form-row">
+            <label>비밀번호 <span style="color:var(--text-muted);font-size:11px;">(선택 — 수정/삭제 시 필요)</span></label>
+            <input type="password" id="modding-f-password" placeholder="비밀번호 설정 (없으면 빈칸)" maxlength="30" autocomplete="new-password">
+        </div>
         <div class="modding-form-actions">
             <button class="btn-cancel" onclick="moddingFormOpen=false;moddingFormImages=[];renderModdingTab();">취소</button>
             <button class="btn-submit" onclick="submitModdingShare()">공유하기</button>
@@ -2113,6 +2221,7 @@ function buildModdingForm(prefillName) {
         const area = document.getElementById("modding-upload-area");
         const fileInput = document.getElementById("modding-file-input");
         const memo = document.getElementById("modding-f-memo");
+        const nameInput = document.getElementById("modding-f-name");
 
         if (memo) memo.addEventListener("input", () => {
             document.getElementById("modding-memo-count").textContent = memo.value.length + " / 1000";
@@ -2124,10 +2233,35 @@ function buildModdingForm(prefillName) {
             area.addEventListener("drop", (e) => { e.preventDefault(); area.style.borderColor = "var(--border)"; handleModdingFiles(e.dataTransfer.files); });
             fileInput.addEventListener("change", () => { handleModdingFiles(fileInput.files); fileInput.value = ""; });
         }
+        // 아이템 이름 입력 시 카테고리 자동 감지 (readonly가 아닐 때만)
+        if (nameInput && !nameInput.readOnly) {
+            nameInput.addEventListener("input", () => {
+                clearTimeout(_moddingCategoryHintTimer);
+                _moddingCategoryHintTimer = setTimeout(() => checkModdingCategoryHint(nameInput.value), 600);
+            });
+        }
         renderModdingUploadPreview();
     }, 0);
 
     return form;
+}
+
+async function checkModdingCategoryHint(name) {
+    const warning = document.getElementById("modding-cat-warning");
+    if (!warning || !name.trim()) { if (warning) warning.style.display = "none"; return; }
+
+    try {
+        const res = await fetch(`/api/modding/category-hint?name=${encodeURIComponent(name)}`);
+        const json = await res.json();
+        const suggested = json.category;
+        if (suggested && suggested !== moddingCategory) {
+            const catLabel = MODDING_CATEGORIES.find((c) => c.key === suggested)?.label || suggested;
+            warning.textContent = `⚠ "${escapeHtml(json.matched_name || name)}"은(는) ${catLabel} 카테고리에 속합니다. 카테고리를 확인해주세요.`;
+            warning.style.display = "";
+        } else {
+            warning.style.display = "none";
+        }
+    } catch { /* 무시 */ }
 }
 
 async function handleModdingFiles(files) {
@@ -2178,6 +2312,8 @@ async function submitModdingShare() {
     const name = (document.getElementById("modding-f-name")?.value || "").trim();
     const memo = (document.getElementById("modding-f-memo")?.value || "").trim();
     const author = (document.getElementById("modding-f-author")?.value || "").trim();
+    const password = (document.getElementById("modding-f-password")?.value || "").trim();
+    const subType = (document.getElementById("modding-f-subtype")?.value || "").trim();
 
     if (!name) { alert("이름을 입력해주세요."); return; }
     if (!author) { alert("작성자 이름을 입력해주세요."); return; }
@@ -2190,6 +2326,8 @@ async function submitModdingShare() {
             item_name: name,
             author: author,
             memo: memo,
+            sub_type: subType,
+            password: password,
             image_filenames: moddingFormImages.map((img) => img.filename),
         }),
     });
@@ -2200,6 +2338,176 @@ async function submitModdingShare() {
     moddingFormImages = [];
     moddingSelectedItem = name;
     renderModdingTab();
+}
+
+// 수정 모달에서 이미지 상태 관리 (파일명 배열 + 미리보기 URL)
+let _mauthImages = [];  // { filename, previewUrl }
+
+function openModdingAuthModal(shareId, expectedAuthor, mode, cardEl) {
+    const overlay = document.createElement("div");
+    overlay.className = "modding-auth-overlay";
+
+    const currentMemo = mode === "edit"
+        ? (cardEl.querySelector(".modding-card-memo")?.textContent || "")
+        : "";
+
+    // 현재 이미지 파일명 목록 (카드에 저장된 data 속성)
+    if (mode === "edit") {
+        const saved = cardEl.dataset.imageFilenames;
+        _mauthImages = saved
+            ? JSON.parse(saved).map((fname) => ({ filename: fname, previewUrl: `/api/modding/images/${fname}` }))
+            : [];
+    }
+
+    overlay.innerHTML = `
+        <div class="modding-auth-box">
+            <div class="modding-auth-title">${mode === "edit" ? "게시글 수정" : "게시글 삭제"}</div>
+            ${mode === "delete" ? '<div class="modding-auth-desc">삭제하면 복구할 수 없습니다.</div>' : ""}
+            <div class="modding-auth-field">
+                <label>작성자 이름</label>
+                <input type="text" id="mauth-author" value="${escapeHtml(expectedAuthor)}">
+            </div>
+            <div class="modding-auth-field">
+                <label>비밀번호 <span style="font-size:11px;opacity:0.6;">(설정 안했으면 비워두세요)</span></label>
+                <input type="password" id="mauth-password" placeholder="비밀번호">
+            </div>
+            ${mode === "edit" ? `
+            <div class="modding-auth-field">
+                <label>메모 수정</label>
+                <textarea id="mauth-memo" rows="4" maxlength="1000" placeholder="메모를 입력하세요...">${escapeHtml(currentMemo)}</textarea>
+            </div>
+            <div class="modding-auth-field">
+                <label>이미지 <span style="font-size:11px;opacity:0.6;">최대 5장</span></label>
+                <div class="modding-upload-preview" id="mauth-img-preview"></div>
+                <div class="modding-upload-area" id="mauth-upload-area">클릭하거나 이미지를 드래그하여 추가</div>
+                <input type="file" id="mauth-file-input" accept="image/*" multiple style="display:none;">
+            </div>` : ""}
+            <div class="modding-auth-error" id="mauth-error" style="display:none;"></div>
+            <div class="modding-auth-actions">
+                <button class="modding-action-confirm ${mode === "delete" ? "btn-delete" : ""}" id="mauth-confirm">
+                    ${mode === "edit" ? "수정하기" : "삭제하기"}
+                </button>
+                <button class="modding-action-cancel" id="mauth-cancel">취소</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+    overlay.querySelector("#mauth-cancel").addEventListener("click", () => { _mauthImages = []; overlay.remove(); });
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) { _mauthImages = []; overlay.remove(); } });
+    overlay.querySelector("#mauth-confirm").addEventListener("click", () =>
+        _submitModdingAuth(shareId, mode, overlay, cardEl)
+    );
+
+    if (mode === "edit") {
+        _renderMauthImagePreview(overlay);
+        const uploadArea = overlay.querySelector("#mauth-upload-area");
+        const fileInput = overlay.querySelector("#mauth-file-input");
+        uploadArea.addEventListener("click", () => fileInput.click());
+        uploadArea.addEventListener("dragover", (e) => { e.preventDefault(); uploadArea.style.borderColor = "var(--primary)"; });
+        uploadArea.addEventListener("dragleave", () => { uploadArea.style.borderColor = ""; });
+        uploadArea.addEventListener("drop", (e) => { e.preventDefault(); uploadArea.style.borderColor = ""; _handleMauthFiles(e.dataTransfer.files, overlay); });
+        fileInput.addEventListener("change", () => { _handleMauthFiles(fileInput.files, overlay); fileInput.value = ""; });
+    }
+}
+
+function _renderMauthImagePreview(overlay) {
+    const preview = overlay.querySelector("#mauth-img-preview");
+    if (!preview) return;
+    preview.innerHTML = "";
+    _mauthImages.forEach((img, idx) => {
+        const thumb = document.createElement("div");
+        thumb.className = "thumb";
+        thumb.innerHTML = `<img src="${escapeHtml(img.previewUrl)}"><button class="thumb-remove" type="button">×</button>`;
+        thumb.querySelector(".thumb-remove").addEventListener("click", () => {
+            _mauthImages.splice(idx, 1);
+            _renderMauthImagePreview(overlay);
+        });
+        preview.appendChild(thumb);
+    });
+    const uploadArea = overlay.querySelector("#mauth-upload-area");
+    if (uploadArea) uploadArea.style.display = _mauthImages.length >= 5 ? "none" : "";
+}
+
+async function _handleMauthFiles(files, overlay) {
+    const remaining = 5 - _mauthImages.length;
+    if (remaining <= 0) return;
+    const errEl = overlay.querySelector("#mauth-error");
+
+    for (const file of Array.from(files).slice(0, remaining)) {
+        if (!file.type.startsWith("image/")) continue;
+        const formData = new FormData();
+        formData.append("file", file);
+        try {
+            const res = await fetch("/api/modding/upload", { method: "POST", body: formData });
+            const json = await res.json();
+            if (json.ok) {
+                _mauthImages.push({ filename: json.filename, previewUrl: URL.createObjectURL(file) });
+                _renderMauthImagePreview(overlay);
+            } else {
+                errEl.textContent = json.msg; errEl.style.display = "block";
+            }
+        } catch {
+            errEl.textContent = "업로드에 실패했습니다."; errEl.style.display = "block";
+        }
+    }
+}
+
+async function _submitModdingAuth(shareId, mode, overlay, cardEl) {
+    const author = (overlay.querySelector("#mauth-author")?.value || "").trim();
+    const password = (overlay.querySelector("#mauth-password")?.value || "").trim();
+    const errEl = overlay.querySelector("#mauth-error");
+
+    function showErr(msg) {
+        errEl.textContent = msg;
+        errEl.style.display = "block";
+    }
+
+    if (!author) { showErr("작성자 이름을 입력해주세요."); return; }
+
+    if (mode === "delete") {
+        const res = await fetch(
+            `/api/modding/shares/${shareId}?author=${encodeURIComponent(author)}&password=${encodeURIComponent(password)}`,
+            { method: "DELETE" }
+        );
+        const json = await res.json();
+        if (!json.ok) { showErr(json.msg || "삭제 실패"); return; }
+        _mauthImages = [];
+        overlay.remove();
+        cardEl.remove();
+    } else {
+        const memo = (overlay.querySelector("#mauth-memo")?.value || "").trim();
+        const imageFilenames = _mauthImages.map((img) => img.filename);
+        const res = await fetch(`/api/modding/shares/${shareId}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ author, password, memo, image_filenames: imageFilenames }),
+        });
+        const json = await res.json();
+        if (!json.ok) { showErr(json.msg || "수정 실패"); return; }
+
+        // 카드 내 메모 업데이트
+        const memoEl = cardEl.querySelector(`#modding-memo-${shareId}`);
+        if (memoEl) memoEl.textContent = memo;
+
+        // 카드 내 이미지 업데이트
+        const imagesContainer = cardEl.querySelector(".modding-images");
+        const newImagesHtml = imageFilenames.length
+            ? '<div class="modding-images">' +
+              imageFilenames.map((fname) => `<img src="/api/modding/images/${fname}" alt="모딩 이미지" onclick="openModdingLightbox(this.src)">`).join("") +
+              '</div>'
+            : "";
+        if (imagesContainer) {
+            imagesContainer.outerHTML = newImagesHtml;
+        } else if (newImagesHtml) {
+            cardEl.insertAdjacentHTML("beforeend", newImagesHtml);
+        }
+        // 카드의 파일명 데이터 갱신
+        cardEl.dataset.imageFilenames = JSON.stringify(imageFilenames);
+
+        _mauthImages = [];
+        overlay.remove();
+    }
 }
 
 function openModdingLightbox(src) {
@@ -2516,15 +2824,21 @@ function _renderBaroCard(container, baro) {
         return;
     }
 
-    const itemsHtml = (baro.inventory || []).map((item) => `
+    const itemsHtml = (baro.inventory || []).map((item) => {
+        const marketInfo = item.market_sell != null
+            ? `<span class="baro-market-price">시세 ${item.market_sell}p${item.market_buy != null ? ` · 매수 ${item.market_buy}p` : ""}</span>`
+            : "";
+        return `
         <div class="vendor-item">
             <div class="vendor-item-name">${escapeHtml(item.item)}</div>
             <div class="vendor-item-price">
                 <span class="vendor-ducat">${item.ducats}두캣</span>
                 <span class="vendor-credit">+ ${(item.credits || 0).toLocaleString()}크레딧</span>
+                ${marketInfo}
             </div>
         </div>
-    `).join("");
+    `;
+    }).join("");
 
     card.innerHTML = `
         <div class="vendor-status online">방문 중 — ${escapeHtml(baro.location || "")}</div>
@@ -2733,13 +3047,37 @@ async function loadRelicValue() {
 
     try {
         const res = await fetch(`/api/relics/value?name=${encodeURIComponent(name)}&ref=${encodeURIComponent(refine)}`);
-        if (!res.ok) { resultsEl.innerHTML = `<div class="relic-empty">렐릭을 찾을 수 없습니다.</div>`; return; }
+        if (!res.ok) { await _showRelicNotFound(resultsEl, name); return; }
         const json = await res.json();
-        if (!json.ok) { resultsEl.innerHTML = `<div class="relic-empty">${escapeHtml(json.msg || "렐릭을 찾을 수 없습니다.")}</div>`; return; }
+        if (!json.ok) { await _showRelicNotFound(resultsEl, name); return; }
         renderRelicResult(json.data);
     } catch (_) {
         resultsEl.innerHTML = `<div class="relic-empty">오류가 발생했습니다.</div>`;
     }
+}
+
+async function _showRelicNotFound(resultsEl, query) {
+    let suggestions = [];
+    try {
+        const res = await fetch(`/api/relics/search?q=${encodeURIComponent(query)}`);
+        if (res.ok) {
+            const json = await res.json();
+            suggestions = (json.data || []).slice(0, 5);
+        }
+    } catch (_) {}
+
+    if (!suggestions.length) {
+        resultsEl.innerHTML = `<div class="relic-empty">"${escapeHtml(query)}" 렐릭을 찾을 수 없습니다.</div>`;
+        return;
+    }
+
+    let html = `<div class="relic-empty">"${escapeHtml(query)}" 렐릭을 찾을 수 없습니다.<br><span style="font-size:12px;color:var(--text-muted)">혹시 이 렐릭을 찾으셨나요?</span></div>`;
+    html += `<div class="relic-suggest-list">`;
+    suggestions.forEach((s) => {
+        html += `<div class="relic-suggest-chip" onclick="document.getElementById('relic-input').value=${JSON.stringify(s)};loadRelicValue()">${escapeHtml(s)}</div>`;
+    });
+    html += `</div>`;
+    resultsEl.innerHTML = html;
 }
 
 function renderRelicResult(data) {

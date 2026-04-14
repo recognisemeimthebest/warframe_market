@@ -1,0 +1,1710 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>워프봇</title>
+    <style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+:root {
+    --bg: #1a1a2e; --surface: #16213e; --primary: #4db8ff;
+    --text: #e0e0e0; --text-muted: #888; --user-bubble: #0f3460;
+    --price-bg: #0a1628; --green: #4caf50; --red: #ff6b6b; --border: #2a2a4a;
+    --orange: #ff9800;
+}
+html, body { height: 100%; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); }
+#app { display: flex; flex-direction: column; height: 100%; max-width: 600px; margin: 0 auto; }
+header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
+header h1 { font-size: 18px; color: var(--primary); }
+.status { font-size: 12px; padding: 4px 8px; border-radius: 12px; }
+.status.online { background: rgba(76,175,80,0.2); color: var(--green); }
+.status.offline { background: rgba(255,107,107,0.2); color: var(--red); }
+
+#tabs { display: flex; background: var(--surface); border-bottom: 1px solid var(--border); }
+.tab { flex: 1; padding: 10px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--text-muted); font-size: 13px; font-weight: 600; cursor: pointer; }
+.tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+.tab-content { display: none; }
+.tab-content.active { display: flex; flex-direction: column; }
+
+main { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+#messages { flex: 1; overflow-y: auto; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.message { display: flex; max-width: 85%; }
+.message.user { align-self: flex-end; }
+.message.bot { align-self: flex-start; }
+.bubble { padding: 10px 14px; border-radius: 16px; line-height: 1.5; font-size: 14px; word-break: break-word; }
+.message.user .bubble { background: var(--user-bubble); border-bottom-right-radius: 4px; }
+.message.bot .bubble { background: var(--surface); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+.bubble small { color: var(--text-muted); font-size: 12px; }
+
+.price-card { background: var(--price-bg); border: 1px solid var(--border); border-radius: 12px; padding: 14px; min-width: 260px; }
+.price-card .title { font-size: 15px; font-weight: 600; color: var(--primary); margin-bottom: 10px; }
+.price-card .title a { color: var(--primary); text-decoration: none; }
+.price-card .row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; }
+.price-card .label { color: var(--text-muted); }
+.price-card .value { font-weight: 600; }
+.price-card .footer { margin-top: 8px; font-size: 11px; color: var(--text-muted); text-align: right; }
+.price-card .rank-divider { border-top: 1px solid var(--border); margin: 8px 0 6px; }
+.price-card .rank-label { font-size: 12px; font-weight: 600; color: var(--primary); margin: 6px 0 2px; }
+
+.suggest-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px; min-width: 260px; }
+.suggest-card .suggest-title { font-size: 14px; color: var(--text-muted); margin-bottom: 8px; }
+.suggest-card .suggest-item { display: block; padding: 8px 12px; margin: 4px 0; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; color: var(--primary); font-size: 13px; cursor: pointer; text-decoration: none; }
+.suggest-card .suggest-item:hover { border-color: var(--primary); background: rgba(77,184,255,0.1); }
+.suggest-card .suggest-sub { color: var(--text-muted); font-size: 11px; }
+
+footer { padding: 12px 16px; background: var(--surface); border-top: 1px solid var(--border); }
+#chat-form { display: flex; gap: 8px; }
+#chat-input { flex: 1; padding: 10px 14px; border: 1px solid var(--border); border-radius: 20px; background: var(--bg); color: var(--text); font-size: 14px; outline: none; }
+#chat-input:focus { border-color: var(--primary); }
+#chat-form button { padding: 10px 18px; background: var(--primary); color: #000; border: none; border-radius: 20px; font-size: 14px; font-weight: 600; cursor: pointer; }
+#chat-form button:active { opacity: 0.8; }
+
+/* 급등 */
+#surge-filters { display: flex; gap: 8px; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.surge-filter { padding: 6px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 16px; color: var(--text-muted); font-size: 12px; cursor: pointer; }
+.surge-filter.active { background: rgba(77,184,255,0.15); border-color: var(--primary); color: var(--primary); }
+#surge-list { flex: 1; overflow-y: auto; padding: 12px 16px; }
+.surge-empty { text-align: center; color: var(--text-muted); padding: 40px 16px; font-size: 14px; }
+.surge-card { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; margin-bottom: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
+.surge-card:hover { border-color: var(--primary); }
+.surge-info { flex: 1; }
+.surge-name { font-size: 14px; font-weight: 600; color: var(--text); }
+.surge-name-sub { font-size: 11px; color: var(--text-muted); margin-left: 6px; }
+.surge-detail { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+.surge-pct { font-size: 16px; font-weight: 700; color: var(--green); white-space: nowrap; margin-left: 12px; }
+.surge-period { display: inline-block; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; margin-right: 6px; }
+.surge-period.p-1d { background: rgba(76,175,80,0.2); color: var(--green); }
+.surge-period.p-7d { background: rgba(77,184,255,0.2); color: var(--primary); }
+.surge-period.p-30d { background: rgba(255,152,0,0.2); color: var(--orange); }
+
+/* 거래소 */
+#trade-filters { display: flex; gap: 8px; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.trade-filter { padding: 6px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 16px; color: var(--text-muted); font-size: 12px; cursor: pointer; }
+.trade-filter.active { background: rgba(77,184,255,0.15); border-color: var(--primary); color: var(--primary); }
+#trade-list { flex: 1; overflow-y: auto; padding: 12px 16px; }
+.trade-card { padding: 12px 14px; margin-bottom: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.trade-card:hover { border-color: var(--primary); }
+.trade-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.trade-type { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; }
+.trade-type.buy { background: rgba(76,175,80,0.2); color: var(--green); }
+.trade-type.sell { background: rgba(255,107,107,0.2); color: var(--red); }
+.trade-user { font-size: 12px; color: var(--text-muted); }
+.trade-item { font-size: 14px; font-weight: 600; color: var(--text); }
+.trade-price-row { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
+.trade-price { font-size: 16px; font-weight: 700; color: var(--primary); }
+.trade-memo { font-size: 12px; color: var(--text-muted); margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--border); }
+.trade-delete { background: none; border: 1px solid var(--border); color: var(--text-muted); border-radius: 6px; padding: 2px 8px; font-size: 11px; cursor: pointer; }
+.trade-delete:hover { border-color: var(--red); color: var(--red); }
+.trade-qty { font-size: 12px; color: var(--text-muted); }
+
+/* 거래소 등록 */
+#trade-register { padding: 16px; text-align: center; }
+#trade-register p { color: var(--text-muted); font-size: 14px; margin-bottom: 12px; }
+#trade-register input { padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); font-size: 14px; outline: none; width: 200px; }
+#trade-register input:focus { border-color: var(--primary); }
+#trade-register button { margin-top: 8px; padding: 8px 20px; background: var(--primary); color: #000; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.trade-status-msg { padding: 40px 16px; text-align: center; color: var(--text-muted); font-size: 14px; }
+
+#trade-form-area { padding: 12px 16px; background: var(--surface); border-top: 1px solid var(--border); }
+#trade-new-btn { width: 100%; padding: 10px; background: var(--primary); color: #000; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
+#trade-new-form { display: none; }
+#trade-new-form .form-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+#trade-new-form .form-row label { font-size: 12px; color: var(--text-muted); min-width: 50px; }
+#trade-new-form .form-row input, #trade-new-form .form-row select {
+    flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
+    background: var(--bg); color: var(--text); font-size: 13px; outline: none;
+}
+.market-ref-hint { font-size: 11px; color: var(--orange); padding: 4px 0 8px; }
+#trade-new-form .form-actions { display: flex; gap: 8px; }
+#trade-new-form .form-actions button { flex: 1; padding: 8px; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.btn-submit { background: var(--primary); color: #000; }
+.btn-cancel { background: var(--bg); color: var(--text-muted); border: 1px solid var(--border) !important; }
+
+/* 시세 감시 */
+#chat-mode-bar { display: flex; gap: 8px; padding: 8px 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.chat-mode { padding: 5px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 16px; color: var(--text-muted); font-size: 12px; cursor: pointer; }
+.chat-mode.active { background: rgba(77,184,255,0.15); border-color: var(--primary); color: var(--primary); }
+.chat-mode[data-mode="watchlist"].active { background: rgba(255,152,0,0.15); border-color: var(--orange); color: var(--orange); }
+.chat-mode[data-mode="auction"].active { background: rgba(156,39,176,0.15); border-color: #ce93d8; color: #ce93d8; }
+#chat-watchlist { flex: 1; overflow-y: auto; padding: 12px 16px; }
+.watchlist-card { padding: 12px 14px; margin-bottom: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; display: flex; justify-content: space-between; align-items: center; }
+.watchlist-card:hover { border-color: var(--orange); }
+.watchlist-info { flex: 1; }
+.watchlist-item { font-size: 14px; font-weight: 600; color: var(--text); }
+.watchlist-price-row { display: flex; gap: 12px; align-items: center; margin-top: 4px; }
+.watchlist-target { font-size: 13px; color: var(--orange); font-weight: 700; }
+.watchlist-market { font-size: 11px; color: var(--text-muted); }
+.watchlist-status { font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+.watchlist-status.waiting { background: rgba(255,152,0,0.15); color: var(--orange); }
+.watchlist-status.hit { background: rgba(76,175,80,0.2); color: var(--green); }
+.watchlist-actions { display: flex; align-items: center; gap: 6px; margin-left: 10px; }
+.watchlist-delete { background: none; border: 1px solid var(--border); color: var(--text-muted); border-radius: 6px; padding: 2px 8px; font-size: 11px; cursor: pointer; }
+.watchlist-delete:hover { border-color: var(--red); color: var(--red); }
+.watchlist-add-form { padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; }
+.watchlist-add-form .form-row { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+.watchlist-add-form .form-row label { font-size: 12px; color: var(--text-muted); min-width: 50px; }
+.watchlist-add-form .form-row input { flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); font-size: 13px; outline: none; }
+.watchlist-add-form .form-row input:focus { border-color: var(--orange); }
+.watchlist-empty { text-align: center; color: var(--text-muted); font-size: 13px; padding: 30px 16px; }
+.watchlist-hint { font-size: 11px; color: var(--text-muted); margin-bottom: 12px; }
+
+/* 월드 상태 */
+#world-filters { display: flex; gap: 8px; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.world-filter { padding: 6px 14px; background: var(--bg); border: 1px solid var(--border); border-radius: 16px; color: var(--text-muted); font-size: 12px; cursor: pointer; }
+.world-filter.active { background: rgba(77,184,255,0.15); border-color: var(--primary); color: var(--primary); }
+#world-list { flex: 1; overflow-y: auto; padding: 12px 16px; }
+.world-card { padding: 12px 14px; margin-bottom: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.world-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.world-card-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.world-card-timer { font-size: 13px; font-weight: 600; color: var(--orange); }
+.world-card-detail { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.world-tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; margin-right: 6px; }
+.world-tag.lith { background: rgba(76,175,80,0.2); color: var(--green); }
+.world-tag.meso { background: rgba(77,184,255,0.2); color: var(--primary); }
+.world-tag.neo { background: rgba(255,152,0,0.2); color: var(--orange); }
+.world-tag.axi { background: rgba(255,107,107,0.2); color: var(--red); }
+.world-tag.requiem { background: rgba(156,39,176,0.2); color: #ce93d8; }
+.world-tag.omnia { background: rgba(255,215,0,0.2); color: #ffd700; }
+.world-tag.enemy { background: rgba(255,255,255,0.08); color: var(--text-muted); }
+.world-tag.hard { background: rgba(255,107,107,0.15); color: var(--red); }
+
+.cycle-row { display: flex; align-items: center; gap: 10px; padding: 10px 14px; margin-bottom: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.cycle-name { font-size: 13px; font-weight: 600; color: var(--text); min-width: 70px; }
+.cycle-state { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 4px; }
+.cycle-state.day { background: rgba(255,215,0,0.2); color: #ffd700; }
+.cycle-state.night { background: rgba(77,100,180,0.2); color: #7986cb; }
+.cycle-state.warm { background: rgba(255,107,107,0.2); color: var(--red); }
+.cycle-state.cold { background: rgba(77,184,255,0.2); color: var(--primary); }
+.cycle-timer { font-size: 12px; color: var(--orange); margin-left: auto; }
+
+.invasion-bar { height: 6px; border-radius: 3px; background: var(--border); margin-top: 6px; overflow: hidden; }
+.invasion-bar-fill { height: 100%; border-radius: 3px; }
+.invasion-bar-fill.corpus { background: var(--primary); }
+.invasion-bar-fill.grineer { background: var(--red); }
+.invasion-bar-fill.infested { background: var(--green); }
+.invasion-rewards { display: flex; justify-content: space-between; margin-top: 4px; font-size: 11px; }
+.invasion-rewards .atk { color: var(--primary); }
+.invasion-rewards .def { color: var(--red); }
+
+/* 설정 */
+#settings-btn { background: none; border: none; color: var(--text-muted); font-size: 20px; cursor: pointer; padding: 2px; line-height: 1; }
+#settings-btn:hover { color: var(--primary); }
+#settings-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 200; }
+#settings-panel { position: fixed; top: 0; right: 0; width: 320px; max-width: 85vw; height: 100%; background: var(--bg); border-left: 1px solid var(--border); z-index: 201; overflow-y: auto; display: flex; flex-direction: column; animation: slideRight 0.2s; }
+@keyframes slideRight { from { transform: translateX(100%); } to { transform: translateX(0); } }
+.settings-header { display: flex; justify-content: space-between; align-items: center; padding: 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.settings-title { font-size: 16px; font-weight: 700; color: var(--text); }
+.settings-close { background: none; border: none; color: var(--text-muted); font-size: 22px; cursor: pointer; }
+.settings-body { padding: 16px; flex: 1; overflow-y: auto; }
+.settings-section { margin-bottom: 20px; }
+.settings-section-title { font-size: 13px; font-weight: 700; color: var(--primary); margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
+.settings-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+.settings-row span { font-size: 13px; color: var(--text); }
+.settings-row select { padding: 5px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 12px; outline: none; }
+.settings-hint { font-size: 11px; color: var(--text-muted); padding: 4px 0 6px; }
+.settings-sub-label { font-size: 12px; color: var(--text-muted); margin: 10px 0 8px; }
+.toggle-switch { position: relative; width: 44px; height: 24px; display: inline-block; }
+.toggle-switch input { opacity: 0; width: 0; height: 0; }
+.toggle-slider { position: absolute; inset: 0; background: var(--border); border-radius: 24px; cursor: pointer; transition: 0.2s; }
+.toggle-slider::before { content: ""; position: absolute; width: 18px; height: 18px; left: 3px; bottom: 3px; background: var(--text-muted); border-radius: 50%; transition: 0.2s; }
+.toggle-switch input:checked + .toggle-slider { background: var(--primary); }
+.toggle-switch input:checked + .toggle-slider::before { transform: translateX(20px); background: #fff; }
+.mode-toggle { display: flex; gap: 4px; }
+.mode-btn { padding: 5px 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text-muted); font-size: 12px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+.mode-btn.active { background: var(--primary); color: #000; border-color: var(--primary); }
+.palette-grid { display: flex; flex-direction: column; gap: 8px; }
+.palette-option { display: flex; align-items: center; gap: 10px; padding: 10px; background: var(--surface); border: 2px solid var(--border); border-radius: 10px; cursor: pointer; transition: 0.15s; }
+.palette-option:hover { border-color: var(--text-muted); }
+.palette-option.active { border-color: var(--primary); }
+.palette-colors { display: flex; gap: 4px; }
+.palette-swatch { width: 24px; height: 24px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.1); }
+.palette-name { font-size: 12px; color: var(--text); font-weight: 600; }
+
+/* 경매 */
+#chat-auction { flex: 1; overflow-y: auto; padding: 12px 16px; }
+.auction-search { display: flex; gap: 8px; margin-bottom: 10px; }
+.auction-search input { flex: 1; padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); font-size: 13px; outline: none; }
+.auction-search input:focus { border-color: #ce93d8; }
+.auction-search button { padding: 10px 16px; background: #ce93d8; color: #000; border: none; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.auction-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+.auction-tab { padding: 5px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 16px; color: var(--text-muted); font-size: 12px; cursor: pointer; }
+.auction-tab.active { background: rgba(156,39,176,0.15); border-color: #ce93d8; color: #ce93d8; }
+.auction-card { padding: 12px 14px; margin-bottom: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.auction-card:hover { border-color: #ce93d8; }
+.auction-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 6px; }
+.auction-card-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.auction-card-title a { color: #ce93d8; text-decoration: none; }
+.auction-card-price { font-size: 16px; font-weight: 700; color: #ce93d8; }
+.auction-card-price .buyout { font-size: 11px; color: var(--text-muted); font-weight: 400; }
+.auction-stats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.auction-stat { display: inline-block; padding: 2px 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; font-size: 11px; color: var(--text-muted); }
+.auction-stat.positive { color: var(--green); border-color: rgba(76,175,80,0.3); }
+.auction-stat.negative { color: var(--red); border-color: rgba(255,107,107,0.3); }
+.auction-seller { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+.auction-seller .online { color: var(--green); }
+.auction-empty { text-align: center; padding: 30px 16px; color: var(--text-muted); font-size: 13px; }
+.auction-ephemera-tag { font-size: 10px; padding: 1px 6px; border-radius: 4px; background: rgba(156,39,176,0.15); color: #ce93d8; font-weight: 600; }
+
+/* 파밍 */
+#farming-results { flex: 1; overflow-y: auto; padding: 12px 16px; }
+#farming-footer form { display: flex; gap: 8px; padding: 12px 16px; background: var(--surface); border-top: 1px solid var(--border); }
+#farming-footer input { flex: 1; padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg); color: var(--text); font-size: 14px; outline: none; }
+#farming-footer input:focus { border-color: var(--primary); }
+#farming-footer button { padding: 10px 18px; background: var(--primary); color: #000; border: none; border-radius: 10px; font-size: 14px; font-weight: 600; cursor: pointer; }
+.farming-welcome { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 13px; line-height: 1.8; }
+.farming-card { padding: 14px; margin-bottom: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.farming-card-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+.farming-card-sub { font-size: 11px; color: var(--text-muted); margin-bottom: 10px; }
+.farming-card-type { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; margin-right: 6px; }
+.farming-card-type.prime { background: rgba(255,152,0,0.2); color: var(--orange); }
+.farming-card-type.mod { background: rgba(77,184,255,0.2); color: var(--primary); }
+.farming-card-type.frame { background: rgba(156,39,176,0.2); color: #ce93d8; }
+.farming-card-type.weapon { background: rgba(76,175,80,0.2); color: var(--green); }
+.farming-drop { display: flex; justify-content: space-between; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 13px; }
+.farming-drop:last-child { border-bottom: none; }
+.farming-drop-source { color: var(--text); flex: 1; }
+.farming-drop-rate { color: var(--orange); font-weight: 600; font-size: 12px; min-width: 55px; text-align: right; }
+.farming-relic-rarity { font-size: 11px; padding: 1px 6px; border-radius: 4px; font-weight: 600; }
+.farming-relic-rarity.common { background: rgba(76,175,80,0.2); color: var(--green); }
+.farming-relic-rarity.uncommon { background: rgba(77,184,255,0.2); color: var(--primary); }
+.farming-relic-rarity.rare { background: rgba(255,152,0,0.2); color: var(--orange); }
+.farming-candidates { margin-bottom: 8px; }
+
+/* 모딩 공유 */
+#modding-content { flex: 1; overflow-y: auto; padding: 12px 16px; }
+.modding-cats { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.modding-cat-btn { padding: 6px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; color: var(--text-muted); font-size: 12px; cursor: pointer; }
+.modding-cat-btn.active { background: rgba(156,39,176,0.15); border-color: #ce93d8; color: #ce93d8; }
+.modding-card { padding: 12px; margin-bottom: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+.modding-card-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+.modding-card-author { font-size: 13px; font-weight: 600; color: var(--primary); }
+.modding-card-date { font-size: 11px; color: var(--text-muted); }
+.modding-card-memo { font-size: 13px; color: var(--text); line-height: 1.5; margin-bottom: 8px; white-space: pre-wrap; word-break: break-word; }
+.modding-images { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+.modding-images img { height: 120px; border-radius: 6px; border: 1px solid var(--border); object-fit: cover; cursor: pointer; }
+.modding-images img:hover { border-color: var(--primary); }
+.modding-item-card { display: flex; align-items: center; gap: 12px; padding: 12px; margin-bottom: 8px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
+.modding-item-card:hover { border-color: var(--primary); }
+.modding-item-thumb-empty { width: 56px; height: 56px; border-radius: 8px; background: var(--bg); border: 1px solid var(--border); flex-shrink: 0; }
+.modding-item-info { flex: 1; min-width: 0; }
+.modding-item-info .modding-item-name { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+.modding-item-meta { font-size: 11px; color: var(--text-muted); }
+.modding-item-arrow { font-size: 20px; color: var(--text-muted); flex-shrink: 0; }
+.modding-detail-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.modding-back-btn { padding: 4px 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; color: var(--text-muted); font-size: 12px; cursor: pointer; }
+.modding-back-btn:hover { border-color: var(--primary); color: var(--primary); }
+.modding-detail-title { font-size: 16px; font-weight: 700; color: var(--text); flex: 1; }
+.modding-empty { text-align: center; padding: 40px 20px; color: var(--text-muted); font-size: 13px; }
+.modding-add-btn { display: flex; align-items: center; justify-content: center; gap: 4px; padding: 8px 16px; background: var(--primary); color: #000; border: none; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+.modding-form { padding: 14px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; }
+.modding-form .form-row { margin-bottom: 10px; }
+.modding-form .form-row label { display: block; font-size: 12px; color: var(--text-muted); margin-bottom: 4px; }
+.modding-form .form-row input, .modding-form .form-row textarea, .modding-form .form-row select { width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg); color: var(--text); font-size: 13px; outline: none; box-sizing: border-box; }
+.modding-form textarea { resize: vertical; min-height: 80px; font-family: inherit; }
+.modding-form-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.modding-form-actions button { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; }
+.modding-upload-area { border: 1px dashed var(--border); border-radius: 8px; padding: 12px; text-align: center; color: var(--text-muted); font-size: 12px; cursor: pointer; }
+.modding-upload-area:hover { border-color: var(--primary); color: var(--primary); }
+.modding-upload-preview { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.modding-upload-preview .thumb { position: relative; display: inline-block; }
+.modding-upload-preview .thumb img { height: 64px; border-radius: 4px; border: 1px solid var(--border); object-fit: cover; }
+.modding-upload-preview .thumb-remove { position: absolute; top: -4px; right: -4px; width: 16px; height: 16px; background: #ef5350; color: #fff; border: none; border-radius: 50%; font-size: 10px; line-height: 16px; text-align: center; cursor: pointer; padding: 0; }
+.modding-lightbox { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 9999; cursor: pointer; }
+.modding-lightbox img { max-width: 90vw; max-height: 90vh; border-radius: 8px; }
+.modding-card-delete { background: none; border: 1px solid var(--border); color: var(--text-muted); border-radius: 6px; padding: 2px 8px; font-size: 11px; cursor: pointer; margin-left: auto; }
+.modding-card-delete:hover { border-color: var(--red); color: var(--red); }
+
+.alert-notify { position: fixed; top: 60px; left: 50%; transform: translateX(-50%); max-width: 560px; width: calc(100% - 32px); padding: 12px 16px; background: rgba(77,184,255,0.15); border: 1px solid var(--primary); border-radius: 10px; color: var(--primary); font-size: 13px; font-weight: 600; z-index: 100; display: none; animation: slideDown 0.3s; }
+@keyframes slideDown { from { opacity: 0; transform: translateX(-50%) translateY(-10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
+main::-webkit-scrollbar, #messages::-webkit-scrollbar, #surge-list::-webkit-scrollbar, #trade-list::-webkit-scrollbar, #world-list::-webkit-scrollbar, #chat-watchlist::-webkit-scrollbar, #chat-auction::-webkit-scrollbar, #farming-results::-webkit-scrollbar, #modding-content::-webkit-scrollbar { width: 4px; }
+main::-webkit-scrollbar-thumb, #messages::-webkit-scrollbar-thumb, #surge-list::-webkit-scrollbar-thumb, #trade-list::-webkit-scrollbar-thumb, #world-list::-webkit-scrollbar-thumb, #chat-watchlist::-webkit-scrollbar-thumb, #chat-auction::-webkit-scrollbar-thumb, #farming-results::-webkit-scrollbar-thumb, #modding-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <header>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <h1>워프봇</h1>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;">
+                <span id="status" class="status online">API 직접 연동</span>
+                <button id="settings-btn" onclick="toggleSettings()" title="설정">&#9881;</button>
+            </div>
+        </header>
+
+        <!-- 설정 패널 -->
+        <div id="settings-overlay" style="display:none;" onclick="toggleSettings()"></div>
+        <div id="settings-panel" style="display:none;">
+            <div class="settings-header">
+                <span class="settings-title">설정</span>
+                <button class="settings-close" onclick="toggleSettings()">&times;</button>
+            </div>
+            <div class="settings-body">
+                <div class="settings-section">
+                    <div class="settings-section-title">알림</div>
+                    <div class="settings-row">
+                        <span>방해 금지 모드</span>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="set-dnd" onchange="saveSettings()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="settings-hint">활성화하면 모든 알림이 일시 중단됩니다.</div>
+                </div>
+                <div class="settings-section">
+                    <div class="settings-section-title">테마</div>
+                    <div class="settings-row">
+                        <span>모드</span>
+                        <div class="mode-toggle">
+                            <button class="mode-btn active" data-mode="dark" onclick="switchMode('dark')">다크</button>
+                            <button class="mode-btn" data-mode="light" onclick="switchMode('light')">라이트</button>
+                        </div>
+                    </div>
+                    <div class="settings-sub-label" id="palette-label">다크 팔레트</div>
+                    <div class="palette-grid" id="palette-grid"></div>
+                </div>
+            </div>
+        </div>
+
+        <nav id="tabs">
+            <button class="tab active" data-tab="chat">시세 조회</button>
+            <button class="tab" data-tab="surges">급등 알림</button>
+            <button class="tab" data-tab="trade">거래소</button>
+            <button class="tab" data-tab="world">월드</button>
+            <button class="tab" data-tab="farming">파밍</button>
+            <button class="tab" data-tab="modding">모딩 공유</button>
+        </nav>
+
+        <!-- 시세 조회 -->
+        <main id="tab-chat" class="tab-content active">
+            <div id="chat-mode-bar">
+                <button class="chat-mode active" data-mode="chat">채팅</button>
+                <button class="chat-mode" data-mode="watchlist">시세 감시</button>
+                <button class="chat-mode" data-mode="auction">경매</button>
+            </div>
+            <div id="messages">
+                <div class="message bot">
+                    <div class="bubble">
+                        안녕! 워프레임 시세 봇이야.<br>
+                        아이템 이름을 입력하면 시세를 알려줄게!<br>
+                        <small>예: "rhino prime set" 또는 "nikana prime blade"</small>
+                    </div>
+                </div>
+            </div>
+            <div id="chat-watchlist" style="display:none;"></div>
+            <div id="chat-auction" style="display:none;"></div>
+        </main>
+
+        <!-- 급등 알림 -->
+        <main id="tab-surges" class="tab-content">
+            <div id="surge-list"></div>
+        </main>
+
+        <!-- 거래소 -->
+        <main id="tab-trade" class="tab-content">
+            <div id="trade-register" style="display:none;">
+                <p>거래소를 이용하려면 닉네임 등록이 필요합니다.</p>
+                <input type="text" id="trade-name-input" placeholder="닉네임 입력" maxlength="20">
+                <br><button onclick="tradeRegister()">등록</button>
+            </div>
+            <div id="trade-approved" style="display:none;">
+                <div id="trade-filters">
+                    <button class="trade-filter active" data-type="">전체</button>
+                    <button class="trade-filter" data-type="buy">삽니다</button>
+                    <button class="trade-filter" data-type="sell">팝니다</button>
+                </div>
+                <div id="trade-list"></div>
+            </div>
+        </main>
+
+        <!-- 월드 상태 -->
+        <main id="tab-world" class="tab-content">
+            <div id="world-filters">
+                <button class="world-filter active" data-section="fissures">균열</button>
+                <button class="world-filter" data-section="arbitration">중재</button>
+                <button class="world-filter" data-section="invasions">침공</button>
+                <button class="world-filter" data-section="cycles">오픈월드</button>
+            </div>
+            <div id="world-list"></div>
+            <div class="alert-notify" id="alert-notify"></div>
+        </main>
+
+        <!-- 파밍 정보 -->
+        <main id="tab-farming" class="tab-content">
+            <div id="farming-results"></div>
+        </main>
+
+        <!-- 모딩 공유 -->
+        <main id="tab-modding" class="tab-content">
+            <div id="modding-content"></div>
+        </main>
+
+        <footer id="farming-footer" style="display:none;">
+            <form id="farming-form" onsubmit="return false;">
+                <input type="text" id="farming-input" placeholder="아이템/모드 이름 검색..." autocomplete="off">
+                <button type="submit">검색</button>
+            </form>
+        </footer>
+
+        <footer id="chat-footer">
+            <form id="chat-form" onsubmit="return false;">
+                <input type="text" id="chat-input" placeholder="아이템 이름을 입력하세요 (영문)..." autocomplete="off">
+                <button type="submit">전송</button>
+            </form>
+        </footer>
+
+        <footer id="trade-footer" style="display:none;">
+            <div id="trade-form-area">
+                <button id="trade-new-btn" onclick="toggleTradeForm()">+ 매물 등록</button>
+                <div id="trade-new-form">
+                    <div class="form-row">
+                        <label>유형</label>
+                        <select id="tf-type"><option value="buy">삽니다</option><option value="sell">팝니다</option></select>
+                    </div>
+                    <div class="form-row">
+                        <label>아이템</label>
+                        <input type="text" id="tf-item" placeholder="아이템 이름" autocomplete="off">
+                    </div>
+                    <div class="form-row">
+                        <label>가격</label>
+                        <input type="number" id="tf-price" placeholder="플래티넘" min="1">
+                        <span style="color:var(--text-muted);font-size:13px;">p</span>
+                    </div>
+                    <div class="form-row">
+                        <label>수량</label>
+                        <input type="number" id="tf-qty" value="1" min="1" max="999" style="width:60px;flex:none;">
+                    </div>
+                    <div class="form-row">
+                        <label>메모</label>
+                        <input type="text" id="tf-memo" placeholder="(선택) 한마디" maxlength="100">
+                    </div>
+                    <div class="form-actions">
+                        <button class="btn-cancel" onclick="toggleTradeForm()">취소</button>
+                        <button class="btn-submit" onclick="submitListing()">등록</button>
+                    </div>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+<script>
+/* ── 워프봇 standalone — 외부 API 직접 연동 + localStorage ── */
+
+const WM_API = "https://api.warframe.market/v1";
+const WS_API = "https://api.warframestat.us/pc";
+const DROPS_API = "https://drops.warframestat.us/data/all.slim.json";
+
+const messagesEl = document.getElementById("messages");
+const form = document.getElementById("chat-form");
+const input = document.getElementById("chat-input");
+
+// ── warframe.market 아이템 목록 캐시 ──
+let wmItemsCache = null;
+
+async function loadWmItems() {
+    if (wmItemsCache) return wmItemsCache;
+    try {
+        const res = await fetch(`${WM_API}/items`);
+        const json = await res.json();
+        wmItemsCache = json.payload.items;
+        return wmItemsCache;
+    } catch {
+        return [];
+    }
+}
+
+function escapeHtml(str) {
+    const el = document.createElement("span");
+    el.textContent = str;
+    return el.innerHTML;
+}
+
+function addMessage(text, sender) {
+    const div = document.createElement("div");
+    div.className = `message ${sender}`;
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.innerHTML = escapeHtml(text).replace(/\n/g, "<br>");
+    div.appendChild(bubble);
+    messagesEl.appendChild(div);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function formatPrice(min, count) {
+    return min != null ? `${min}p (${count}건)` : "등록 없음";
+}
+
+
+// ── 시세 조회 (warframe.market 직접) ──
+async function queryPrice(text) {
+    addMessage("검색 중...", "bot");
+
+    const items = await loadWmItems();
+    const q = text.toLowerCase().trim();
+
+    // 정확 매칭
+    let match = items.find(i => i.url_name === q.replace(/ /g, "_"));
+    if (!match) {
+        // 이름 매칭
+        match = items.find(i => i.item_name.toLowerCase() === q);
+    }
+    if (!match) {
+        // 부분 매칭 후보
+        const candidates = items.filter(i =>
+            i.item_name.toLowerCase().includes(q) || i.url_name.includes(q.replace(/ /g, "_"))
+        ).slice(0, 8);
+
+        // 마지막 "검색 중..." 제거
+        messagesEl.lastChild.remove();
+
+        if (candidates.length === 0) {
+            addMessage(`"${text}"에 대한 아이템을 찾지 못했어요.`, "bot");
+            return;
+        }
+        if (candidates.length === 1) {
+            match = candidates[0];
+        } else {
+            // 후보 목록 표시
+            const div = document.createElement("div");
+            div.className = "message bot";
+            const card = document.createElement("div");
+            card.className = "suggest-card";
+            const title = document.createElement("div");
+            title.className = "suggest-title";
+            title.textContent = "이 아이템을 찾으셨나요?";
+            card.appendChild(title);
+            candidates.forEach(c => {
+                const a = document.createElement("a");
+                a.className = "suggest-item";
+                a.textContent = c.item_name;
+                a.addEventListener("click", () => {
+                    addMessage(c.item_name, "user");
+                    queryPrice(c.url_name);
+                });
+                card.appendChild(a);
+            });
+            div.appendChild(card);
+            messagesEl.appendChild(div);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+            return;
+        }
+    }
+
+    // "검색 중..." 제거
+    if (messagesEl.lastChild) {
+        const last = messagesEl.lastChild;
+        if (last.textContent.includes("검색 중")) last.remove();
+    }
+
+    // 주문 조회
+    try {
+        const res = await fetch(`${WM_API}/items/${match.url_name}/orders?include=item`);
+        const json = await res.json();
+        const orders = json.payload.orders.filter(o => o.user.status !== "offline" && o.platform === "pc");
+
+        const sells = orders.filter(o => o.order_type === "sell").sort((a, b) => a.platinum - b.platinum);
+        const buys = orders.filter(o => o.order_type === "buy").sort((a, b) => b.platinum - a.platinum);
+
+        const sellMin = sells.length ? sells[0].platinum : null;
+        const buyMax = buys.length ? buys[0].platinum : null;
+
+        // 48h 통계
+        let avg48h = null, vol48h = 0;
+        try {
+            const statRes = await fetch(`${WM_API}/items/${match.url_name}/statistics`);
+            const statJson = await statRes.json();
+            const closed = statJson.payload.statistics_closed?.["48hours"] || [];
+            if (closed.length > 0) {
+                const last = closed[closed.length - 1];
+                avg48h = last.avg_price;
+                vol48h = last.volume;
+            }
+        } catch {}
+
+        const avg48hText = avg48h != null ? `${avg48h.toFixed(1)}p (거래 ${vol48h}건)` : "-";
+
+        // 랭크별 가격 체크
+        const hasRank = sells.some(o => o.mod_rank != null && o.mod_rank > 0);
+        let rankHtml = "";
+        if (hasRank) {
+            const maxRank = Math.max(...sells.filter(o => o.mod_rank != null).map(o => o.mod_rank));
+            const rank0Sells = sells.filter(o => o.mod_rank === 0);
+            const rankMaxSells = sells.filter(o => o.mod_rank === maxRank);
+            const rank0Buys = buys.filter(o => o.mod_rank === 0);
+            const rankMaxBuys = buys.filter(o => o.mod_rank === maxRank);
+
+            rankHtml = `<div class="rank-divider"></div>`;
+            if (rank0Sells.length || rank0Buys.length) {
+                rankHtml += `
+                    <div class="rank-label">랭크 0</div>
+                    <div class="row"><span class="label">판매 최저가</span><span class="value">${formatPrice(rank0Sells[0]?.platinum, rank0Sells.length)}</span></div>
+                    <div class="row"><span class="label">구매 최고가</span><span class="value">${formatPrice(rank0Buys[0]?.platinum, rank0Buys.length)}</span></div>
+                `;
+            }
+            if (rankMaxSells.length || rankMaxBuys.length) {
+                rankHtml += `
+                    <div class="rank-label">랭크 MAX (${maxRank})</div>
+                    <div class="row"><span class="label">판매 최저가</span><span class="value">${formatPrice(rankMaxSells[0]?.platinum, rankMaxSells.length)}</span></div>
+                    <div class="row"><span class="label">구매 최고가</span><span class="value">${formatPrice(rankMaxBuys[0]?.platinum, rankMaxBuys.length)}</span></div>
+                `;
+            }
+        }
+
+        const div = document.createElement("div");
+        div.className = "message bot";
+        const card = document.createElement("div");
+        card.className = "price-card";
+        card.innerHTML = `
+            <div class="title"><a href="https://warframe.market/items/${match.url_name}" target="_blank">${escapeHtml(match.item_name)}</a></div>
+            <div class="row"><span class="label">판매 최저가</span><span class="value">${formatPrice(sellMin, sells.length)}</span></div>
+            <div class="row"><span class="label">구매 최고가</span><span class="value">${formatPrice(buyMax, buys.length)}</span></div>
+            <div class="row"><span class="label">48시간 평균</span><span class="value">${avg48hText}</span></div>
+            ${rankHtml}
+            <div class="footer">warframe.market · 온라인/인게임 유저 기준</div>
+        `;
+        div.appendChild(card);
+        messagesEl.appendChild(div);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+
+    } catch (e) {
+        addMessage("시세 조회 중 오류가 발생했습니다: " + e.message, "bot");
+    }
+}
+
+form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const text = input.value.trim();
+    if (!text) return;
+    addMessage(text, "user");
+    input.value = "";
+    queryPrice(text);
+});
+
+
+// ── 탭 전환 ──
+const tabBtns = document.querySelectorAll(".tab");
+const chatFooter = document.getElementById("chat-footer");
+const tradeFooter = document.getElementById("trade-footer");
+const farmingFooter = document.getElementById("farming-footer");
+let activeTab = "chat";
+
+tabBtns.forEach(btn => {
+    btn.addEventListener("click", () => {
+        const tab = btn.dataset.tab;
+        if (tab === activeTab) return;
+
+        tabBtns.forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById("tab-" + activeTab).classList.remove("active");
+        document.getElementById("tab-" + tab).classList.add("active");
+
+        chatFooter.style.display = "none";
+        tradeFooter.style.display = "none";
+        farmingFooter.style.display = "none";
+
+        if (tab === "chat") chatFooter.style.display = chatMode === "chat" ? "" : "none";
+        if (tab === "trade") { renderTradeTab(); if (localStorage.getItem("tradeName")) tradeFooter.style.display = ""; }
+        if (tab === "farming") { farmingFooter.style.display = ""; renderFarmingWelcome(); }
+        if (tab === "surges") renderSurges();
+        if (tab === "world") fetchWorldState();
+        if (tab === "modding") renderModdingTab();
+
+        activeTab = tab;
+    });
+});
+
+
+// ── 시세 조회 모드 전환 ──
+let chatMode = "chat";
+document.querySelectorAll(".chat-mode").forEach(btn => {
+    btn.addEventListener("click", () => {
+        const mode = btn.dataset.mode;
+        if (mode === chatMode) return;
+        document.querySelectorAll(".chat-mode").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById("messages").style.display = mode === "chat" ? "" : "none";
+        document.getElementById("chat-watchlist").style.display = mode === "watchlist" ? "" : "none";
+        document.getElementById("chat-auction").style.display = mode === "auction" ? "" : "none";
+        chatFooter.style.display = mode === "chat" ? "" : "none";
+        chatMode = mode;
+        if (mode === "watchlist") renderWatchlist();
+        if (mode === "auction") renderAuctionView();
+    });
+});
+
+
+// ── 급등 알림 (서버 없으므로 안내 표시) ──
+function renderSurges() {
+    const el = document.getElementById("surge-list");
+    el.innerHTML = '<div class="surge-empty">급등 알림은 서버 모니터링이 필요합니다.<br>Pi 배포 후 자동으로 작동합니다.</div>';
+}
+
+
+// ── 거래소 (localStorage) ──
+let tradeFilterType = "";
+
+function getTradeListings() {
+    return JSON.parse(localStorage.getItem("tradeListings") || "[]");
+}
+
+function saveTradeListings(listings) {
+    localStorage.setItem("tradeListings", JSON.stringify(listings));
+}
+
+function renderTradeTab() {
+    const name = localStorage.getItem("tradeName") || "";
+    document.getElementById("trade-register").style.display = "none";
+    document.getElementById("trade-approved").style.display = "none";
+
+    if (!name) {
+        document.getElementById("trade-register").style.display = "";
+    } else {
+        document.getElementById("trade-approved").style.display = "";
+        tradeFooter.style.display = activeTab === "trade" ? "" : "none";
+        renderListings();
+    }
+}
+
+function tradeRegister() {
+    const name = document.getElementById("trade-name-input").value.trim();
+    if (!name) return;
+    localStorage.setItem("tradeName", name);
+    renderTradeTab();
+}
+
+document.querySelectorAll(".trade-filter").forEach(btn => {
+    btn.addEventListener("click", () => {
+        document.querySelectorAll(".trade-filter").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        tradeFilterType = btn.dataset.type;
+        renderListings();
+    });
+});
+
+function renderListings() {
+    let items = getTradeListings();
+    if (tradeFilterType) items = items.filter(l => l.trade_type === tradeFilterType);
+
+    const el = document.getElementById("trade-list");
+    if (!items.length) {
+        el.innerHTML = '<div class="surge-empty">매물이 없습니다.</div>';
+        return;
+    }
+    el.innerHTML = "";
+    items.forEach(l => {
+        const card = document.createElement("div");
+        card.className = "trade-card";
+        const myName = localStorage.getItem("tradeName") || "";
+        const delBtn = l.user_name === myName
+            ? `<button class="trade-delete" onclick="deleteListing(${l.id})">삭제</button>` : "";
+        card.innerHTML = `
+            <div class="trade-card-header">
+                <span class="trade-type ${l.trade_type}">${l.trade_type === "buy" ? "삽니다" : "팝니다"}</span>
+                <span class="trade-user">${escapeHtml(l.user_name)}</span>
+            </div>
+            <div class="trade-item">${escapeHtml(l.item_name)}</div>
+            <div class="trade-price-row">
+                <span class="trade-price">${l.price}p</span>
+                <span class="trade-qty">${l.quantity > 1 ? l.quantity + "개" : ""}</span>
+                ${delBtn}
+            </div>
+            ${l.memo ? `<div class="trade-memo">${escapeHtml(l.memo)}</div>` : ""}
+        `;
+        el.appendChild(card);
+    });
+}
+
+function deleteListing(id) {
+    let listings = getTradeListings();
+    listings = listings.filter(l => l.id !== id);
+    saveTradeListings(listings);
+    renderListings();
+}
+
+function toggleTradeForm() {
+    const f = document.getElementById("trade-new-form");
+    f.style.display = f.style.display === "none" ? "" : "none";
+}
+
+function submitListing() {
+    const name = localStorage.getItem("tradeName") || "";
+    if (!name) return;
+    const itemName = document.getElementById("tf-item").value.trim();
+    const price = parseInt(document.getElementById("tf-price").value) || 0;
+    if (!itemName || price < 1) { alert("아이템과 가격을 입력해주세요."); return; }
+
+    const listings = getTradeListings();
+    listings.unshift({
+        id: Date.now(),
+        user_name: name,
+        trade_type: document.getElementById("tf-type").value,
+        item_name: itemName,
+        price: price,
+        quantity: parseInt(document.getElementById("tf-qty").value) || 1,
+        memo: document.getElementById("tf-memo").value,
+        created_at: new Date().toISOString(),
+    });
+    saveTradeListings(listings);
+    toggleTradeForm();
+    renderListings();
+}
+
+
+// ── 월드 상태 (warframestat.us 직접) ──
+let worldSection = "fissures";
+
+document.querySelectorAll(".world-filter").forEach(btn => {
+    btn.addEventListener("click", () => {
+        document.querySelectorAll(".world-filter").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        worldSection = btn.dataset.section;
+        fetchWorldState();
+    });
+});
+
+async function fetchWorldState() {
+    const el = document.getElementById("world-list");
+    el.innerHTML = '<div class="surge-empty">로딩 중...</div>';
+
+    try {
+        if (worldSection === "fissures") {
+            const res = await fetch(`${WS_API}/fissures`);
+            const data = await res.json();
+            renderFissures(data.filter(f => f.active));
+        } else if (worldSection === "arbitration") {
+            const res = await fetch(`${WS_API}/arbitration`);
+            const data = await res.json();
+            renderArbitration(data);
+        } else if (worldSection === "invasions") {
+            const res = await fetch(`${WS_API}/invasions`);
+            const data = await res.json();
+            renderInvasions(data.filter(i => !i.completed));
+        } else if (worldSection === "cycles") {
+            const [cetus, vallis, cambion, zariman] = await Promise.all([
+                fetch(`${WS_API}/cetusCycle`).then(r => r.json()).catch(() => null),
+                fetch(`${WS_API}/vallisCycle`).then(r => r.json()).catch(() => null),
+                fetch(`${WS_API}/cambionCycle`).then(r => r.json()).catch(() => null),
+                fetch(`${WS_API}/zarimanCycle`).then(r => r.json()).catch(() => null),
+            ]);
+            renderCycles({ cetus, vallis, cambion, zariman });
+        }
+    } catch {
+        el.innerHTML = '<div class="surge-empty">데이터를 불러오지 못했습니다.</div>';
+    }
+}
+
+function renderFissures(items) {
+    const el = document.getElementById("world-list");
+    if (!items.length) { el.innerHTML = '<div class="surge-empty">활성 균열이 없습니다.</div>'; return; }
+    el.innerHTML = "";
+    items.forEach(f => {
+        const card = document.createElement("div");
+        card.className = "world-card";
+        const tierCls = (f.tier || "").toLowerCase();
+        card.innerHTML = `
+            <div class="world-card-header">
+                <div class="world-card-title">
+                    <span class="world-tag ${tierCls}">${escapeHtml(f.tier)}</span>
+                    ${f.isHard ? '<span class="world-tag hard">스틸패스</span>' : ""}
+                    ${escapeHtml(f.node)}
+                </div>
+                <div class="world-card-timer">${escapeHtml(f.eta || "")}</div>
+            </div>
+            <div class="world-card-detail">
+                <span class="world-tag enemy">${escapeHtml(f.enemy || "")}</span>
+                ${escapeHtml(f.missionType || "")}
+            </div>
+        `;
+        el.appendChild(card);
+    });
+}
+
+function renderArbitration(arb) {
+    const el = document.getElementById("world-list");
+    if (!arb || arb.error) { el.innerHTML = '<div class="surge-empty">현재 중재 정보가 없습니다.</div>'; return; }
+    el.innerHTML = `
+        <div class="world-card">
+            <div class="world-card-header">
+                <div class="world-card-title">${escapeHtml(arb.node || "")}</div>
+                <div class="world-card-timer">${escapeHtml(arb.eta || "")}</div>
+            </div>
+            <div class="world-card-detail">
+                <span class="world-tag enemy">${escapeHtml(arb.enemy || "")}</span>
+                ${escapeHtml(arb.type || "")}
+            </div>
+        </div>
+    `;
+}
+
+function renderInvasions(items) {
+    const el = document.getElementById("world-list");
+    if (!items.length) { el.innerHTML = '<div class="surge-empty">활성 침공이 없습니다.</div>'; return; }
+    el.innerHTML = "";
+    items.forEach(inv => {
+        const card = document.createElement("div");
+        card.className = "world-card";
+        const atkReward = (inv.attackerReward?.countedItems || []).map(i => escapeHtml(i.type)).join(", ") || "크레딧";
+        const defReward = (inv.defenderReward?.countedItems || []).map(i => escapeHtml(i.type)).join(", ") || "크레딧";
+        const pct = ((inv.completion || 0)).toFixed(1);
+        const fillCls = (inv.attackingFaction || "").toLowerCase();
+        card.innerHTML = `
+            <div class="world-card-header">
+                <div class="world-card-title">${escapeHtml(inv.node || "")}</div>
+                <div class="world-card-timer">${pct}%</div>
+            </div>
+            <div class="world-card-detail">${escapeHtml(inv.desc || "")}</div>
+            <div class="invasion-rewards">
+                <span class="atk">${escapeHtml(inv.attackingFaction || "")}: ${atkReward}</span>
+                <span class="def">${escapeHtml(inv.defendingFaction || "")}: ${defReward}</span>
+            </div>
+            <div class="invasion-bar"><div class="invasion-bar-fill ${fillCls}" style="width:${Math.max(0, Math.min(100, inv.completion || 0))}%"></div></div>
+        `;
+        el.appendChild(card);
+    });
+}
+
+function renderCycles(data) {
+    const el = document.getElementById("world-list");
+    el.innerHTML = "";
+    const stateMap = { day: "낮", night: "밤", warm: "따뜻함", cold: "추위", fass: "파스", vome: "봄", corpus: "코퍼스", grineer: "그리니어" };
+    const stateClass = { day: "day", night: "night", warm: "warm", cold: "cold", fass: "warm", vome: "cold", corpus: "cold", grineer: "warm" };
+    const regionNames = { cetus: "세투스", vallis: "오브 밸리스", cambion: "캠비온 퇴적지", zariman: "자리만" };
+
+    for (const [region, info] of Object.entries(data)) {
+        if (!info) continue;
+        const row = document.createElement("div");
+        row.className = "cycle-row";
+        const state = info.state || "";
+        row.innerHTML = `
+            <div class="cycle-name">${regionNames[region] || region}</div>
+            <span class="cycle-state ${stateClass[state] || ""}">${stateMap[state] || state}</span>
+            <span class="cycle-timer">${escapeHtml(info.timeLeft || info.shortString || "")}</span>
+        `;
+        el.appendChild(row);
+    }
+    if (!el.children.length) {
+        el.innerHTML = '<div class="surge-empty">사이클 정보를 불러올 수 없습니다.</div>';
+    }
+}
+
+
+// ── 파밍 정보 (drops.warframestat.us 직접) ──
+let dropTableCache = null;
+
+async function loadDropTable() {
+    if (dropTableCache) return dropTableCache;
+    try {
+        const res = await fetch(DROPS_API);
+        dropTableCache = await res.json();
+        return dropTableCache;
+    } catch {
+        return null;
+    }
+}
+
+function renderFarmingWelcome() {
+    document.getElementById("farming-results").innerHTML = `
+        <div class="farming-welcome">
+            아이템이나 모드 이름을 검색하면<br>파밍 위치와 드롭 확률을 알려드려요!<br>
+            <small>(첫 검색 시 드롭 테이블 로딩에 수 초 소요)</small>
+        </div>
+    `;
+}
+
+document.getElementById("farming-form").addEventListener("submit", async () => {
+    const q = document.getElementById("farming-input").value.trim();
+    if (!q) return;
+    const resultsEl = document.getElementById("farming-results");
+    resultsEl.innerHTML = '<div class="surge-empty">검색 중... (첫 검색 시 드롭 테이블 다운로드)</div>';
+
+    const table = await loadDropTable();
+    if (!table) {
+        resultsEl.innerHTML = '<div class="surge-empty">드롭 테이블을 불러오지 못했습니다.</div>';
+        return;
+    }
+
+    // 검색
+    const ql = q.toLowerCase();
+    const results = [];
+
+    for (const place of table) {
+        if (!place.rewards) continue;
+        for (const reward of place.rewards) {
+            if (reward.itemName && reward.itemName.toLowerCase().includes(ql)) {
+                results.push({
+                    source: place.place || "Unknown",
+                    item: reward.itemName,
+                    rarity: reward.rarity || "",
+                    chance: reward.chance != null ? reward.chance.toFixed(2) + "%" : "",
+                });
+            }
+        }
+    }
+
+    if (!results.length) {
+        resultsEl.innerHTML = `<div class="surge-empty">"${escapeHtml(q)}"에 대한 파밍 정보를 찾지 못했습니다.</div>`;
+        return;
+    }
+
+    // 그룹화: 아이템별
+    const byItem = {};
+    for (const r of results) {
+        if (!byItem[r.item]) byItem[r.item] = [];
+        byItem[r.item].push(r);
+    }
+
+    resultsEl.innerHTML = "";
+    const itemNames = Object.keys(byItem).slice(0, 5);
+    for (const itemName of itemNames) {
+        const drops = byItem[itemName].slice(0, 15);
+        const card = document.createElement("div");
+        card.className = "farming-card";
+        let dropsHtml = drops.map(d => `
+            <div class="farming-drop">
+                <div class="farming-drop-source">
+                    ${escapeHtml(d.source)}
+                    ${d.rarity ? `<span class="farming-relic-rarity ${d.rarity.toLowerCase()}">${escapeHtml(d.rarity)}</span>` : ""}
+                </div>
+                <div class="farming-drop-rate">${escapeHtml(d.chance)}</div>
+            </div>
+        `).join("");
+        card.innerHTML = `
+            <div class="farming-card-title">${escapeHtml(itemName)}</div>
+            <div class="farming-card-sub">${drops.length}개 드롭 소스${byItem[itemName].length > 15 ? ` (총 ${byItem[itemName].length}건 중 15건 표시)` : ""}</div>
+            ${dropsHtml}
+        `;
+        resultsEl.appendChild(card);
+    }
+    if (Object.keys(byItem).length > 5) {
+        resultsEl.innerHTML += `<div class="surge-empty">외 ${Object.keys(byItem).length - 5}개 아이템 검색됨. 더 구체적으로 검색해보세요.</div>`;
+    }
+});
+
+
+// ── 워치리스트 (localStorage) ──
+function getWatchlist() {
+    return JSON.parse(localStorage.getItem("watchlist") || "[]");
+}
+
+function saveWatchlist(list) {
+    localStorage.setItem("watchlist", JSON.stringify(list));
+}
+
+function renderWatchlist() {
+    const el = document.getElementById("chat-watchlist");
+    const items = getWatchlist();
+    el.innerHTML = "";
+
+    // 추가 폼
+    const addForm = document.createElement("div");
+    addForm.className = "watchlist-add-form";
+    addForm.innerHTML = `
+        <div class="form-row"><label>아이템</label><input type="text" id="wl-item" placeholder="아이템 이름 (영문)..." autocomplete="off"></div>
+        <div class="form-row"><label>목표가</label><input type="number" id="wl-price" placeholder="이 가격 이하면 알림" min="1"><span style="color:var(--text-muted);font-size:13px;margin-left:4px;">p</span></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+            <button class="btn-submit" onclick="addWatchItem()" style="padding:6px 14px;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;background:var(--orange);color:#000;">추가</button>
+        </div>
+    `;
+    el.appendChild(addForm);
+
+    if (!items.length) {
+        const empty = document.createElement("div");
+        empty.className = "watchlist-empty";
+        empty.textContent = "감시 중인 아이템이 없습니다.";
+        el.appendChild(empty);
+        return;
+    }
+
+    items.forEach((w, idx) => {
+        const card = document.createElement("div");
+        card.className = "watchlist-card";
+        const isHit = w.status === "triggered";
+        card.innerHTML = `
+            <div class="watchlist-info">
+                <div class="watchlist-item">${escapeHtml(w.item_name)}</div>
+                <div class="watchlist-price-row">
+                    <span class="watchlist-target">목표 ${w.target_price}p</span>
+                    <span class="watchlist-market">현재 ${w.current_price != null ? w.current_price + "p" : "-"}</span>
+                </div>
+            </div>
+            <div class="watchlist-actions">
+                <span class="watchlist-status ${isHit ? "hit" : "waiting"}">${isHit ? "도달!" : "대기"}</span>
+                <button class="watchlist-delete" onclick="removeWatchItem(${idx})">삭제</button>
+            </div>
+        `;
+        el.appendChild(card);
+    });
+}
+
+async function addWatchItem() {
+    const itemInput = document.getElementById("wl-item").value.trim();
+    const price = parseInt(document.getElementById("wl-price").value) || 0;
+    if (!itemInput) { alert("아이템을 입력해주세요."); return; }
+    if (price < 1) { alert("목표가를 입력해주세요."); return; }
+
+    const items = await loadWmItems();
+    const q = itemInput.toLowerCase();
+    const match = items.find(i => i.url_name === q.replace(/ /g, "_") || i.item_name.toLowerCase() === q);
+    if (!match) { alert("아이템을 찾을 수 없습니다. 영문으로 정확히 입력해주세요."); return; }
+
+    const list = getWatchlist();
+    list.unshift({
+        item_name: match.item_name,
+        item_slug: match.url_name,
+        target_price: price,
+        current_price: null,
+        status: "watching",
+    });
+    saveWatchlist(list);
+    renderWatchlist();
+}
+
+function removeWatchItem(idx) {
+    const list = getWatchlist();
+    list.splice(idx, 1);
+    saveWatchlist(list);
+    renderWatchlist();
+}
+
+
+// ── 경매 (warframe.market auction 직접) ──
+let auctionType = "riven";
+let auctionQuery = "";
+
+const ELEMENT_KO = {
+    impact: "충격", heat: "화염", cold: "냉기", electricity: "전기",
+    toxin: "독소", blast: "폭발", radiation: "방사능", viral: "바이러스",
+    corrosive: "부식", gas: "가스", magnetic: "자기",
+};
+
+function renderAuctionView() {
+    const container = document.getElementById("chat-auction");
+    container.innerHTML = "";
+
+    const search = document.createElement("div");
+    search.className = "auction-search";
+    search.innerHTML = `
+        <input type="text" id="auction-search-input" placeholder="무기 이름 (영문, 예: kuva_bramma)..." value="${escapeHtml(auctionQuery)}">
+        <button onclick="doAuctionSearch()">검색</button>
+    `;
+    container.appendChild(search);
+
+    // Enter 키 지원
+    setTimeout(() => {
+        const inp = document.getElementById("auction-search-input");
+        if (inp) inp.addEventListener("keydown", e => { if (e.key === "Enter") doAuctionSearch(); });
+    }, 0);
+
+    const tabs = document.createElement("div");
+    tabs.className = "auction-tabs";
+    [{ key: "riven", label: "리벤 모드" }, { key: "lich", label: "리치/시스터" }].forEach(t => {
+        const btn = document.createElement("button");
+        btn.className = "auction-tab" + (auctionType === t.key ? " active" : "");
+        btn.textContent = t.label;
+        btn.onclick = () => { auctionType = t.key; renderAuctionView(); };
+        tabs.appendChild(btn);
+    });
+    container.appendChild(tabs);
+
+    if (!auctionQuery) {
+        container.innerHTML += '<div class="auction-empty">무기 이름을 검색해보세요.<br><small>예: kuva_bramma, rubico_prime</small></div>';
+        return;
+    }
+
+    if (auctionType === "riven") fetchRivenAuctions(container);
+    else fetchLichAuctions(container);
+}
+
+function doAuctionSearch() {
+    auctionQuery = (document.getElementById("auction-search-input")?.value || "").trim();
+    renderAuctionView();
+}
+
+async function fetchRivenAuctions(container) {
+    const weapon = auctionQuery.toLowerCase().replace(/ /g, "_");
+    container.innerHTML += '<div class="auction-empty">검색 중...</div>';
+
+    try {
+        const res = await fetch(`${WM_API}/auctions/search?type=riven&weapon_url_name=${weapon}&buyout_policy=with&sort_by=price_asc`);
+        const json = await res.json();
+        const auctions = json.payload?.auctions || [];
+
+        // 마지막 "검색 중..." 제거
+        const loading = container.querySelector(".auction-empty");
+        if (loading) loading.remove();
+
+        if (!auctions.length) {
+            container.innerHTML += '<div class="auction-empty">검색 결과가 없습니다.</div>';
+            return;
+        }
+
+        auctions.slice(0, 30).forEach(a => {
+            const card = document.createElement("div");
+            card.className = "auction-card";
+            const item = a.item;
+            const name = item.name || weapon;
+            const priceText = a.top_bid ? a.top_bid + "p" : (a.starting_price + "p 시작");
+            const buyoutText = a.buyout_price ? `<span class="buyout">즉시 구매 ${a.buyout_price}p</span>` : "";
+
+            const stats = (item.attributes || []).map(s => {
+                const positive = s.positive;
+                return `<span class="auction-stat ${positive ? "positive" : "negative"}">${escapeHtml(s.url_name.replace(/_/g, " "))} ${s.value > 0 ? "+" : ""}${s.value.toFixed(1)}%</span>`;
+            }).join("");
+
+            card.innerHTML = `
+                <div class="auction-card-header">
+                    <div class="auction-card-title"><a href="https://warframe.market/auction/${a.id}" target="_blank">${escapeHtml(name)}</a></div>
+                    <div class="auction-card-price">${priceText} ${buyoutText}</div>
+                </div>
+                <div class="auction-stats">${stats}</div>
+                <div class="auction-stats" style="margin-top:4px;">
+                    <span class="auction-stat">MR ${item.mastery_level || 0}</span>
+                    <span class="auction-stat">리롤 ${item.re_rolls || 0}회</span>
+                </div>
+                <div class="auction-seller">
+                    ${escapeHtml(a.owner?.ingame_name || "")} ·
+                    <span class="${a.owner?.status !== "offline" ? "online" : ""}">
+                        ${a.owner?.status === "ingame" ? "인게임" : a.owner?.status === "online" ? "온라인" : "오프라인"}
+                    </span>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    } catch (e) {
+        container.innerHTML += `<div class="auction-empty">경매 데이터를 불러오지 못했습니다.<br><small>${escapeHtml(e.message)}</small></div>`;
+    }
+}
+
+async function fetchLichAuctions(container) {
+    const weapon = auctionQuery.toLowerCase().replace(/ /g, "_");
+    container.innerHTML += '<div class="auction-empty">검색 중...</div>';
+
+    try {
+        const res = await fetch(`${WM_API}/auctions/search?type=lich&weapon_url_name=${weapon}&buyout_policy=with&sort_by=price_asc`);
+        const json = await res.json();
+        const auctions = json.payload?.auctions || [];
+
+        const loading = container.querySelector(".auction-empty");
+        if (loading) loading.remove();
+
+        if (!auctions.length) {
+            container.innerHTML += '<div class="auction-empty">검색 결과가 없습니다.</div>';
+            return;
+        }
+
+        auctions.slice(0, 30).forEach(a => {
+            const card = document.createElement("div");
+            card.className = "auction-card";
+            const item = a.item;
+            const priceText = a.top_bid ? a.top_bid + "p" : "-";
+            const buyoutText = a.buyout_price ? `<span class="buyout">즉시 구매 ${a.buyout_price}p</span>` : '<span class="buyout">즉구 없음</span>';
+            const sourceLabel = item.type === "lich" ? "리치" : "시스터";
+            const elementKo = ELEMENT_KO[item.element] || item.element || "";
+            const ephTag = item.having_ephemera ? `<span class="auction-ephemera-tag">에페메라</span>` : "";
+
+            card.innerHTML = `
+                <div class="auction-card-header">
+                    <div class="auction-card-title"><a href="https://warframe.market/auction/${a.id}" target="_blank">${escapeHtml(item.weapon_url_name || weapon)}</a> ${ephTag}</div>
+                    <div class="auction-card-price">${priceText} ${buyoutText}</div>
+                </div>
+                <div class="auction-stats">
+                    <span class="auction-stat">${sourceLabel}</span>
+                    <span class="auction-stat positive">${escapeHtml(elementKo)} ${item.damage || 0}%</span>
+                </div>
+                <div class="auction-seller">
+                    ${escapeHtml(a.owner?.ingame_name || "")} ·
+                    <span class="${a.owner?.status !== "offline" ? "online" : ""}">
+                        ${a.owner?.status === "ingame" ? "인게임" : a.owner?.status === "online" ? "온라인" : "오프라인"}
+                    </span>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    } catch (e) {
+        container.innerHTML += `<div class="auction-empty">경매 데이터를 불러오지 못했습니다.<br><small>${escapeHtml(e.message)}</small></div>`;
+    }
+}
+
+
+// ── 모딩 공유 (localStorage) ──
+const MODDING_CATEGORIES = [
+    { key: "warframe", label: "워프레임" },
+    { key: "primary", label: "주무기" },
+    { key: "secondary", label: "보조무기" },
+    { key: "melee", label: "근접무기" },
+    { key: "archwing", label: "아크윙" },
+    { key: "necramech", label: "네크라메크" },
+    { key: "archgun", label: "아크윙무기" },
+    { key: "companion", label: "동반자" },
+];
+
+let moddingCategory = "warframe";
+let moddingSelectedItem = "";
+let moddingFormOpen = false;
+let moddingFormImages = []; // data URLs
+
+function getModdingShares() {
+    return JSON.parse(localStorage.getItem("moddingShares") || "[]");
+}
+
+function saveModdingShares(shares) {
+    localStorage.setItem("moddingShares", JSON.stringify(shares));
+}
+
+function renderModdingTab() {
+    const container = document.getElementById("modding-content");
+    container.innerHTML = "";
+
+    const cats = document.createElement("div");
+    cats.className = "modding-cats";
+    MODDING_CATEGORIES.forEach(cat => {
+        const btn = document.createElement("button");
+        btn.className = "modding-cat-btn" + (moddingCategory === cat.key ? " active" : "");
+        btn.textContent = cat.label;
+        btn.onclick = () => { moddingCategory = cat.key; moddingSelectedItem = ""; moddingFormOpen = false; moddingFormImages = []; renderModdingTab(); };
+        cats.appendChild(btn);
+    });
+    container.appendChild(cats);
+
+    if (moddingSelectedItem) {
+        renderModdingDetail(container);
+    } else {
+        renderModdingItemList(container);
+    }
+}
+
+function renderModdingItemList(container) {
+    const addRow = document.createElement("div");
+    addRow.style.cssText = "display:flex;justify-content:flex-end;margin-bottom:10px;";
+    const addBtn = document.createElement("button");
+    addBtn.className = "modding-add-btn";
+    addBtn.innerHTML = "+ 공유하기";
+    addBtn.onclick = () => { moddingFormOpen = !moddingFormOpen; renderModdingTab(); };
+    addRow.appendChild(addBtn);
+    container.appendChild(addRow);
+
+    if (moddingFormOpen) {
+        container.appendChild(buildModdingForm());
+    }
+
+    const shares = getModdingShares().filter(s => s.category === moddingCategory);
+
+    // 아이템별 그룹화
+    const byItem = {};
+    for (const s of shares) {
+        if (!byItem[s.item_name]) byItem[s.item_name] = [];
+        byItem[s.item_name].push(s);
+    }
+
+    const itemNames = Object.keys(byItem);
+    if (!itemNames.length) {
+        container.innerHTML += '<div class="modding-empty">아직 공유된 모딩이 없습니다. 첫 번째로 공유해보세요!</div>';
+        return;
+    }
+
+    // 최신순 정렬
+    itemNames.sort((a, b) => {
+        const latestA = Math.max(...byItem[a].map(s => new Date(s.created_at).getTime()));
+        const latestB = Math.max(...byItem[b].map(s => new Date(s.created_at).getTime()));
+        return latestB - latestA;
+    });
+
+    itemNames.forEach(name => {
+        const items = byItem[name];
+        const latest = new Date(Math.max(...items.map(s => new Date(s.created_at).getTime())));
+        const dateStr = latest.toLocaleDateString("ko-KR", { month: "short", day: "numeric" });
+        const card = document.createElement("div");
+        card.className = "modding-item-card";
+        card.innerHTML = `
+            <div class="modding-item-thumb-empty"></div>
+            <div class="modding-item-info">
+                <div class="modding-item-name">${escapeHtml(name)}</div>
+                <div class="modding-item-meta">${items.length}건의 공유 · ${dateStr} 최신</div>
+            </div>
+            <div class="modding-item-arrow">›</div>
+        `;
+        card.onclick = () => { moddingSelectedItem = name; moddingFormOpen = false; renderModdingTab(); };
+        container.appendChild(card);
+    });
+}
+
+function renderModdingDetail(container) {
+    const header = document.createElement("div");
+    header.className = "modding-detail-header";
+    header.innerHTML = `
+        <button class="modding-back-btn" onclick="moddingSelectedItem='';renderModdingTab();">← 목록</button>
+        <span class="modding-detail-title">${escapeHtml(moddingSelectedItem)}</span>
+    `;
+    container.appendChild(header);
+
+    const addRow = document.createElement("div");
+    addRow.style.cssText = "display:flex;justify-content:flex-end;margin-bottom:10px;";
+    const addBtn = document.createElement("button");
+    addBtn.className = "modding-add-btn";
+    addBtn.innerHTML = "+ 공유하기";
+    addBtn.onclick = () => { moddingFormOpen = !moddingFormOpen; renderModdingTab(); };
+    addRow.appendChild(addBtn);
+    container.appendChild(addRow);
+
+    if (moddingFormOpen) {
+        container.appendChild(buildModdingForm(moddingSelectedItem));
+    }
+
+    const shares = getModdingShares().filter(s => s.category === moddingCategory && s.item_name === moddingSelectedItem);
+    if (!shares.length) {
+        container.innerHTML += '<div class="modding-empty">이 아이템에 대한 공유가 없습니다.</div>';
+        return;
+    }
+
+    const myName = localStorage.getItem("tradeName") || "";
+
+    shares.forEach(s => {
+        const card = document.createElement("div");
+        card.className = "modding-card";
+        const dateStr = new Date(s.created_at).toLocaleDateString("ko-KR", { year: "numeric", month: "short", day: "numeric" });
+        let imagesHtml = "";
+        if (s.images && s.images.length) {
+            imagesHtml = '<div class="modding-images">' +
+                s.images.map(src => `<img src="${src}" alt="모딩 이미지" onclick="openModdingLightbox(this.src)">`).join("") +
+                '</div>';
+        }
+        const delBtn = s.author === myName ? `<button class="modding-card-delete" onclick="deleteModdingShare(${s.id});event.stopPropagation();">삭제</button>` : "";
+        card.innerHTML = `
+            <div class="modding-card-top">
+                <span class="modding-card-author">${escapeHtml(s.author)}</span>
+                <span class="modding-card-date">${dateStr}</span>
+                ${delBtn}
+            </div>
+            ${s.memo ? `<div class="modding-card-memo">${escapeHtml(s.memo)}</div>` : ""}
+            ${imagesHtml}
+        `;
+        container.appendChild(card);
+    });
+}
+
+function deleteModdingShare(id) {
+    let shares = getModdingShares();
+    shares = shares.filter(s => s.id !== id);
+    saveModdingShares(shares);
+    renderModdingTab();
+}
+
+function buildModdingForm(prefillName) {
+    const form = document.createElement("div");
+    form.className = "modding-form";
+    const catLabel = MODDING_CATEGORIES.find(c => c.key === moddingCategory)?.label || "";
+    const nameVal = prefillName ? escapeHtml(prefillName) : "";
+    const nameRo = prefillName ? " readonly" : "";
+
+    form.innerHTML = `
+        <div class="form-row"><label>${escapeHtml(catLabel)} 이름</label><input type="text" id="modding-f-name" placeholder="예: Mesa Prime" maxlength="50" value="${nameVal}"${nameRo}></div>
+        <div class="form-row">
+            <label>메모 (최대 1000자)</label>
+            <textarea id="modding-f-memo" maxlength="1000" placeholder="모딩에 대한 설명이나 운영법을 적어주세요..."></textarea>
+            <div style="text-align:right;font-size:11px;color:var(--text-muted);margin-top:2px;" id="modding-memo-count">0 / 1000</div>
+        </div>
+        <div class="form-row">
+            <label>이미지 (최대 5장)</label>
+            <div class="modding-upload-area" id="modding-upload-area">클릭하거나 이미지를 드래그하여 업로드</div>
+            <input type="file" id="modding-file-input" accept="image/*" multiple style="display:none;">
+            <div class="modding-upload-preview" id="modding-upload-preview"></div>
+        </div>
+        <div class="form-row"><label>작성자</label><input type="text" id="modding-f-author" placeholder="닉네임" maxlength="20" value="${escapeHtml(localStorage.getItem("tradeName") || "")}"></div>
+        <div class="modding-form-actions">
+            <button class="btn-cancel" onclick="moddingFormOpen=false;moddingFormImages=[];renderModdingTab();">취소</button>
+            <button class="btn-submit" onclick="submitModdingShare()">공유하기</button>
+        </div>
+    `;
+
+    setTimeout(() => {
+        const area = document.getElementById("modding-upload-area");
+        const fileInput = document.getElementById("modding-file-input");
+        const memo = document.getElementById("modding-f-memo");
+
+        if (memo) memo.addEventListener("input", () => {
+            document.getElementById("modding-memo-count").textContent = memo.value.length + " / 1000";
+        });
+        if (area && fileInput) {
+            area.addEventListener("click", () => fileInput.click());
+            area.addEventListener("dragover", e => { e.preventDefault(); area.style.borderColor = "var(--primary)"; });
+            area.addEventListener("dragleave", () => { area.style.borderColor = "var(--border)"; });
+            area.addEventListener("drop", e => { e.preventDefault(); area.style.borderColor = "var(--border)"; handleModdingFiles(e.dataTransfer.files); });
+            fileInput.addEventListener("change", () => { handleModdingFiles(fileInput.files); fileInput.value = ""; });
+        }
+        renderModdingUploadPreview();
+    }, 0);
+
+    return form;
+}
+
+function handleModdingFiles(files) {
+    const remaining = 5 - moddingFormImages.length;
+    if (remaining <= 0) return;
+
+    for (const file of Array.from(files).slice(0, remaining)) {
+        if (!file.type.startsWith("image/")) continue;
+        const reader = new FileReader();
+        reader.onload = () => {
+            moddingFormImages.push(reader.result);
+            renderModdingUploadPreview();
+        };
+        reader.readAsDataURL(file);
+    }
+}
+
+function renderModdingUploadPreview() {
+    const preview = document.getElementById("modding-upload-preview");
+    if (!preview) return;
+    preview.innerHTML = "";
+    moddingFormImages.forEach((dataUrl, idx) => {
+        const thumb = document.createElement("div");
+        thumb.className = "thumb";
+        thumb.innerHTML = `<img src="${dataUrl}"><button class="thumb-remove" onclick="removeModdingImage(${idx})">×</button>`;
+        preview.appendChild(thumb);
+    });
+    const area = document.getElementById("modding-upload-area");
+    if (area) area.style.display = moddingFormImages.length >= 5 ? "none" : "";
+}
+
+function removeModdingImage(idx) {
+    moddingFormImages.splice(idx, 1);
+    renderModdingUploadPreview();
+}
+
+function submitModdingShare() {
+    const name = (document.getElementById("modding-f-name")?.value || "").trim();
+    const memo = (document.getElementById("modding-f-memo")?.value || "").trim();
+    const author = (document.getElementById("modding-f-author")?.value || "").trim();
+
+    if (!name) { alert("이름을 입력해주세요."); return; }
+    if (!author) { alert("작성자 이름을 입력해주세요."); return; }
+
+    const shares = getModdingShares();
+    shares.unshift({
+        id: Date.now(),
+        category: moddingCategory,
+        item_name: name,
+        author: author,
+        memo: memo,
+        images: [...moddingFormImages],
+        created_at: new Date().toISOString(),
+    });
+    saveModdingShares(shares);
+
+    moddingFormOpen = false;
+    moddingFormImages = [];
+    moddingSelectedItem = name;
+    renderModdingTab();
+}
+
+function openModdingLightbox(src) {
+    const lb = document.createElement("div");
+    lb.className = "modding-lightbox";
+    lb.innerHTML = `<img src="${src}">`;
+    lb.onclick = () => lb.remove();
+    document.body.appendChild(lb);
+}
+
+
+// ── 알림 팝업 ──
+function showAlertNotify(text) {
+    if (JSON.parse(localStorage.getItem("settingDnd") || "false")) return;
+    const el = document.getElementById("alert-notify");
+    if (!el) return;
+    el.textContent = text;
+    el.style.display = "block";
+    setTimeout(() => { el.style.display = "none"; }, 5000);
+}
+
+
+// ── 설정 ──
+function toggleSettings() {
+    const overlay = document.getElementById("settings-overlay");
+    const panel = document.getElementById("settings-panel");
+    const show = overlay.style.display === "none";
+    overlay.style.display = show ? "" : "none";
+    panel.style.display = show ? "" : "none";
+    if (show) { loadSettings(); renderPaletteGrid(); }
+}
+
+function saveSettings() {
+    localStorage.setItem("settingDnd", JSON.stringify(document.getElementById("set-dnd").checked));
+}
+
+function loadSettings() {
+    document.getElementById("set-dnd").checked = JSON.parse(localStorage.getItem("settingDnd") || "false");
+}
+
+// ── 테마 ──
+const PALETTES = {
+    dark: [
+        { name: "기본", colors: ["#1a1a2e", "#16213e", "#4db8ff", "#e0e0e0"], vars: { "--bg": "#1a1a2e", "--surface": "#16213e", "--primary": "#4db8ff", "--text": "#e0e0e0", "--text-muted": "#888", "--border": "#2a2a4a", "--user-bubble": "#0f3460", "--price-bg": "#0a1628" } },
+        { name: "보라", colors: ["#1a1025", "#2d1b4e", "#b388ff", "#e0e0e0"], vars: { "--bg": "#1a1025", "--surface": "#2d1b4e", "--primary": "#b388ff", "--text": "#e0e0e0", "--text-muted": "#999", "--border": "#3d2a5c", "--user-bubble": "#3a1f6e", "--price-bg": "#120b1c" } },
+        { name: "초록", colors: ["#0d1f0d", "#1a3a1a", "#66bb6a", "#d0e8d0"], vars: { "--bg": "#0d1f0d", "--surface": "#1a3a1a", "--primary": "#66bb6a", "--text": "#d0e8d0", "--text-muted": "#7a9c7a", "--border": "#2a4a2a", "--user-bubble": "#1a4a1a", "--price-bg": "#081408" } },
+    ],
+    light: [
+        { name: "기본", colors: ["#f5f5f5", "#ffffff", "#1976d2", "#212121"], vars: { "--bg": "#f5f5f5", "--surface": "#ffffff", "--primary": "#1976d2", "--text": "#212121", "--text-muted": "#757575", "--border": "#e0e0e0", "--user-bubble": "#bbdefb", "--price-bg": "#e3f2fd" } },
+        { name: "따뜻한", colors: ["#fff8e1", "#ffffff", "#f57c00", "#3e2723"], vars: { "--bg": "#fff8e1", "--surface": "#ffffff", "--primary": "#f57c00", "--text": "#3e2723", "--text-muted": "#8d6e63", "--border": "#ffe0b2", "--user-bubble": "#ffe0b2", "--price-bg": "#fff3e0" } },
+    ],
+};
+
+let currentMode = localStorage.getItem("themeMode") || "dark";
+let currentPalette = parseInt(localStorage.getItem("themePalette_" + currentMode) || "0");
+
+function applyPalette() {
+    const palettes = PALETTES[currentMode];
+    const p = palettes[currentPalette] || palettes[0];
+    for (const [key, val] of Object.entries(p.vars)) {
+        document.documentElement.style.setProperty(key, val);
+    }
+}
+
+function switchMode(mode) {
+    currentMode = mode;
+    localStorage.setItem("themeMode", mode);
+    currentPalette = parseInt(localStorage.getItem("themePalette_" + mode) || "0");
+    applyPalette();
+    document.querySelectorAll(".mode-btn").forEach(b => b.classList.toggle("active", b.dataset.mode === mode));
+    document.getElementById("palette-label").textContent = (mode === "dark" ? "다크" : "라이트") + " 팔레트";
+    renderPaletteGrid();
+}
+
+function renderPaletteGrid() {
+    const grid = document.getElementById("palette-grid");
+    if (!grid) return;
+    grid.innerHTML = "";
+    const palettes = PALETTES[currentMode];
+    palettes.forEach((p, idx) => {
+        const opt = document.createElement("div");
+        opt.className = "palette-option" + (idx === currentPalette ? " active" : "");
+        opt.addEventListener("click", () => {
+            currentPalette = idx;
+            localStorage.setItem("themePalette_" + currentMode, idx);
+            applyPalette();
+            renderPaletteGrid();
+        });
+        const colors = document.createElement("div");
+        colors.className = "palette-colors";
+        p.colors.forEach(c => {
+            const swatch = document.createElement("div");
+            swatch.className = "palette-swatch";
+            swatch.style.background = c;
+            colors.appendChild(swatch);
+        });
+        const name = document.createElement("span");
+        name.className = "palette-name";
+        name.textContent = p.name;
+        opt.appendChild(colors);
+        opt.appendChild(name);
+        grid.appendChild(opt);
+    });
+}
+
+// ── 초기화 ──
+applyPalette();
+// 백그라운드로 아이템 목록 미리 로드
+loadWmItems();
+</script>
+</body>
+</html>

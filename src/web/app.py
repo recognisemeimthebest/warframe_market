@@ -17,7 +17,7 @@ from src.market.auction import (
     search_lich_auctions,
     search_riven_auctions,
 )
-from src.market.history import get_recent_surges, init_db
+from src.market.history import get_recent_surges, init_db, DB_PATH as HISTORY_DB_PATH
 from src.market.items import (
     _slug_to_ko,
     _slug_to_en_name,
@@ -49,14 +49,17 @@ from src.market.watchlist import (
 )
 from src.modding.share import (
     IMAGES_DIR,
+    SUBTYPES,
     create_share,
     delete_share,
+    update_share,
     get_items_in_category,
     get_shares,
     init_modding_db,
     save_image,
 )
 from src.wiki.drops import fetch_item_description, load_drop_table, refresh_drop_table, search_farming, search_resources
+from src.wiki.skins import search_skins
 from src.market.relic import get_relic_value, search_relics, _build_relic_cache
 from src.world.api import (
     get_arbitration,
@@ -309,11 +312,178 @@ async def api_vendors():
         get_void_trader(),
         get_steel_path(),
     )
+
+    # 바로 활성화 중이면 각 아이템 시세 병렬 조회
+    if baro.get("active") and baro.get("inventory"):
+        async def _enrich_baro(item: dict) -> dict:
+            resolved = resolve_item(item["item"])
+            if resolved:
+                slug, _ = resolved
+                try:
+                    price = await get_item_price(slug)
+                    item["market_sell"] = price.sell_min
+                    item["market_buy"] = price.buy_max
+                    item["slug"] = slug
+                except Exception:
+                    pass
+            return item
+
+        baro["inventory"] = list(
+            await asyncio.gather(*[_enrich_baro(i) for i in baro["inventory"]])
+        )
+
     return {
         "baro": baro,
         "steel_path": steel_path,
         "nightwave": static.get("nightwave", {}),
         "syndicates": static.get("syndicates", []),
+    }
+
+
+# ── 차익 탐지 ──
+
+@app.get("/api/arbitrage")
+async def api_arbitrage(limit: int = 40):
+    """현재 판매가가 48시간 평균보다 낮은 아이템 — 저평가 매수 기회."""
+    import sqlite3
+
+    conn = sqlite3.connect(str(HISTORY_DB_PATH))
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute("""
+            SELECT p.slug, p.sell_min, p.buy_max, p.avg_price, p.volume, p.sell_count
+            FROM price_snapshot p
+            INNER JOIN (
+                SELECT slug, MAX(id) AS max_id
+                FROM price_snapshot
+                WHERE sell_min IS NOT NULL AND avg_price IS NOT NULL
+                  AND rank IS NULL AND sell_min > 5 AND avg_price > 5
+                  AND volume > 2
+                GROUP BY slug
+            ) latest ON p.id = latest.max_id
+            WHERE p.sell_min < p.avg_price * 0.8
+              AND p.sell_count >= 1
+            ORDER BY CAST(p.avg_price - p.sell_min AS REAL) / p.avg_price DESC
+            LIMIT ?
+        """, (limit,)).fetchall()
+    finally:
+        conn.close()
+
+    items = []
+    for r in rows:
+        slug = r["slug"]
+        sell = r["sell_min"]
+        avg = round(r["avg_price"])
+        discount = avg - sell
+        discount_pct = round(discount * 100 / avg, 1) if avg else 0
+        name = _slug_to_ko(slug) or _slug_to_en_name(slug) or slug.replace("_", " ").title()
+        items.append({
+            "slug": slug,
+            "name": name,
+            "sell_min": sell,
+            "avg_price": avg,
+            "discount": discount,
+            "discount_pct": discount_pct,
+            "volume": r["volume"],
+            "sell_count": r["sell_count"],
+            "buy_max": r["buy_max"],
+        })
+
+    return {"data": items}
+
+
+# ── 세트/부품 차익 ──
+
+@app.get("/api/set-arbitrage")
+async def api_set_arbitrage(min_profit: int = 10, limit: int = 40):
+    """세트 vs 부품 합산 가격 비교 — 분해/조합 차익 탐지."""
+    import sqlite3
+
+    conn = sqlite3.connect(str(HISTORY_DB_PATH))
+    conn.row_factory = sqlite3.Row
+    try:
+        rows = conn.execute("""
+            SELECT p.slug, p.sell_min, p.buy_max
+            FROM price_snapshot p
+            INNER JOIN (
+                SELECT slug, MAX(id) AS max_id
+                FROM price_snapshot
+                WHERE rank IS NULL
+                GROUP BY slug
+            ) latest ON p.id = latest.max_id
+            WHERE p.sell_min IS NOT NULL OR p.buy_max IS NOT NULL
+        """).fetchall()
+    finally:
+        conn.close()
+
+    price_map: dict[str, dict] = {
+        r["slug"]: {"sell_min": r["sell_min"], "buy_max": r["buy_max"]}
+        for r in rows
+    }
+
+    set_slugs = [s for s in price_map if s.endswith("_set")]
+
+    breakdown = []  # 세트 구매 → 부품 판매
+    assembly  = []  # 부품 구매 → 세트 판매
+
+    for set_slug in set_slugs:
+        base = set_slug[:-4]  # "rhino_prime_set" → "rhino_prime"
+        parts = [s for s in price_map if s.startswith(base + "_") and not s.endswith("_set")]
+        if len(parts) < 2:
+            continue
+
+        sp = price_map[set_slug]
+        set_sell  = sp.get("sell_min")
+        set_buy   = sp.get("buy_max")
+
+        part_prices = [price_map[p] for p in parts]
+        parts_sell_sum = sum(p["sell_min"] for p in part_prices if p.get("sell_min"))
+        parts_buy_sum  = sum(p["sell_min"] for p in part_prices if p.get("sell_min"))  # 부품 구입비 = 판매자한테 사는 금액
+
+        set_name = _slug_to_ko(set_slug) or _slug_to_en_name(set_slug) or set_slug.replace("_", " ").title()
+
+        def _part_info(p_slug):
+            pp = price_map[p_slug]
+            return {
+                "slug": p_slug,
+                "name": _slug_to_ko(p_slug) or _slug_to_en_name(p_slug) or p_slug.replace("_", " ").title(),
+                "sell_min": pp.get("sell_min"),
+            }
+
+        # ① 분해 차익: 세트 판매가 < 부품 합산 판매가 → 세트 사서 부품 따로 팔기
+        if set_sell and parts_sell_sum and parts_sell_sum - set_sell >= min_profit:
+            profit = parts_sell_sum - set_sell
+            breakdown.append({
+                "set_slug": set_slug,
+                "set_name": set_name,
+                "set_sell": set_sell,
+                "parts_sell_sum": parts_sell_sum,
+                "profit": profit,
+                "profit_pct": round(profit * 100 / set_sell, 1),
+                "parts": [_part_info(p) for p in parts],
+                "type": "breakdown",
+            })
+
+        # ② 조합 차익: 부품 합산 판매가 < 세트 구매 희망가 → 부품 사서 세트로 팔기
+        if set_buy and parts_sell_sum and set_buy - parts_sell_sum >= min_profit:
+            profit = set_buy - parts_sell_sum
+            assembly.append({
+                "set_slug": set_slug,
+                "set_name": set_name,
+                "set_buy": set_buy,
+                "parts_sell_sum": parts_sell_sum,
+                "profit": profit,
+                "profit_pct": round(profit * 100 / parts_sell_sum, 1),
+                "parts": [_part_info(p) for p in parts],
+                "type": "assembly",
+            })
+
+    breakdown.sort(key=lambda x: x["profit_pct"], reverse=True)
+    assembly.sort(key=lambda x: x["profit_pct"], reverse=True)
+
+    return {
+        "breakdown": breakdown[:limit],
+        "assembly": assembly[:limit],
     }
 
 
@@ -351,6 +521,17 @@ async def api_relic_value(name: str = Query(""), ref: str = Query("Radiant")):
     }
 
 
+# ── 스킨 API ──
+
+@app.get("/api/skins/search")
+async def api_skins_search(q: str = Query(""), skin_type: str = Query("warframe")):
+    """워프레임/무기 스킨 이미지 검색 (Fandom Wiki)."""
+    if not q.strip():
+        return {"data": []}
+    results = await search_skins(q.strip(), skin_type)
+    return {"data": results}
+
+
 # ── 경매 API ──
 
 # 무기 미지정 시 기본 조회할 인기 무기들 (카테고리별)
@@ -386,7 +567,7 @@ async def api_riven_auctions(
 ):
     """리벤 경매 검색. 무기 미지정 시 인기 무기 자동 조회."""
     bp = buyout_policy if buyout_policy else None
-    cap = min(limit, 100)
+    cap = min(limit, 300)
 
     if weapon:
         # 한글/영문/slug 입력을 리벤 무기 url_name으로 변환
@@ -433,7 +614,7 @@ async def api_lich_auctions(
         eph = False
 
     bp = buyout_policy if buyout_policy else None
-    cap = min(limit, 100)
+    cap = min(limit, 300)
 
     if weapon:
         items = await search_lich_auctions(
@@ -560,6 +741,37 @@ async def api_remove_watch(watch_id: int, user_name: str = Query("")):
 
 # ── 모딩 공유 API ──
 
+@app.get("/api/modding/subtypes")
+async def api_modding_subtypes():
+    """카테고리별 서브타입 목록."""
+    return {"data": SUBTYPES}
+
+
+@app.get("/api/modding/category-hint")
+async def api_modding_category_hint(name: str = Query("")):
+    """아이템 이름으로 카테고리 추측. 매칭 없으면 null."""
+    if not name.strip():
+        return {"category": None}
+    items = search_items(name.strip(), limit=1)
+    if not items:
+        return {"category": None}
+    item = items[0]
+    cat = item.get("category", "")
+    # warframe.market 카테고리 → 모딩 카테고리 매핑
+    cat_map = {
+        "warframes": "warframe",
+        "primary_weapons": "primary",
+        "secondary_weapons": "secondary",
+        "melee_weapons": "melee",
+        "arch_guns": "archgun",
+        "arch_melee": "melee",
+        "sentinels": "companion",
+        "companions": "companion",
+    }
+    mapped = cat_map.get(cat)
+    return {"category": mapped, "matched_name": item.get("en_name", "")}
+
+
 @app.get("/api/modding/items")
 async def api_modding_items(category: str = "warframe"):
     """카테고리별 아이템 목록."""
@@ -574,6 +786,7 @@ async def api_modding_shares(category: str = "warframe", item_name: str = "", li
         {
             "id": s.id, "category": s.category, "item_name": s.item_name,
             "author": s.author, "memo": s.memo, "created_at": s.created_at,
+            "sub_type": s.sub_type, "has_password": s.has_password,
             "images": [f"/api/modding/images/{fname}" for fname in s.images],
         }
         for s in shares
@@ -589,6 +802,8 @@ async def api_modding_create_share(body: dict):
         author=body.get("author", ""),
         memo=body.get("memo", ""),
         image_filenames=body.get("image_filenames", []),
+        sub_type=body.get("sub_type", ""),
+        password=body.get("password", ""),
     )
     if isinstance(result, str):
         return {"ok": False, "msg": result}
@@ -624,11 +839,29 @@ async def api_modding_image(filename: str):
     return FileResponse(filepath)
 
 
+@app.put("/api/modding/shares/{share_id}")
+async def api_modding_update_share(share_id: int, body: dict):
+    """모딩 공유 메모 수정."""
+    image_filenames = body.get("image_filenames")  # None이면 이미지 변경 없음
+    result = update_share(
+        share_id=share_id,
+        author=body.get("author", ""),
+        password=body.get("password", ""),
+        memo=body.get("memo", ""),
+        image_filenames=image_filenames,
+    )
+    if isinstance(result, str):
+        return {"ok": False, "msg": result}
+    return {"ok": bool(result)}
+
+
 @app.delete("/api/modding/shares/{share_id}")
-async def api_modding_delete_share(share_id: int, author: str = Query("")):
+async def api_modding_delete_share(share_id: int, author: str = Query(""), password: str = Query("")):
     """모딩 공유 삭제."""
-    ok = delete_share(share_id, author=author)
-    return {"ok": ok}
+    result = delete_share(share_id, author=author, password=password)
+    if isinstance(result, str):
+        return {"ok": False, "msg": result}
+    return {"ok": bool(result)}
 
 
 # ── 관리자 API ──
