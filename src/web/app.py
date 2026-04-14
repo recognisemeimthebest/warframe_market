@@ -376,7 +376,7 @@ async def api_arbitrage(limit: int = 40):
         avg = round(r["avg_price"])
         discount = avg - sell
         discount_pct = round(discount * 100 / avg, 1) if avg else 0
-        name = _slug_to_ko(slug) or _slug_to_en_name(slug) or slug.replace("_", " ").title()
+        name = _slug_to_ko.get(slug) or _slug_to_en_name.get(slug) or slug.replace("_", " ").title()
         items.append({
             "slug": slug,
             "name": name,
@@ -440,13 +440,13 @@ async def api_set_arbitrage(min_profit: int = 10, limit: int = 40):
         parts_sell_sum = sum(p["sell_min"] for p in part_prices if p.get("sell_min"))
         parts_buy_sum  = sum(p["sell_min"] for p in part_prices if p.get("sell_min"))  # 부품 구입비 = 판매자한테 사는 금액
 
-        set_name = _slug_to_ko(set_slug) or _slug_to_en_name(set_slug) or set_slug.replace("_", " ").title()
+        set_name = _slug_to_ko.get(set_slug) or _slug_to_en_name.get(set_slug) or set_slug.replace("_", " ").title()
 
         def _part_info(p_slug):
             pp = price_map[p_slug]
             return {
                 "slug": p_slug,
-                "name": _slug_to_ko(p_slug) or _slug_to_en_name(p_slug) or p_slug.replace("_", " ").title(),
+                "name": _slug_to_ko.get(p_slug) or _slug_to_en_name.get(p_slug) or p_slug.replace("_", " ").title(),
                 "sell_min": pp.get("sell_min"),
             }
 
