@@ -64,6 +64,8 @@ from src.world.api import (
     get_fissures,
     get_invasions,
     get_world_state,
+    get_void_trader,
+    get_steel_path,
 )
 
 from src.config import VAPID_PUBLIC_KEY
@@ -279,6 +281,40 @@ async def api_invasions():
 @app.get("/api/world/cycles")
 async def api_cycles():
     return {"data": await get_cycles()}
+
+
+# ── 상인 API ──
+
+_vendors_static: dict | None = None
+
+
+def _load_vendors_static() -> dict:
+    global _vendors_static
+    if _vendors_static is None:
+        import json
+        from src.config import DATA_DIR
+        path = DATA_DIR / "vendors.json"
+        try:
+            _vendors_static = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            _vendors_static = {"nightwave": {}, "syndicates": []}
+    return _vendors_static
+
+
+@app.get("/api/vendors")
+async def api_vendors():
+    """상인 전체 데이터 (키티어 + 테신 + 나이트웨이브 + 진영)."""
+    static = _load_vendors_static()
+    baro, steel_path = await asyncio.gather(
+        get_void_trader(),
+        get_steel_path(),
+    )
+    return {
+        "baro": baro,
+        "steel_path": steel_path,
+        "nightwave": static.get("nightwave", {}),
+        "syndicates": static.get("syndicates", []),
+    }
 
 
 # ── 렐릭 API ──

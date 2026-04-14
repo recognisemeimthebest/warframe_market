@@ -665,6 +665,10 @@ async function fetchWorldState() {
             const res = await fetch("/api/world/cycles");
             const json = await res.json();
             renderCycles(json.data || {});
+        } else if (worldSection === "vendors") {
+            const res = await fetch("/api/vendors");
+            const json = await res.json();
+            renderVendors(json);
         }
     } catch {
         el.innerHTML = '<div class="surge-empty">데이터를 불러오지 못했습니다.</div>';
@@ -2464,6 +2468,209 @@ function installPwa() {
 if (window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone) {
     const sec = document.getElementById("install-section");
     if (sec) sec.style.display = "none";
+}
+
+// ── 상인 ──
+
+function renderVendors(data) {
+    const el = document.getElementById("world-list");
+    el.innerHTML = "";
+
+    // 키티어
+    _renderBaroCard(el, data.baro || {});
+    // 테신
+    _renderSteelPathCard(el, data.steel_path || {});
+    // 나이트웨이브
+    _renderNightwaveCard(el, data.nightwave || {});
+    // 진영
+    _renderSyndicateCards(el, data.syndicates || []);
+}
+
+function _vendorSection(title, subtitleHtml) {
+    const sec = document.createElement("div");
+    sec.className = "vendor-section";
+    sec.innerHTML = `<div class="vendor-section-title">${escapeHtml(title)}${subtitleHtml ? ' <span class="vendor-section-sub">' + subtitleHtml + '</span>' : ''}</div>`;
+    return sec;
+}
+
+function _renderBaroCard(container, baro) {
+    const sec = _vendorSection("키티어 (보이드 상인)", "");
+    const card = document.createElement("div");
+    card.className = "vendor-card";
+
+    if (baro.error) {
+        card.innerHTML = '<div class="vendor-empty">데이터를 불러오지 못했습니다.</div>';
+        sec.appendChild(card);
+        container.appendChild(sec);
+        return;
+    }
+
+    if (!baro.active) {
+        card.innerHTML = `
+            <div class="vendor-status offline">부재 중</div>
+            <div class="vendor-eta"><span class="vendor-eta-label">도착까지</span> ${escapeHtml(baro.eta || "")}</div>
+            <div class="vendor-hint">키티어는 격주로 릴레이에 방문합니다.</div>
+        `;
+        sec.appendChild(card);
+        container.appendChild(sec);
+        return;
+    }
+
+    const itemsHtml = (baro.inventory || []).map((item) => `
+        <div class="vendor-item">
+            <div class="vendor-item-name">${escapeHtml(item.item)}</div>
+            <div class="vendor-item-price">
+                <span class="vendor-ducat">${item.ducats}두캣</span>
+                <span class="vendor-credit">+ ${(item.credits || 0).toLocaleString()}크레딧</span>
+            </div>
+        </div>
+    `).join("");
+
+    card.innerHTML = `
+        <div class="vendor-status online">방문 중 — ${escapeHtml(baro.location || "")}</div>
+        <div class="vendor-eta"><span class="vendor-eta-label">출발까지</span> ${escapeHtml(baro.eta || "")}</div>
+        <div class="vendor-items">${itemsHtml || '<div class="vendor-empty">재고 없음</div>'}</div>
+    `;
+    sec.appendChild(card);
+    container.appendChild(sec);
+}
+
+function _renderSteelPathCard(container, sp) {
+    const sec = _vendorSection("테신 (스틸패스 명예 상점)", "");
+    const card = document.createElement("div");
+    card.className = "vendor-card";
+
+    if (sp.error) {
+        card.innerHTML = '<div class="vendor-empty">데이터를 불러오지 못했습니다.</div>';
+        sec.appendChild(card);
+        container.appendChild(sec);
+        return;
+    }
+
+    const cur = sp.current_reward || {};
+    const evergreenHtml = (sp.evergreens || []).map((i) => `
+        <div class="vendor-item">
+            <div class="vendor-item-name">${escapeHtml(i.name)}</div>
+            <div class="vendor-item-price"><span class="vendor-steel">${i.cost} 명예</span></div>
+        </div>
+    `).join("");
+
+    const rotationHtml = (sp.rotation || []).map((i) => {
+        const isCurrent = i.name === cur.name;
+        return `<div class="vendor-item${isCurrent ? " vendor-item-current" : ""}">
+            <div class="vendor-item-name">${isCurrent ? "★ " : ""}${escapeHtml(i.name)}</div>
+            <div class="vendor-item-price"><span class="vendor-steel">${i.cost} 명예</span></div>
+        </div>`;
+    }).join("");
+
+    card.innerHTML = `
+        <div class="vendor-subsection-title">이번 주 순환 보상</div>
+        <div class="vendor-current-reward">
+            <span class="vendor-item-name">${escapeHtml(cur.name || "")}</span>
+            <span class="vendor-steel">${cur.cost || 0} 명예</span>
+            <span class="vendor-remaining">${escapeHtml(sp.remaining || "")}</span>
+        </div>
+        <div class="vendor-subsection-title" style="margin-top:10px;">순환 목록</div>
+        <div class="vendor-items">${rotationHtml}</div>
+        <div class="vendor-subsection-title" style="margin-top:10px;">상시 판매</div>
+        <div class="vendor-items">${evergreenHtml}</div>
+    `;
+    sec.appendChild(card);
+    container.appendChild(sec);
+}
+
+function _renderNightwaveCard(container, nw) {
+    if (!nw.items || !nw.items.length) return;
+    const sec = _vendorSection("나이트웨이브 크레드 상점", "(NW 크레드)");
+    const card = document.createElement("div");
+    card.className = "vendor-card";
+
+    // 카테고리별 그룹핑
+    const groups = {};
+    nw.items.forEach((item) => {
+        const cat = item.category || "기타";
+        if (!groups[cat]) groups[cat] = [];
+        groups[cat].push(item);
+    });
+
+    let html = "";
+    for (const [cat, items] of Object.entries(groups)) {
+        html += `<div class="vendor-subsection-title">${escapeHtml(cat)}</div>`;
+        html += `<div class="vendor-items">`;
+        items.forEach((item) => {
+            const unitTag = item.unit ? ` <span class="vendor-unit">${escapeHtml(item.unit)}</span>` : "";
+            html += `<div class="vendor-item">
+                <div class="vendor-item-name">${escapeHtml(item.name_ko || item.name)}${unitTag}</div>
+                <div class="vendor-item-price"><span class="vendor-nw">${item.cost} NW</span></div>
+            </div>`;
+        });
+        html += `</div>`;
+    }
+
+    card.innerHTML = html;
+    sec.appendChild(card);
+    container.appendChild(sec);
+}
+
+let activeSyndicateId = "steel_meridian";
+
+function _renderSyndicateCards(container, syndicates) {
+    if (!syndicates.length) return;
+    const sec = _vendorSection("진영 상점", "");
+
+    // 진영 탭
+    const tabs = document.createElement("div");
+    tabs.className = "vendor-syndicate-tabs";
+    syndicates.forEach((s) => {
+        const btn = document.createElement("button");
+        btn.className = "vendor-syndicate-tab" + (activeSyndicateId === s.id ? " active" : "");
+        btn.textContent = s.name_ko;
+        btn.style.borderColor = activeSyndicateId === s.id ? s.color : "transparent";
+        btn.style.color = activeSyndicateId === s.id ? s.color : "";
+        btn.addEventListener("click", () => {
+            activeSyndicateId = s.id;
+            _renderSyndicateCards(container.querySelector ? container : document.getElementById("world-list"), syndicates);
+        });
+        tabs.appendChild(btn);
+    });
+    sec.appendChild(tabs);
+
+    const active = syndicates.find((s) => s.id === activeSyndicateId) || syndicates[0];
+    const card = document.createElement("div");
+    card.className = "vendor-card";
+
+    // 타입별 그룹핑
+    const groups = {};
+    (active.offerings || []).forEach((item) => {
+        const t = item.type || "기타";
+        if (!groups[t]) groups[t] = [];
+        groups[t].push(item);
+    });
+
+    let html = "";
+    for (const [type, items] of Object.entries(groups)) {
+        html += `<div class="vendor-subsection-title">${escapeHtml(type)}</div><div class="vendor-items">`;
+        items.forEach((item) => {
+            html += `<div class="vendor-item">
+                <div class="vendor-item-name">${escapeHtml(item.name_ko || item.name)}</div>
+                <div class="vendor-item-price"><span class="vendor-standing">${(item.cost || 0).toLocaleString()} 스탠딩</span></div>
+            </div>`;
+        });
+        html += `</div>`;
+    }
+
+    card.innerHTML = html;
+    sec.appendChild(card);
+
+    // 기존 상인 섹션 교체 (진영 재렌더 시)
+    const existing = document.querySelector(".vendor-syndicate-section");
+    if (existing) {
+        existing.replaceWith(sec);
+    } else {
+        sec.classList.add("vendor-syndicate-section");
+        container.appendChild(sec);
+    }
+    sec.classList.add("vendor-syndicate-section");
 }
 
 // ── 렐릭 기대 수익 ──

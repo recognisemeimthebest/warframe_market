@@ -334,3 +334,70 @@ async def get_world_state() -> dict:
         "invasions": invasions,
         "cycles": cycles,
     }
+
+
+# ── 상인 / 진영 ──
+
+_WFSTAT_URL = "https://api.warframestat.us/pc"
+
+
+async def get_void_trader() -> dict:
+    """키티어 (보이드 상인) 현재 재고."""
+    try:
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True, headers={"User-Agent": "warframe-chatbot/1.0"}) as c:
+            r = await c.get(f"{_WFSTAT_URL}/voidTrader")
+            r.raise_for_status()
+            d = r.json()
+    except Exception:
+        logger.exception("키티어 데이터 조회 실패")
+        return {"active": False, "error": True}
+
+    def _iso_to_ms(s) -> int:
+        if not s:
+            return 0
+        try:
+            from datetime import datetime, timezone
+            dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
+            return int(dt.timestamp() * 1000)
+        except Exception:
+            return 0
+
+    now_ms = int(time.time() * 1000)
+    activation_ms = _iso_to_ms(d.get("activation"))
+    expiry_ms = _iso_to_ms(d.get("expiry"))
+    active = activation_ms <= now_ms < expiry_ms
+
+    inventory = []
+    for item in d.get("inventory", []):
+        inventory.append({
+            "item": item.get("item", ""),
+            "ducats": item.get("ducats", 0),
+            "credits": item.get("credits", 0),
+        })
+
+    return {
+        "active": active,
+        "location": d.get("location", ""),
+        "eta": _eta_from_expiry(expiry_ms) if active else _eta_from_expiry(activation_ms),
+        "eta_label": "출발까지" if active else "도착까지",
+        "inventory": inventory,
+    }
+
+
+async def get_steel_path() -> dict:
+    """테신 스틸패스 스토어."""
+    try:
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True, headers={"User-Agent": "warframe-chatbot/1.0"}) as c:
+            r = await c.get(f"{_WFSTAT_URL}/steelPath")
+            r.raise_for_status()
+            d = r.json()
+    except Exception:
+        logger.exception("스틸패스 데이터 조회 실패")
+        return {"error": True}
+
+    return {
+        "current_reward": d.get("currentReward", {}),
+        "remaining": d.get("remaining", ""),
+        "rotation": d.get("rotation", []),
+        "evergreens": d.get("evergreens", []),
+    }
