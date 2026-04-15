@@ -4,6 +4,7 @@ import asyncio
 import logging
 import re
 import time
+from difflib import SequenceMatcher
 
 import httpx
 
@@ -67,31 +68,31 @@ _KO_SKIN_NAMES: dict[str, str] = {
     "티타니아": "Titania",
     "나이더스": "Nidus",
     "옥타비아": "Octavia",
-    "네자": "Nezha",
-    "하로우": "Harrow",
+    "나타": "Nezha",
+    "해로우": "Harrow",
     "코라": "Khora",
     "가라": "Garuda",
     "바우반": "Vauban",
-    "와크": "Wukong", "우콩": "Wukong",
+    "오공": "Wukong", "우콩": "Wukong",
     "힐드린": "Hildryn",
-    "와이스프": "Wisp",
+    "위습": "Wisp",
     "가우스": "Gauss",
     "지안": "Gian", "자얀": "Gian",
-    "프로테아": "Protea",
-    "엑시": "Xaku",
-    "레비리안": "Lavos",
+    "프로티아": "Protea",
+    "자쿠": "Xaku",
+    "라보스": "Lavos",
     "파인": "Phane",
-    "세브고스": "Sevagoth",
+    "세바고스": "Sevagoth",
     "칼리반": "Caliban",
     "구르마그": "Gourmagul",
-    "스탁스": "Styanax",
+    "스티아낙스": "Styanax",
     "단테": "Dante",
     "오필리아": "Opaline",
     # 무기 (자주 쓰는 것)
     "니카나": "Nikana",
-    "스쿼드": "Skana",
-    "부크리": "Burston",
-    "파리스": "Paris",
+    "스카나": "Skana",
+    "버스튼": "Burston",
+    "패리스": "Paris",
     "루프나": "Rufna",
 }
 
@@ -100,16 +101,47 @@ def _has_korean(text: str) -> bool:
     return any("\uAC00" <= ch <= "\uD7A3" or "\u3131" <= ch <= "\u318E" for ch in text)
 
 
+def _jamo(text: str) -> str:
+    """한글 음절을 자모로 분해 (비한글은 그대로)."""
+    CHOSUNG  = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ"
+    JUNGSUNG = "ㅏㅐㅑㅒㅓㅔㅕㅖㅗㅘㅙㅚㅛㅜㅝㅞㅟㅠㅡㅢㅣ"
+    JONGSUNG = " ㄱㄲㄳㄴㄵㄶㄷㄹㄺㄻㄼㄽㄾㄿㅀㅁㅂㅄㅅㅆㅇㅈㅊㅋㅌㅍㅎ"
+    out = []
+    for ch in text:
+        if "가" <= ch <= "힣":
+            code = ord(ch) - 0xAC00
+            jong = code % 28
+            code //= 28
+            out.append(CHOSUNG[code // 21])
+            out.append(JUNGSUNG[code % 21])
+            if jong:
+                out.append(JONGSUNG[jong])
+        else:
+            out.append(ch)
+    return "".join(out)
+
+
 def _ko_to_en_query(query: str) -> str:
     """한글 쿼리를 영문 이름으로 변환. 변환 실패 시 원문 반환."""
     q = query.strip()
+    q_clean = q.replace(" ", "")
 
     # 1. 직접 매핑 우선 확인
-    direct = _KO_SKIN_NAMES.get(q) or _KO_SKIN_NAMES.get(q.replace(" ", ""))
+    direct = _KO_SKIN_NAMES.get(q) or _KO_SKIN_NAMES.get(q_clean)
     if direct:
         return direct
 
-    # 2. market DB 퍼지 검색
+    # 2. _KO_SKIN_NAMES 키들과 자모 유사도 비교 (오타 허용)
+    q_jamo = _jamo(q_clean)
+    best_score, best_en = 0.0, ""
+    for ko_key, en_val in _KO_SKIN_NAMES.items():
+        score = SequenceMatcher(None, q_jamo, _jamo(ko_key)).ratio()
+        if score > best_score:
+            best_score, best_en = score, en_val
+    if best_score >= 0.75:
+        return best_en
+
+    # 3. market DB 퍼지 검색
     try:
         from src.market.items import search_items
         results = search_items(q, limit=1)
