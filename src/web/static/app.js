@@ -1149,12 +1149,6 @@ async function fetchSkins() {
 
     const resultsDiv = document.getElementById("skin-results");
 
-    // 한글 입력 감지
-    if (/[\uAC00-\uD7AF\u1100-\u11FF\u3130-\u318F]/.test(q)) {
-        resultsDiv.innerHTML = '<div class="skin-empty">스킨 검색은 영문으로 입력해주세요.<br><small>예: Rhino, Mesa, Arca Plasmor</small></div>';
-        return;
-    }
-
     resultsDiv.innerHTML = '<div class="skin-loading">검색 중...</div>';
 
     try {
@@ -1169,7 +1163,7 @@ async function fetchSkins() {
 function renderSkinCards(skins) {
     const resultsDiv = document.getElementById("skin-results");
     if (!skins.length) {
-        resultsDiv.innerHTML = '<div class="skin-empty">검색 결과가 없습니다.<br><small>영문으로 검색해보세요 (예: Rhino, Saryn)</small></div>';
+        resultsDiv.innerHTML = '<div class="skin-empty">검색 결과가 없습니다.<br><small>예: 라이노, 사르인, Rhino, Saryn</small></div>';
         return;
     }
 
