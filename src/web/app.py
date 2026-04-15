@@ -492,9 +492,7 @@ async def api_set_arbitrage(min_profit: int = 10, limit: int = 40):
     conn.row_factory = sqlite3.Row
     try:
         rows = conn.execute("""
-            SELECT p.slug,
-                   COALESCE(p.sell_2nd, p.sell_min) AS sell_min,
-                   p.buy_max
+            SELECT p.slug, p.sell_min, p.buy_max
             FROM price_snapshot p
             INNER JOIN (
                 SELECT slug, MAX(id) AS max_id
