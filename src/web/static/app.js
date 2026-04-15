@@ -263,8 +263,14 @@ function addPriceCard(price) {
         }
     }
 
+    const vaultBadge = price.vaulted === true
+        ? '<span class="vault-badge vaulted">단종</span>'
+        : price.vaulted === false
+            ? '<span class="vault-badge active">현역</span>'
+            : "";
+
     card.innerHTML = `
-        <div class="title"><a href="https://warframe.market/items/${price.slug}" target="_blank">${escapeHtml(price.item_name)}</a></div>
+        <div class="title"><a href="https://warframe.market/items/${price.slug}" target="_blank">${escapeHtml(price.item_name)}</a>${vaultBadge}</div>
         <div class="row"><span class="label">판매 최저가</span><span class="value">${formatPrice(price.sell_min, price.sell_count)}</span></div>
         <div class="row"><span class="label">구매 최고가</span><span class="value">${formatPrice(price.buy_max, price.buy_count)}</span></div>
         <div class="row"><span class="label">48시간 평균</span><span class="value">${avg48h}</span></div>
@@ -1334,10 +1340,16 @@ function buildFarmingCard(item) {
     const wikiHref = item.wiki_url
         || "https://warframe.fandom.com/wiki/" + encodeURIComponent(item.name.replace(/ /g, "_"));
 
+    const farmVaultBadge = item.vaulted === true
+        ? '<span class="vault-badge vaulted">단종</span>'
+        : item.vaulted === false
+            ? '<span class="vault-badge active">현역</span>'
+            : "";
+
     card.innerHTML = `
         <div class="farming-card-title">
             ${typeCls !== "other" ? `<span class="farming-card-type ${typeCls}">${typeLabels[typeCls] || typeCls}</span>` : ""}
-            ${nameDisplay}
+            ${nameDisplay}${farmVaultBadge}
         </div>
         ${item.description ? `<div class="farming-card-desc">${escapeHtml(item.description)}</div>` : ""}
         <div class="farming-card-sub">${item.drops ? item.drops.length + "개 파밍 위치" : ""}</div>

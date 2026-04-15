@@ -30,4 +30,5 @@ async def price(query: str):
         "buy_count": item_price.buy_count,
         "avg_48h": item_price.avg_48h,
         "volume_48h": item_price.volume_48h,
+        "vaulted": item_price.vaulted,
     }

@@ -16,6 +16,7 @@ def _strip_html(text: str) -> str:
     return re.sub(r"<[^>]+>", "", text).strip()
 
 from src.config import DATA_DIR
+from src.market.vault import is_vaulted_by_name
 
 logger = logging.getLogger(__name__)
 
@@ -158,6 +159,7 @@ def _build_cache(data: list | dict) -> int:
                 _farming_cache[key] = FarmingInfo(
                     name=item_name,
                     item_type=_guess_type(item_name),
+                    vaulted=is_vaulted_by_name(item_name),
                 )
 
             info = _farming_cache[key]

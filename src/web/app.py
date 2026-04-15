@@ -1194,6 +1194,7 @@ async def _handle_price_query(ws: WebSocket, query: str) -> None:
             "buy_count": price.buy_count,
             "avg_48h": price.avg_48h,
             "volume_48h": price.volume_48h,
+            "vaulted": price.vaulted,
         }
         if price.max_rank is not None and price.rank_prices:
             resp["max_rank"] = price.max_rank

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import httpx
 
 from src.config import MARKET_API_BASE, MARKET_RATE_LIMIT
+from src.market.vault import is_vaulted
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,7 @@ class ItemPrice:
     volume_48h: int = 0
     max_rank: int | None = None       # 모드/아케인 최대 랭크
     rank_prices: list[RankPrice] | None = None  # 랭크별 가격 (0, max)
+    vaulted: bool | None = None       # True=단종, False=현역, None=프라임 아님
 
 
 async def _get(client: httpx.AsyncClient, url: str) -> dict | None:
@@ -153,6 +155,7 @@ async def get_item_price(slug: str, item_name: str = "") -> ItemPrice | None:
         sell_count=len(sell_orders),
         buy_max=buy_orders[0]["platinum"] if buy_orders else None,
         buy_count=len(buy_orders),
+        vaulted=is_vaulted(slug),
     )
 
     # 48시간 평균
