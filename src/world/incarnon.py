@@ -21,16 +21,16 @@ logger = logging.getLogger(__name__)
 # 마지막 검증: 2026-04-13 기준 (Zylok/Sibear/Dread/Despair/Hate 확인됨)
 INCARNON_ROTATION: list[list[str]] = [
     # ── 시리즈 1 (Duviri 출시, 2023-04) ──────────────────────────────────
-    ["Lato", "Braton", "Skana", "Paris", "Kunai"],
-    ["Boar", "Gammacor", "Angstrum", "Gorgon", "Anku"],
-    ["Bo", "Latron", "Furis", "Furax", "Strun"],
-    ["Lex", "Magistar", "Bolto", "Attica", "Ceramic Dagger"],
-    ["Bronco", "Torid", "Dual Toxocyst", "Dual Ichors", "Miter"],
-    ["Atomos", "Ack & Brunt", "Soma", "Staticor", "Twin Gremlins"],
+    ["라토", "브래튼", "스카나", "패리스", "쿠나이"],
+    ["보어", "감마코어", "앙스트럼", "고르곤", "안쿠"],
+    ["보", "레트론", "퓨리스", "퓨렉스", "스트런"],
+    ["렉스", "마기스타", "볼터", "브롱코", "세라믹 대거"],
+    ["아토모스", "토리드", "듀얼 톡소시스트", "듀얼 이코르", "마이터"],
+    ["버스튼", "아크 앤 브런트", "소마", "바스토", "나미 솔로"],
     # ── 시리즈 2 ──────────────────────────────────────────────────────────
-    ["Burston", "Cronus", "Flux Rifle", "Fusilai", "Cestra"],
-    ["Fang", "Granmu Prism", "Hikou", "Knell", "Sicarus"],
-    ["Zylok", "Sibear", "Dread", "Despair", "Hate"],   # ← 2026-04-13 확인됨
+    ["자일락", "시비어", "드레드", "디스페어", "헤이트"],
+    ["데라", "시바리스", "세스트라", "시카루스", "오키나"]
+       # ← 2026-04-13 확인됨
 ]
 
 # ── 에포크 ─────────────────────────────────────────────────────────────────
@@ -38,7 +38,7 @@ INCARNON_ROTATION: list[list[str]] = [
 # 실제 worldState EndlessXpSchedule.Activation 값으로 확인됨
 # 주간 리셋: 매주 월요일 00:00 UTC
 _EPOCH_UNIX = 1776038400   # 2026-04-13 00:00 UTC (worldState 확인)
-_EPOCH_ROTATION_IDX = 8    # 위 날짜의 로테이션 인덱스
+_EPOCH_ROTATION_IDX = 6    # 위 날짜의 로테이션 인덱스 (자일락 주차 = index 6)
 _WEEK_SECS = 7 * 24 * 3600
 
 
