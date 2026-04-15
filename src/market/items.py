@@ -149,6 +149,74 @@ def _load_ko_aliases() -> None:
         _ko_to_slug[alias.replace(" ", "").lower()] = slug
 
 
+# ── 부품 수량 캐시 (quantityInSet > 1 인 slug만 저장) ──
+_part_quantities: dict[str, int] = {}
+_PART_QTY_PATH = DATA_DIR / "part_quantities.json"
+
+
+def load_part_quantities() -> int:
+    """part_quantities.json 로드."""
+    global _part_quantities
+    if not _PART_QTY_PATH.exists():
+        return 0
+    try:
+        _part_quantities = json.loads(_PART_QTY_PATH.read_text(encoding="utf-8"))
+        logger.info("부품 수량 캐시 로드: %d개", len(_part_quantities))
+        return len(_part_quantities)
+    except Exception:
+        logger.exception("부품 수량 캐시 로드 실패")
+        return 0
+
+
+def get_part_quantity(slug: str) -> int:
+    """세트 내 필요 수량 (미캐시 = 1)."""
+    return _part_quantities.get(slug, 1)
+
+
+async def refresh_part_quantities() -> int:
+    """component 태그 아이템의 quantityInSet을 API에서 가져와 캐시.
+    quantityInSet > 1 인 것만 저장. 백그라운드 1회 실행용."""
+    import asyncio
+    import httpx
+
+    cache_path = DATA_DIR / "items.json"
+    if not cache_path.exists():
+        return 0
+
+    items = json.loads(cache_path.read_text(encoding="utf-8"))
+    part_slugs = [it["slug"] for it in items if "component" in it.get("tags", [])]
+    if not part_slugs:
+        return 0
+
+    sem = asyncio.Semaphore(3)
+    new_qty: dict[str, int] = {}
+
+    async def _fetch(slug: str) -> None:
+        async with sem:
+            try:
+                async with httpx.AsyncClient(timeout=10, follow_redirects=True) as c:
+                    r = await c.get(
+                        f"https://api.warframe.market/v2/items/{slug}",
+                        headers={"Platform": "pc", "Language": "en"},
+                    )
+                    if r.status_code == 200:
+                        qty = r.json().get("data", {}).get("quantityInSet")
+                        if qty and qty > 1:
+                            new_qty[slug] = int(qty)
+            except Exception:
+                pass
+            finally:
+                await asyncio.sleep(1 / 3)
+
+    await asyncio.gather(*[_fetch(s) for s in part_slugs])
+
+    global _part_quantities
+    _part_quantities = new_qty
+    _PART_QTY_PATH.write_text(json.dumps(new_qty, ensure_ascii=False), encoding="utf-8")
+    logger.info("부품 수량 캐시 갱신 완료: %d개 (qty>1)", len(new_qty))
+    return len(new_qty)
+
+
 def _load_items_cache() -> bool:
     """로컬 캐시에서 아이템 목록 로드."""
     cache_path = DATA_DIR / "items.json"

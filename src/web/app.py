@@ -21,8 +21,11 @@ from src.market.history import get_recent_surges, init_db, DB_PATH as HISTORY_DB
 from src.market.items import (
     _slug_to_ko,
     _slug_to_en_name,
+    get_part_quantity,
+    load_part_quantities,
     refresh_items_cache,
     refresh_ko_names,
+    refresh_part_quantities,
     resolve_item,
     search_items,
 )
@@ -114,6 +117,14 @@ async def startup() -> None:
             logger.warning("드롭 테이블 다운로드 실패", exc_info=True)
     logger.info("드롭 테이블 로드: %d개", drop_count)
     _build_relic_cache()
+
+    # 부품 수량 캐시 로드 (없으면 백그라운드 갱신)
+    qty_count = load_part_quantities()
+    if qty_count == 0:
+        asyncio.create_task(refresh_part_quantities())
+        logger.info("부품 수량 캐시 없음 — 백그라운드에서 갱신 시작")
+    else:
+        logger.info("부품 수량 캐시 로드: %d개", qty_count)
 
     # DB 초기화
     init_db()
@@ -508,18 +519,23 @@ async def api_set_arbitrage(min_profit: int = 10, limit: int = 40):
         set_sell  = sp.get("sell_min")
         set_buy   = sp.get("buy_max")
 
-        part_prices = [price_map[p] for p in parts]
-        parts_sell_sum = sum(p["sell_min"] for p in part_prices if p.get("sell_min"))
-        parts_buy_sum  = sum(p["sell_min"] for p in part_prices if p.get("sell_min"))  # 부품 구입비 = 판매자한테 사는 금액
+        # 부품별 수량 반영 (예: 배럴 × 2)
+        parts_sell_sum = sum(
+            price_map[p]["sell_min"] * get_part_quantity(p)
+            for p in parts if price_map[p].get("sell_min")
+        )
+        parts_buy_sum = parts_sell_sum  # 부품 구입비 = 판매자한테 사는 금액
 
         set_name = _slug_to_ko.get(set_slug) or _slug_to_en_name.get(set_slug) or set_slug.replace("_", " ").title()
 
         def _part_info(p_slug):
             pp = price_map[p_slug]
+            qty = get_part_quantity(p_slug)
             return {
                 "slug": p_slug,
                 "name": _slug_to_ko.get(p_slug) or _slug_to_en_name.get(p_slug) or p_slug.replace("_", " ").title(),
                 "sell_min": pp.get("sell_min"),
+                "quantity": qty,
             }
 
         # ① 분해 차익: 세트 판매가 < 부품 합산 판매가 → 세트 사서 부품 따로 팔기

@@ -1097,8 +1097,10 @@ async function _loadSetArb(mode) {
                 priceRow = `<span class="arb-buy">부품 합산 ${item.parts_sell_sum}p</span><span class="arb-arrow">→</span><span class="arb-sell">세트 매수가 ${item.set_buy}p</span>`;
             }
 
-            const partsHtml = item.parts.map((p) =>
-                `<span class="arb-part-chip">${escapeHtml(p.name)}${p.sell_min ? " " + p.sell_min + "p" : ""}</span>`
+            const partsHtml = item.parts.map((p) => {
+                const qtyTag = p.quantity > 1 ? ` ×${p.quantity}` : "";
+                return `<span class="arb-part-chip">${escapeHtml(p.name)}${p.sell_min ? " " + p.sell_min + "p" + qtyTag : qtyTag}</span>`;
+            }
             ).join("");
 
             card.innerHTML = `
