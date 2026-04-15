@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
@@ -53,31 +54,14 @@ logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"
 
-app = FastAPI(title="워프봇")
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-
-# 라우터 등록
-app.include_router(trade_router)
-app.include_router(world_router)
-app.include_router(market_router)
-app.include_router(auction_router)
-app.include_router(watchlist_router)
-app.include_router(modding_router)
-app.include_router(admin_router)
-app.include_router(push_router)
-
 # 연결된 WebSocket 클라이언트 목록 (알림 브로드캐스트용)
 connected_clients: set[WebSocket] = set()
 
-# 백그라운드 태스크
-_monitor_task: asyncio.Task | None = None
-_watchlist_task: asyncio.Task | None = None
 
-
-@app.on_event("startup")
-async def startup() -> None:
-    global _monitor_task, _watchlist_task
-
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """앱 시작/종료 lifecycle. deprecated on_event 대체."""
+    # ── startup ──
     try:
         count = await refresh_items_cache()
         logger.info("아이템 캐시 로드: %d개", count)
@@ -118,21 +102,33 @@ async def startup() -> None:
 
     # 백그라운드 태스크 시작
     asyncio.create_task(backfill_statistics(get_popular_slugs()))
-    _monitor_task = asyncio.create_task(run_monitor(broadcast_fn=broadcast))
+    monitor_task = asyncio.create_task(run_monitor(broadcast_fn=broadcast))
     logger.info("시세 모니터 백그라운드 태스크 시작")
     asyncio.create_task(run_live_cache_loop())
     logger.info("라이브 캐시 백그라운드 태스크 시작")
-    _watchlist_task = asyncio.create_task(run_watchlist_monitor(broadcast_fn=broadcast))
+    watchlist_task = asyncio.create_task(run_watchlist_monitor(broadcast_fn=broadcast))
     logger.info("워치리스트 모니터 백그라운드 태스크 시작")
 
+    yield  # 앱 실행 중
 
-@app.on_event("shutdown")
-async def shutdown() -> None:
-    if _monitor_task:
-        _monitor_task.cancel()
-    if _watchlist_task:
-        _watchlist_task.cancel()
+    # ── shutdown ──
+    monitor_task.cancel()
+    watchlist_task.cancel()
     await close_client()
+
+
+app = FastAPI(title="워프봇", lifespan=lifespan)
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+# 라우터 등록
+app.include_router(trade_router)
+app.include_router(world_router)
+app.include_router(market_router)
+app.include_router(auction_router)
+app.include_router(watchlist_router)
+app.include_router(modding_router)
+app.include_router(admin_router)
+app.include_router(push_router)
 
 
 # ── 페이지 서빙 ──
