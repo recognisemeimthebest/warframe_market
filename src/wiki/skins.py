@@ -43,25 +43,85 @@ _cache: dict[str, tuple[float, list[dict]]] = {}
 _CACHE_TTL = 3600  # 1시간
 
 
+# 워프레임/무기 한글명 직접 매핑 (market DB에 없는 항목 포함)
+_KO_SKIN_NAMES: dict[str, str] = {
+    # 워프레임
+    "엑스칼리버": "Excalibur", "엑칼": "Excalibur",
+    "볼트": "Volt",
+    "매그": "Mag",
+    "애쉬": "Ash",
+    "트리니티": "Trinity",
+    "엠버": "Ember",
+    "보반": "Vauban",
+    "사르인": "Saryn",
+    "라이노": "Rhino",
+    "노바": "Nova",
+    "로키": "Loki",
+    "오베론": "Oberon",
+    "하이드로이드": "Hydroid",
+    "네크로스": "Nekros",
+    "제피르": "Zephyr",
+    "메사": "Mesa",
+    "이나로스": "Inaros",
+    "이바라": "Ivara",
+    "티타니아": "Titania",
+    "나이더스": "Nidus",
+    "옥타비아": "Octavia",
+    "네자": "Nezha",
+    "하로우": "Harrow",
+    "코라": "Khora",
+    "가라": "Garuda",
+    "바우반": "Vauban",
+    "와크": "Wukong", "우콩": "Wukong",
+    "힐드린": "Hildryn",
+    "와이스프": "Wisp",
+    "가우스": "Gauss",
+    "지안": "Gian", "자얀": "Gian",
+    "프로테아": "Protea",
+    "엑시": "Xaku",
+    "레비리안": "Lavos",
+    "파인": "Phane",
+    "세브고스": "Sevagoth",
+    "칼리반": "Caliban",
+    "구르마그": "Gourmagul",
+    "스탁스": "Styanax",
+    "단테": "Dante",
+    "오필리아": "Opaline",
+    # 무기 (자주 쓰는 것)
+    "니카나": "Nikana",
+    "스쿼드": "Skana",
+    "부크리": "Burston",
+    "파리스": "Paris",
+    "루프나": "Rufna",
+}
+
+
 def _has_korean(text: str) -> bool:
     return any("\uAC00" <= ch <= "\uD7A3" or "\u3131" <= ch <= "\u318E" for ch in text)
 
 
 def _ko_to_en_query(query: str) -> str:
     """한글 쿼리를 영문 이름으로 변환. 변환 실패 시 원문 반환."""
+    q = query.strip()
+
+    # 1. 직접 매핑 우선 확인
+    direct = _KO_SKIN_NAMES.get(q) or _KO_SKIN_NAMES.get(q.replace(" ", ""))
+    if direct:
+        return direct
+
+    # 2. market DB 퍼지 검색
     try:
         from src.market.items import search_items
-        results = search_items(query, limit=1)
-        if results and results[0].score >= 0.55:
+        results = search_items(q, limit=1)
+        if results and results[0].score >= 0.65:
             en = results[0].name
-            # 스킨 검색용: " Set", " Prime" 접미어 제거 → 기본 이름만 사용
-            # (예: "Mesa Prime Set" → "Mesa", "Nikana Prime" → "Nikana")
+            # 스킨 검색용: " Set", " Prime" 접미어 제거
             en = re.sub(r"\s+Set$", "", en, flags=re.IGNORECASE).strip()
             en = re.sub(r"\s+Prime$", "", en, flags=re.IGNORECASE).strip()
             return en
     except Exception:
         pass
-    return query
+    return q
 
 
 async def search_skins(query: str, skin_type: str = "warframe") -> list[dict]:
