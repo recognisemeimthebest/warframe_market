@@ -29,6 +29,7 @@ from src.market.items import (
     resolve_item,
     search_items,
 )
+from src.market.live_cache import _cache as _live_cache_all, get_live_price, get_cache_info, run_live_cache_loop
 from src.market.monitor import backfill_statistics, get_popular_slugs, run_monitor
 from src.market.trade import (
     approve_user,
@@ -140,6 +141,10 @@ async def startup() -> None:
     # 시세 모니터 백그라운드 시작
     _monitor_task = asyncio.create_task(run_monitor(broadcast_fn=broadcast))
     logger.info("시세 모니터 백그라운드 태스크 시작")
+
+    # 라이브 캐시 백그라운드 시작 (세트 차익 탐지용, 20분마다 갱신)
+    asyncio.create_task(run_live_cache_loop())
+    logger.info("라이브 캐시 백그라운드 태스크 시작")
 
     # 워치리스트 모니터 백그라운드 시작
     _watchlist_task = asyncio.create_task(run_watchlist_monitor(broadcast_fn=broadcast))
@@ -482,6 +487,7 @@ async def api_set_arbitrage(min_profit: int = 10, limit: int = 40):
     """세트 vs 부품 합산 가격 비교 — 분해/조합 차익 탐지."""
     import sqlite3
 
+    # 1. 스냅샷에서 알려진 슬러그 전체 로드 (라이브 캐시 미스 시 fallback)
     conn = sqlite3.connect(str(HISTORY_DB_PATH))
     conn.row_factory = sqlite3.Row
     try:
@@ -501,10 +507,24 @@ async def api_set_arbitrage(min_profit: int = 10, limit: int = 40):
     finally:
         conn.close()
 
-    price_map: dict[str, dict] = {
+    snapshot_map: dict[str, dict] = {
         r["slug"]: {"sell_min": r["sell_min"], "buy_max": r["buy_max"]}
         for r in rows
     }
+
+    # 2. 라이브 캐시 우선 적용 (online/ingame 실시간 데이터)
+    price_map: dict[str, dict] = {}
+    for slug, snap in snapshot_map.items():
+        live = get_live_price(slug)
+        if live and (live.get("sell_min") is not None or live.get("buy_max") is not None):
+            price_map[slug] = {"sell_min": live["sell_min"], "buy_max": live["buy_max"]}
+        else:
+            price_map[slug] = snap
+
+    # 라이브 캐시에만 있는 슬러그 추가 (스냅샷 미보유 신규 아이템)
+    for slug, live in _live_cache_all.items():
+        if slug not in price_map and (live.get("sell_min") is not None or live.get("buy_max") is not None):
+            price_map[slug] = {"sell_min": live["sell_min"], "buy_max": live["buy_max"]}
 
     set_slugs = [s for s in price_map if s.endswith("_set")]
 
