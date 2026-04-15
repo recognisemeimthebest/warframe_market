@@ -456,8 +456,14 @@ async def api_arbitrage(limit: int = 40):
     items = []
     for r in list(rows_plain) + list(rows_ranked):
         slug = r["slug"]
-        sell = r["sell_min"]
+        # 비랭크 아이템은 라이브 캐시 sell_min 우선 적용
+        live = get_live_price(slug) if r["rank"] is None else None
+        sell = (live["sell_min"] if live and live.get("sell_min") else r["sell_min"])
+        if not sell:
+            continue
         ref = round(r["ref_price"])
+        if not ref or sell >= ref * 0.8:  # 라이브 가격 기준 재필터
+            continue
         discount = ref - sell
         discount_pct = round(discount * 100 / ref, 1) if ref else 0
         name = _slug_to_ko.get(slug) or _slug_to_en_name.get(slug) or slug.replace("_", " ").title()
