@@ -54,8 +54,10 @@ def _ko_to_en_query(query: str) -> str:
         results = search_items(query, limit=1)
         if results and results[0].score >= 0.55:
             en = results[0].name
-            # " Set" 접미어 제거 (위키 검색용)
+            # 스킨 검색용: " Set", " Prime" 접미어 제거 → 기본 이름만 사용
+            # (예: "Mesa Prime Set" → "Mesa", "Nikana Prime" → "Nikana")
             en = re.sub(r"\s+Set$", "", en, flags=re.IGNORECASE).strip()
+            en = re.sub(r"\s+Prime$", "", en, flags=re.IGNORECASE).strip()
             return en
     except Exception:
         pass
