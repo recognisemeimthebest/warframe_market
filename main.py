@@ -2,9 +2,9 @@ import uvicorn
 
 from src.config import WEB_HOST, WEB_PORT, setup_logging
 from src.web.app import app
-from src.web.routes import router
+from src.web.routes.price import router as price_router
 
-app.include_router(router)
+app.include_router(price_router)
 
 if __name__ == "__main__":
     setup_logging()
