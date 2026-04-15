@@ -10,6 +10,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from src.market.api import get_item_price
+from src.market.vault import is_vaulted, is_vaulted_by_name
 from src.market.auction import (
     get_lich_items,
     get_riven_items,
@@ -788,6 +789,27 @@ async def api_farming(q: str = "", limit: int = 5):
         existing_names = {r["name"].lower() for r in results}
         resource_results = [r for r in resource_results if r["name"].lower() not in existing_names]
         results = results + resource_results
+
+    # 결과가 없으면 단종 프라임 여부 확인 → 안내 카드 반환
+    if not results:
+        # slug로 resolve 시도
+        resolved = resolve_item(q)
+        if resolved:
+            slug, display_name = resolved
+            vault_status = is_vaulted(slug)
+        else:
+            vault_status = is_vaulted_by_name(q)
+            display_name = q
+            slug = ""
+        if vault_status is True:
+            return {"data": [{
+                "name": display_name,
+                "slug": slug,
+                "type": "prime",
+                "vaulted": True,
+                "drops": [],
+                "description": "볼트에 보관된 단종 프라임입니다. 현재 렐릭 드롭 풀에 없으므로 직접 파밍 불가능합니다. warframe.market에서 구매하거나 언볼트 이벤트를 기다려야 합니다.",
+            }]}
 
     # 소재 타입이 아닌 것만 설명 API 조회 (소재는 description 이미 있음)
     non_resource = [r for r in results if r.get("type") != "resource"]

@@ -1320,7 +1320,16 @@ function buildFarmingCard(item) {
     const typeCls = item.type || "other";
 
     let dropsHtml = "";
-    if (item.drops && item.drops.length) {
+    if (item.vaulted === true && (!item.drops || !item.drops.length)) {
+        dropsHtml = `
+            <div class="vault-notice">
+                <div class="vault-notice-icon">🔒</div>
+                <div class="vault-notice-text">
+                    현재 렐릭 드롭 풀에 없습니다.<br>
+                    <small>warframe.market 구매 또는 언볼트 이벤트를 기다려주세요.</small>
+                </div>
+            </div>`;
+    } else if (item.drops && item.drops.length) {
         dropsHtml = item.drops.map((d) => `
             <div class="farming-drop">
                 <div class="farming-drop-source">
@@ -1352,7 +1361,7 @@ function buildFarmingCard(item) {
             ${nameDisplay}${farmVaultBadge}
         </div>
         ${item.description ? `<div class="farming-card-desc">${escapeHtml(item.description)}</div>` : ""}
-        <div class="farming-card-sub">${item.drops ? item.drops.length + "개 파밍 위치" : ""}</div>
+        ${item.drops && item.drops.length ? `<div class="farming-card-sub">${item.drops.length}개 파밍 위치</div>` : ""}
         ${dropsHtml}
     `;
 
