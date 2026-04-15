@@ -1,0 +1,4 @@
+전송: src\web\app.py
+전송: src\web\static\app.js
+전송: src\web\static\style.css
+재시작: EXIT:0
