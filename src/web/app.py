@@ -397,10 +397,10 @@ async def api_arbitrage(limit: int = 40):
                     FROM price_snapshot
                     WHERE sell_min IS NOT NULL AND avg_price IS NOT NULL
                       AND rank IS NULL AND sell_min > 5 AND avg_price > 5
-                      AND volume > 2
                     GROUP BY slug
                 ) latest ON p.id = latest.max_id
                 WHERE p.slug NOT IN ({ph})
+                  AND p.volume > 2
                   AND p.sell_min < p.avg_price * 0.8
                   AND p.sell_count >= 1
                 ORDER BY CAST(p.avg_price - p.sell_min AS REAL) / p.avg_price DESC
@@ -416,10 +416,10 @@ async def api_arbitrage(limit: int = 40):
                     FROM price_snapshot
                     WHERE sell_min IS NOT NULL AND avg_price IS NOT NULL
                       AND rank IS NULL AND sell_min > 5 AND avg_price > 5
-                      AND volume > 2
                     GROUP BY slug
                 ) latest ON p.id = latest.max_id
-                WHERE p.sell_min < p.avg_price * 0.8
+                WHERE p.volume > 2
+                  AND p.sell_min < p.avg_price * 0.8
                   AND p.sell_count >= 1
                 ORDER BY CAST(p.avg_price - p.sell_min AS REAL) / p.avg_price DESC
                 LIMIT ?
