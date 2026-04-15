@@ -211,7 +211,7 @@ function connect() {
         if (data.type === "chat") {
             addMessage(data.text, "bot");
         } else if (data.type === "price") {
-            if (data.error) { addMessage(data.text, "bot"); }
+            if (!data.ok) { addMessage(data.text, "bot"); }
             else { addPriceCard(data); }
         } else if (data.type === "suggest") {
             addSuggestCard(data.query, data.items);
@@ -2924,7 +2924,7 @@ function _renderBaroCard(container, baro) {
     const card = document.createElement("div");
     card.className = "vendor-card";
 
-    if (baro.error) {
+    if (baro.ok === false) {
         card.innerHTML = '<div class="vendor-empty">데이터를 불러오지 못했습니다.</div>';
         sec.appendChild(card);
         container.appendChild(sec);
@@ -2972,7 +2972,7 @@ function _renderSteelPathCard(container, sp) {
     const card = document.createElement("div");
     card.className = "vendor-card";
 
-    if (sp.error) {
+    if (sp.ok === false) {
         card.innerHTML = '<div class="vendor-empty">데이터를 불러오지 못했습니다.</div>';
         sec.appendChild(card);
         container.appendChild(sec);
@@ -3383,7 +3383,7 @@ async function saveSurgeThresholds() {
             body: JSON.stringify(body),
         });
         const data = await r.json();
-        msg.textContent = data.error ? "저장 실패: " + data.message : "저장됨!";
+        msg.textContent = !data.ok ? "저장 실패: " + (data.msg || "") : "저장됨!";
         setTimeout(() => { msg.textContent = ""; }, 2000);
     } catch {
         msg.textContent = "서버 오류";

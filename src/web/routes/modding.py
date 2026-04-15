@@ -137,7 +137,7 @@ async def api_modding_image(filename: str):
     safe_name = Path(filename).name
     filepath = IMAGES_DIR / safe_name
     if not filepath.exists():
-        return {"error": "not found"}
+        return {"ok": False, "msg": "not found"}
     return FileResponse(filepath)
 
 

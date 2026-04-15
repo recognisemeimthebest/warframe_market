@@ -259,7 +259,7 @@ async def _handle_price_query(ws: WebSocket, query: str) -> None:
             return
         resp = {
             "type": "price",
-            "error": False,
+            "ok": True,
             "item_name": price.item_name,
             "slug": price.slug,
             "sell_min": price.sell_min,

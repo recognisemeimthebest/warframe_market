@@ -352,7 +352,7 @@ async def get_void_trader() -> dict:
         d = r.json()
     except Exception:
         logger.exception("키티어 데이터 조회 실패")
-        return {"active": False, "error": True}
+        return {"active": False, "ok": False}
 
     def _iso_to_ms(s) -> int:
         if not s:
@@ -395,7 +395,7 @@ async def get_steel_path() -> dict:
         d = r.json()
     except Exception:
         logger.exception("스틸패스 데이터 조회 실패")
-        return {"error": True}
+        return {"ok": False}
 
     return {
         "current_reward": d.get("currentReward", {}),
