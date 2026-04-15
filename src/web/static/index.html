@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>워프봇</title>
-    <link rel="stylesheet" href="/static/style.css?v=20260415d">
+    <link rel="stylesheet" href="/static/style.css?v=20260415e">
     <link rel="manifest" href="/static/manifest.json">
     <meta name="theme-color" content="#4db8ff">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -134,6 +134,7 @@
                 <button class="world-filter" data-section="invasions">침공</button>
                 <button class="world-filter" data-section="cycles">오픈월드</button>
                 <button class="world-filter" data-section="vendors">상인</button>
+                <button class="world-filter" data-section="incarnon">인카논</button>
                 <button class="world-filter" data-section="alerts">알림 설정</button>
             </div>
             <div id="world-list"></div>
@@ -187,7 +188,7 @@
 
     </div>
 
-    <script src="/static/app.js?v=20260415d"></script>
+    <script src="/static/app.js?v=20260415e"></script>
     <script>
         if ("serviceWorker" in navigator) {
             navigator.serviceWorker.register("/static/sw.js").catch(() => {});

@@ -401,3 +401,82 @@ async def get_steel_path() -> dict:
         "rotation": d.get("rotation", []),
         "evergreens": d.get("evergreens", []),
     }
+
+
+# ── 인카논 제네시스 로테이션 ──
+
+async def get_incarnon_rotation(search: str = "", weeks: int = 9) -> dict:
+    """인카논 제네시스 어댑터 주간 로테이션 반환.
+
+    worldState에서 현재 주차를 실시간으로 가져와 로테이션 인덱스를 보정.
+    """
+    from src.world.incarnon import (
+        INCARNON_ROTATION, get_rotation_schedule, find_weapon,
+        _current_week_idx, _EPOCH_UNIX, _EPOCH_ROTATION_IDX, _WEEK_SECS,
+    )
+    import src.world.incarnon as _inc
+
+    # 1. worldState에서 현재 주차 실시간 조회 (보정용)
+    live_weapons: list[str] = []
+    try:
+        ws = await _fetch_worldstate()
+        if ws:
+            schedule = ws.get("EndlessXpSchedule", [])
+            if schedule:
+                for cat in schedule[0].get("CategoryChoices", []):
+                    if cat.get("Category") == "EXC_HARD":
+                        live_weapons = cat.get("Choices", [])
+                        break
+    except Exception:
+        logger.warning("인카논 실시간 데이터 조회 실패", exc_info=True)
+
+    # 2. 실시간 데이터와 하드코딩 로테이션 대조 → 인덱스 보정
+    if live_weapons:
+        live_set = {w.lower() for w in live_weapons}
+        for idx, rotation_week in enumerate(INCARNON_ROTATION):
+            rot_set = {w.lower() for w in rotation_week}
+            if len(live_set & rot_set) >= 3:   # 3개 이상 일치 시 해당 인덱스 사용
+                # 에포크 기반 계산과 다르면 동적으로 오버라이드
+                elapsed_weeks = int((time.time() - _EPOCH_UNIX) // _WEEK_SECS)
+                expected_idx = (_EPOCH_ROTATION_IDX + elapsed_weeks) % len(INCARNON_ROTATION)
+                if expected_idx != idx:
+                    logger.warning("인카논 로테이션 인덱스 보정: %d → %d", expected_idx, idx)
+                    # 에포크를 동적으로 조정 (이번 주차가 idx임을 기준으로 재계산)
+                    _inc._EPOCH_ROTATION_IDX = idx
+                    _inc._EPOCH_UNIX = int(time.time()) - (elapsed_weeks * _WEEK_SECS)
+                break
+
+    # 3. 특정 무기 검색
+    if search.strip():
+        found = find_weapon(search)
+        if found:
+            weeks_left = found["week_offset"]
+            if weeks_left == 0:
+                msg = "이번 주에 왔어요!"
+            elif weeks_left == 1:
+                msg = "다음 주에 와요."
+            else:
+                msg = f"{weeks_left}주 후에 와요."
+            return {
+                "mode": "search",
+                "weapon": found["weapon"],
+                "week_offset": weeks_left,
+                "start_date": found["start_date"],
+                "all_weapons": found["all_weapons"],
+                "message": msg,
+                "schedule": get_rotation_schedule(weeks),
+                "live_weapons": live_weapons,
+            }
+        return {
+            "mode": "search",
+            "weapon": None,
+            "message": f'"{search}" 인카논은 목록에 없어요. 이름을 확인해주세요.',
+            "schedule": get_rotation_schedule(weeks),
+            "live_weapons": live_weapons,
+        }
+
+    return {
+        "mode": "schedule",
+        "schedule": get_rotation_schedule(weeks),
+        "live_weapons": live_weapons,
+    }

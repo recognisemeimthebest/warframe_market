@@ -498,6 +498,9 @@ async function fetchWorldState() {
             const res = await fetch("/api/vendors");
             const json = await res.json();
             renderVendors(json);
+        } else if (worldSection === "incarnon") {
+            renderIncarnon();
+            return;
         }
     } catch {
         el.innerHTML = '<div class="surge-empty">데이터를 불러오지 못했습니다.</div>';
@@ -3147,6 +3150,114 @@ function renderRelicResult(data) {
 
     resultsEl.innerHTML = "";
     resultsEl.appendChild(card);
+}
+
+// ── 인카논 로테이션 ──
+
+async function renderIncarnon(search = "") {
+    const el = document.getElementById("world-list");
+    el.innerHTML = "";
+
+    // 검색 영역
+    const searchRow = document.createElement("div");
+    searchRow.style.cssText = "display:flex;gap:8px;margin-bottom:14px;";
+    searchRow.innerHTML = `
+        <input type="text" id="incarnon-search" placeholder="무기 이름 검색... (예: Lato, Soma)" value="${escapeHtml(search)}"
+            style="flex:1;background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;">
+        <button id="incarnon-search-btn" style="padding:8px 14px;background:var(--primary);color:#000;border:none;border-radius:8px;font-weight:700;cursor:pointer;">검색</button>
+    `;
+    el.appendChild(searchRow);
+
+    document.getElementById("incarnon-search-btn").addEventListener("click", () => {
+        const q = document.getElementById("incarnon-search").value.trim();
+        renderIncarnon(q);
+    });
+    document.getElementById("incarnon-search").addEventListener("keydown", (e) => {
+        if (e.key === "Enter") renderIncarnon(e.target.value.trim());
+    });
+
+    el.innerHTML += '<div class="surge-empty" id="incarnon-loading">로딩 중...</div>';
+
+    try {
+        const url = search ? `/api/incarnon?search=${encodeURIComponent(search)}` : "/api/incarnon";
+        const res = await fetch(url);
+        const data = await res.json();
+
+        document.getElementById("incarnon-loading")?.remove();
+
+        // 검색 결과
+        if (data.mode === "search") {
+            const notice = document.createElement("div");
+            if (data.weapon) {
+                const offset = data.week_offset;
+                const label = offset === 0 ? "이번 주" : offset === 1 ? "다음 주" : `${offset}주 후`;
+                const badge = offset === 0
+                    ? '<span class="vault-badge active">이번 주</span>'
+                    : `<span style="background:rgba(77,184,255,0.15);color:var(--primary);border:1px solid rgba(77,184,255,0.3);border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700;margin-left:6px;">${label}</span>`;
+                notice.innerHTML = `
+                    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:12px;">
+                        <div style="font-size:14px;font-weight:700;margin-bottom:6px;">${escapeHtml(data.weapon)} ${badge}</div>
+                        <div style="font-size:12px;color:var(--text-muted);">${data.start_date} 주차 · 함께 오는 무기: ${data.all_weapons.map(escapeHtml).join(", ")}</div>
+                    </div>
+                `;
+            } else {
+                notice.innerHTML = `<div class="surge-empty" style="margin-bottom:12px;">${escapeHtml(data.message)}</div>`;
+            }
+            el.appendChild(notice);
+        }
+
+        // 전체 로테이션 표
+        const schedule = data.schedule || [];
+        const table = document.createElement("div");
+        table.innerHTML = `<div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;">인카논 제네시스 · Circuit (강철의 길) 로테이션</div>`;
+
+        schedule.forEach((week, i) => {
+            const card = document.createElement("div");
+            const isNow = week.week_offset === 0;
+            card.style.cssText = `
+                background:${isNow ? "rgba(77,184,255,0.08)" : "var(--surface)"};
+                border:1px solid ${isNow ? "var(--primary)" : "var(--border)"};
+                border-radius:8px; padding:10px 14px; margin-bottom:8px;
+            `;
+
+            const label = isNow ? "이번 주" : week.week_offset === 1 ? "다음 주" : `${week.week_offset}주 후`;
+            const matchedSearch = search
+                ? week.weapons.find(w => w.toLowerCase().includes(search.toLowerCase()))
+                : null;
+
+            card.innerHTML = `
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                    <span style="font-size:12px;font-weight:700;color:${isNow ? "var(--primary)" : "var(--text-muted)"};">${label}</span>
+                    <span style="font-size:11px;color:var(--text-muted);">${escapeHtml(week.start_date)}</span>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                    ${week.weapons.map(w => {
+                        const highlight = matchedSearch && w.toLowerCase().includes(search.toLowerCase());
+                        return `<span style="background:${highlight ? "rgba(255,152,0,0.2)" : "rgba(255,255,255,0.06)"};
+                            color:${highlight ? "var(--orange)" : "var(--text)"};
+                            border:1px solid ${highlight ? "rgba(255,152,0,0.3)" : "transparent"};
+                            padding:3px 9px;border-radius:12px;font-size:12px;font-weight:${highlight ? "700" : "400"};">
+                            ${escapeHtml(w)}
+                        </span>`;
+                    }).join("")}
+                </div>
+            `;
+            table.appendChild(card);
+        });
+
+        // 실시간 데이터 표시가 있으면 안내
+        if (data.live_weapons && data.live_weapons.length) {
+            const live = document.createElement("div");
+            live.style.cssText = "font-size:11px;color:var(--text-muted);text-align:right;margin-top:4px;";
+            live.textContent = `이번 주 실시간 확인: ${data.live_weapons.join(", ")}`;
+            table.appendChild(live);
+        }
+
+        el.appendChild(table);
+    } catch {
+        document.getElementById("incarnon-loading")?.remove();
+        el.insertAdjacentHTML("beforeend", '<div class="surge-empty">데이터를 불러오지 못했습니다.</div>');
+    }
 }
 
 // ── 초기화 ──

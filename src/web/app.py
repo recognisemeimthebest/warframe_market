@@ -74,6 +74,7 @@ from src.world.api import (
     get_world_state,
     get_void_trader,
     get_steel_path,
+    get_incarnon_rotation,
 )
 
 from src.config import VAPID_PUBLIC_KEY
@@ -305,6 +306,12 @@ async def api_invasions():
 @app.get("/api/world/cycles")
 async def api_cycles():
     return {"data": await get_cycles()}
+
+
+@app.get("/api/incarnon")
+async def api_incarnon(search: str = "", weeks: int = 9):
+    """인카논 제네시스 어댑터 주간 로테이션 조회."""
+    return await get_incarnon_rotation(search=search, weeks=weeks)
 
 
 # ── 상인 API ──
