@@ -1030,7 +1030,7 @@ async function _loadSpreadArb() {
         const res = await fetch("/api/arbitrage?limit=40");
         const json = await res.json();
         const items = json.data || [];
-        body.innerHTML = `<div class="arb-hint" style="padding:8px 0 10px;">48시간 평균가보다 현재 판매가가 낮은 아이템입니다. 지금 사면 평균가에 되팔 수 있어요.</div>`;
+        body.innerHTML = `<div class="arb-hint" style="padding:8px 0 10px;">기준가보다 현재 판매가가 낮은 아이템입니다. 모드/아케인은 동일 랭크끼리 비교합니다.</div>`;
         if (!items.length) {
             body.insertAdjacentHTML("beforeend", `<div class="surge-empty">현재 데이터가 없습니다.<br><span style="font-size:11px;color:var(--text-muted)">가격 모니터링 데이터가 쌓이면 표시됩니다.</span></div>`);
             return;
@@ -1042,23 +1042,26 @@ async function _loadSpreadArb() {
             card.className = "arb-card";
             const c = item.discount_pct >= 30 ? "#4caf50" : item.discount_pct >= 20 ? "var(--orange)" : "var(--primary)";
             const buyText = item.buy_max ? ` · 매수 ${item.buy_max}p` : "";
+            const rankTag = item.rank != null ? ` <span style="font-size:11px;color:var(--text-muted)">[랭크${item.rank}]</span>` : "";
+            const refLabel = item.rank != null ? `랭크${item.rank} 기준가` : "48h 평균가";
+            const volText = item.volume > 0 ? `48h 거래량 ${item.volume}건` : `판매 ${item.sell_count}건`;
             card.innerHTML = `
-                <div class="arb-card-name">${escapeHtml(item.name)}</div>
+                <div class="arb-card-name">${escapeHtml(item.name)}${rankTag}</div>
                 <div class="arb-prices">
                     <span class="arb-buy">현재 ${item.sell_min}p</span>
                     <span class="arb-arrow">vs</span>
-                    <span class="arb-sell">평균 ${item.avg_price}p</span>
+                    <span class="arb-sell">${refLabel} ${item.ref_price}p</span>
                     <span class="arb-spread" style="color:${c}">-${item.discount_pct}% 저렴</span>
                 </div>
-                <div class="arb-meta">48h 거래량 ${item.volume || "-"}건${buyText}</div>
+                <div class="arb-meta">${volText}${buyText}</div>
             `;
             card.addEventListener("click", () => window.open(`https://warframe.market/items/${item.slug}`, "_blank"));
             list.appendChild(card);
         });
         body.appendChild(list);
-        body.insertAdjacentHTML("beforeend", `<div class="arb-footer">warframe.market 48h 평균가 기준 · 실시간 시세와 다를 수 있음</div>`);
-    } catch {
-        body.innerHTML = `<div class="surge-empty">데이터를 불러오지 못했습니다.</div>`;
+        body.insertAdjacentHTML("beforeend", `<div class="arb-footer">판매자 기준가 비교 · 실시간 시세와 다를 수 있음</div>`);
+    } catch (e) {
+        body.innerHTML = `<div class="surge-empty">데이터를 불러오지 못했습니다.<br><span style="font-size:11px;color:var(--text-muted)">${e.message || ""}</span></div>`;
     }
 }
 

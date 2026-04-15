@@ -344,14 +344,21 @@ async def api_vendors():
 
 @app.get("/api/arbitrage")
 async def api_arbitrage(limit: int = 40):
-    """현재 판매가가 48시간 평균보다 낮은 아이템 — 저평가 매수 기회."""
+    """현재 판매가가 기준가보다 낮은 아이템 — 저평가 매수 기회.
+
+    - 비랭크 아이템: 현재 sell_min vs 48h 통계 평균가 (랭크 데이터 있는 아이템 제외)
+    - 랭크 아이템(모드/아케인): rank별 현재 sell_min vs 과거 72h 내 동일 rank sell_min 평균
+    """
     import sqlite3
 
     conn = sqlite3.connect(str(HISTORY_DB_PATH))
     conn.row_factory = sqlite3.Row
     try:
-        rows = conn.execute("""
-            SELECT p.slug, p.sell_min, p.buy_max, p.avg_price, p.volume, p.sell_count
+        # ── 1. 비랭크 아이템 ──
+        # 랭크 스냅샷이 존재하는 아이템(모드/아케인)은 제외 → rank=NULL avg_price와 비교해도 의미없음
+        rows_plain = conn.execute("""
+            SELECT p.slug, NULL AS rank, p.sell_min, p.buy_max,
+                   p.avg_price AS ref_price, p.volume, p.sell_count
             FROM price_snapshot p
             INNER JOIN (
                 SELECT slug, MAX(id) AS max_id
@@ -361,35 +368,68 @@ async def api_arbitrage(limit: int = 40):
                   AND volume > 2
                 GROUP BY slug
             ) latest ON p.id = latest.max_id
-            WHERE p.sell_min < p.avg_price * 0.8
+            WHERE p.slug NOT IN (
+                SELECT DISTINCT slug FROM price_snapshot WHERE rank IS NOT NULL
+            )
+              AND p.sell_min < p.avg_price * 0.8
               AND p.sell_count >= 1
             ORDER BY CAST(p.avg_price - p.sell_min AS REAL) / p.avg_price DESC
             LIMIT ?
         """, (limit,)).fetchall()
+
+        # ── 2. 랭크 아이템(모드/아케인) ──
+        # rank별 최신 sell_min vs 과거 72h 내 동일 rank sell_min 평균 (순수 판매자 가격 비교)
+        rows_ranked = conn.execute("""
+            SELECT cur.slug, cur.rank, cur.sell_min, cur.buy_max,
+                   ref.avg_sell AS ref_price, 0 AS volume, cur.sell_count
+            FROM (
+                SELECT slug, rank, sell_min, buy_max, sell_count, MAX(id) AS id
+                FROM price_snapshot
+                WHERE sell_min IS NOT NULL AND rank IS NOT NULL AND sell_min > 5
+                GROUP BY slug, rank
+            ) cur
+            JOIN (
+                SELECT slug, rank, AVG(sell_min) AS avg_sell
+                FROM price_snapshot
+                WHERE sell_min IS NOT NULL AND rank IS NOT NULL
+                  AND scanned_at < datetime('now', '-1 hour')
+                  AND scanned_at >= datetime('now', '-72 hours')
+                GROUP BY slug, rank
+                HAVING COUNT(*) >= 2
+            ) ref ON cur.slug = ref.slug AND cur.rank = ref.rank
+            WHERE cur.sell_min < ref.avg_sell * 0.8
+            ORDER BY CAST(ref.avg_sell - cur.sell_min AS REAL) / ref.avg_sell DESC
+            LIMIT ?
+        """, (limit,)).fetchall()
+
     finally:
         conn.close()
 
     items = []
-    for r in rows:
+    for r in list(rows_plain) + list(rows_ranked):
         slug = r["slug"]
         sell = r["sell_min"]
-        avg = round(r["avg_price"])
-        discount = avg - sell
-        discount_pct = round(discount * 100 / avg, 1) if avg else 0
+        ref = round(r["ref_price"])
+        discount = ref - sell
+        discount_pct = round(discount * 100 / ref, 1) if ref else 0
         name = _slug_to_ko.get(slug) or _slug_to_en_name.get(slug) or slug.replace("_", " ").title()
-        items.append({
+        entry = {
             "slug": slug,
             "name": name,
             "sell_min": sell,
-            "avg_price": avg,
+            "ref_price": ref,
             "discount": discount,
             "discount_pct": discount_pct,
             "volume": r["volume"],
             "sell_count": r["sell_count"],
             "buy_max": r["buy_max"],
-        })
+        }
+        if r["rank"] is not None:
+            entry["rank"] = r["rank"]
+        items.append(entry)
 
-    return {"data": items}
+    items.sort(key=lambda x: x["discount_pct"], reverse=True)
+    return {"data": items[:limit]}
 
 
 # ── 세트/부품 차익 ──
