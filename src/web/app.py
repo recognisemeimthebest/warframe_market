@@ -73,6 +73,7 @@ from src.world.api import (
 
 from src.config import VAPID_PUBLIC_KEY
 from src.web.push import delete_subscription, init_push_db, save_subscription, send_push_all
+from src.market.learned_aliases import delete_alias, init_aliases_db, list_aliases, save_alias
 
 logger = logging.getLogger(__name__)
 
@@ -120,6 +121,7 @@ async def startup() -> None:
     init_watchlist_db()
     init_modding_db()
     init_push_db()
+    init_aliases_db()
 
     # statistics 백필 (서버 최초 시작 시 히스토리 채우기)
     asyncio.create_task(backfill_statistics(get_popular_slugs()))
@@ -949,6 +951,21 @@ async def api_admin_delete_share(share_id: int):
     return {"ok": ok}
 
 
+@app.get("/api/admin/aliases")
+async def api_admin_aliases():
+    """학습된 별명 목록 (관리용)."""
+    return {"data": list_aliases()}
+
+
+@app.delete("/api/admin/aliases")
+async def api_admin_delete_alias(query: str = Query("")):
+    """잘못 학습된 별명 삭제."""
+    if not query:
+        return {"ok": False}
+    ok = delete_alias(query)
+    return {"ok": ok}
+
+
 # ── Web Push API ──
 
 @app.get("/api/push/vapid-public-key")
@@ -1004,6 +1021,18 @@ async def websocket_chat(ws: WebSocket) -> None:
             except json.JSONDecodeError:
                 continue
             user_text = msg.get("text", "").strip()
+
+            # suggest 선택 확인 → 학습 저장 후 시세 조회
+            if msg.get("type") == "confirm":
+                original_query = msg.get("query", "").strip()
+                slug = msg.get("slug", "").strip()
+                if original_query and slug:
+                    save_alias(original_query, slug)
+                # slug로 바로 시세 조회
+                if slug:
+                    await _handle_price_query(ws, slug)
+                continue
+
             if not user_text:
                 continue
 

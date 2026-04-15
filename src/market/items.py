@@ -267,7 +267,19 @@ class SearchResult:
 
 
 def resolve_item(query: str) -> tuple[str, str] | None:
-    """정확히 매칭되는 아이템 1개를 반환. 없으면 None."""
+    """정확히 매칭되는 아이템 1개를 반환. 없으면 None.
+
+    우선순위: 학습 별명 → 정확 매칭 → 퍼지 매칭
+    """
+    # 1. 학습된 별명 우선 확인
+    try:
+        from src.market.learned_aliases import lookup_alias
+        learned_slug = lookup_alias(query)
+        if learned_slug and learned_slug in _slug_to_en_name:
+            return learned_slug, _slug_to_en_name[learned_slug]
+    except Exception:
+        pass
+
     results = search_items(query, limit=1)
     if results and results[0].score >= 0.55:
         return results[0].slug, results[0].name

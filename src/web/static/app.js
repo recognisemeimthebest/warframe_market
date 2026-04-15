@@ -300,7 +300,7 @@ function addSuggestCard(query, items) {
         }
         a.addEventListener("click", () => {
             addMessage(item.ko_name || item.name, "user");
-            ws.send(JSON.stringify({ text: item.name }));
+            ws.send(JSON.stringify({ type: "confirm", query: query, slug: item.slug }));
         });
         card.appendChild(a);
     });
