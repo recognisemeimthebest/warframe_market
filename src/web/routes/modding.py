@@ -4,6 +4,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Query, Request, UploadFile
 from fastapi.responses import FileResponse
+from pydantic import BaseModel, Field
 
 from src.market.items import search_items
 from src.modding.share import (
@@ -20,6 +21,25 @@ from src.modding.share import (
 )
 
 router = APIRouter(prefix="/api/modding", tags=["modding"])
+
+
+# ── Pydantic 모델 ──
+
+class CreateShareRequest(BaseModel):
+    category: str
+    item_name: str
+    author: str
+    memo: str = ""
+    image_filenames: list[str] = []
+    sub_type: str = ""
+    password: str = ""
+
+
+class UpdateShareRequest(BaseModel):
+    author: str
+    password: str = ""
+    memo: str = ""
+    image_filenames: list[str] | None = None
 
 
 @router.get("/subtypes")
@@ -97,16 +117,16 @@ async def api_modding_weekly_best(limit: int = 5):
 
 
 @router.post("/shares")
-async def api_modding_create_share(body: dict):
+async def api_modding_create_share(body: CreateShareRequest):
     """모딩 공유 등록."""
     result = create_share(
-        category=body.get("category", ""),
-        item_name=body.get("item_name", ""),
-        author=body.get("author", ""),
-        memo=body.get("memo", ""),
-        image_filenames=body.get("image_filenames", []),
-        sub_type=body.get("sub_type", ""),
-        password=body.get("password", ""),
+        category=body.category,
+        item_name=body.item_name,
+        author=body.author,
+        memo=body.memo,
+        image_filenames=body.image_filenames,
+        sub_type=body.sub_type,
+        password=body.password,
     )
     if isinstance(result, str):
         return {"ok": False, "msg": result}
@@ -142,15 +162,14 @@ async def api_modding_image(filename: str):
 
 
 @router.put("/shares/{share_id}")
-async def api_modding_update_share(share_id: int, body: dict):
+async def api_modding_update_share(share_id: int, body: UpdateShareRequest):
     """모딩 공유 메모 수정."""
-    image_filenames = body.get("image_filenames")
     result = update_share(
         share_id=share_id,
-        author=body.get("author", ""),
-        password=body.get("password", ""),
-        memo=body.get("memo", ""),
-        image_filenames=image_filenames,
+        author=body.author,
+        password=body.password,
+        memo=body.memo,
+        image_filenames=body.image_filenames,
     )
     if isinstance(result, str):
         return {"ok": False, "msg": result}

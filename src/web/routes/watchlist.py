@@ -1,6 +1,7 @@
 """워치리스트 API 라우트."""
 
 from fastapi import APIRouter, Query
+from pydantic import BaseModel, Field
 
 from src.market.api import get_item_price
 from src.market.watchlist import (
@@ -11,6 +12,15 @@ from src.market.watchlist import (
 )
 
 router = APIRouter(prefix="/api/watchlist", tags=["watchlist"])
+
+
+# ── Pydantic 모델 ──
+
+class AddWatchRequest(BaseModel):
+    user_name: str
+    item_slug: str
+    item_name: str
+    target_price: int = Field(..., ge=1)
 
 
 @router.get("")
@@ -30,14 +40,14 @@ async def api_watchlist(user_name: str = ""):
 
 
 @router.post("")
-async def api_add_watch(body: dict):
+async def api_add_watch(body: AddWatchRequest):
     """워치리스트 추가."""
-    slug = body.get("item_slug", "").strip()
+    slug = body.item_slug.strip()
     result = add_watch(
-        user_name=body.get("user_name", "").strip(),
+        user_name=body.user_name.strip(),
         item_slug=slug,
-        item_name=body.get("item_name", "").strip(),
-        target_price=body.get("target_price", 0),
+        item_name=body.item_name.strip(),
+        target_price=body.target_price,
     )
     if isinstance(result, str):
         return {"ok": False, "msg": result}

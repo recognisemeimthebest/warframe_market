@@ -1,12 +1,22 @@
 """REST API 라우트 — 시세 조회, 추세, 주간 리포트."""
 
-from fastapi import APIRouter, Body
+from fastapi import APIRouter
+from pydantic import BaseModel, Field
 
 from src.market.api import get_item_price
 from src.market.history import get_alert_config, get_price_trend, get_weekly_report, save_alert_config
 from src.market.items import resolve_item
 
 router = APIRouter(prefix="/api")
+
+
+# ── Pydantic 모델 ──
+
+class AlertConfigRequest(BaseModel):
+    threshold_1d: float | None = None
+    threshold_7d: float | None = None
+    threshold_30d: float | None = None
+    min_price: int | None = None
 
 
 @router.get("/price/{query}")
@@ -45,10 +55,9 @@ async def get_alert_config_api():
 
 
 @router.post("/alert-config")
-async def save_alert_config_api(body: dict = Body(...)):
+async def save_alert_config_api(body: AlertConfigRequest):
     """알림 기준 설정 저장."""
-    allowed = {"threshold_1d", "threshold_7d", "threshold_30d", "min_price"}
-    filtered = {k: v for k, v in body.items() if k in allowed}
+    filtered = {k: v for k, v in body.model_dump().items() if v is not None}
     if not filtered:
         return {"ok": False, "msg": "유효한 설정값이 없습니다."}
     try:

@@ -1,6 +1,9 @@
 """거래소 API 라우트."""
 
+from typing import Literal
+
 from fastapi import APIRouter, Query
+from pydantic import BaseModel, Field
 
 from src.market.trade import (
     create_listing,
@@ -13,13 +16,27 @@ from src.market.trade import (
 router = APIRouter(prefix="/api/trade", tags=["trade"])
 
 
+# ── Pydantic 모델 ──
+
+class RegisterRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=20)
+
+
+class CreateListingRequest(BaseModel):
+    user_name: str
+    item_slug: str
+    item_name: str
+    trade_type: Literal["buy", "sell"]
+    price: int = Field(..., ge=1)
+    rank: int | None = None
+    quantity: int = Field(1, ge=1)
+    memo: str = Field("", max_length=100)
+
+
 @router.post("/register")
-async def api_trade_register(body: dict):
+async def api_trade_register(body: RegisterRequest):
     """거래소 유저 등록 요청."""
-    name = body.get("name", "").strip()
-    if not name or len(name) > 20:
-        return {"ok": False, "msg": "이름은 1~20자로 입력해주세요."}
-    result = register_user(name)
+    result = register_user(body.name.strip())
     if isinstance(result, str):
         return {"ok": False, "msg": result}
     return {"ok": True, "user": {"id": result.id, "name": result.name, "status": result.status}}
@@ -52,36 +69,19 @@ async def api_trade_listings(trade_type: str = "", limit: int = 50):
 
 
 @router.post("/listings")
-async def api_trade_create_listing(body: dict):
+async def api_trade_create_listing(body: CreateListingRequest):
     """매물 등록."""
-    user_name = body.get("user_name", "").strip()
-    user = get_user_by_name(user_name)
+    user = get_user_by_name(body.user_name.strip())
     if not user or user.status != "approved":
         return {"ok": False, "msg": "승인된 유저만 매물을 등록할 수 있습니다."}
 
-    item_slug = body.get("item_slug", "").strip()
-    item_name = body.get("item_name", "").strip()
-    trade_type = body.get("trade_type", "")
-    price = body.get("price", 0)
-    rank = body.get("rank")
-    quantity = body.get("quantity", 1)
-    memo = body.get("memo", "").strip()
-
-    if trade_type not in ("buy", "sell"):
-        return {"ok": False, "msg": "trade_type은 buy 또는 sell이어야 합니다."}
-    if not item_slug or not item_name:
+    if not body.item_slug.strip() or not body.item_name.strip():
         return {"ok": False, "msg": "아이템을 선택해주세요."}
-    if not isinstance(price, int) or price < 1:
-        return {"ok": False, "msg": "가격은 1p 이상이어야 합니다."}
-    if not isinstance(quantity, int) or quantity < 1:
-        quantity = 1
-    if len(memo) > 100:
-        memo = memo[:100]
 
     listing_id = create_listing(
-        user_id=user.id, trade_type=trade_type,
-        item_slug=item_slug, item_name=item_name,
-        price=price, rank=rank, quantity=quantity, memo=memo,
+        user_id=user.id, trade_type=body.trade_type,
+        item_slug=body.item_slug.strip(), item_name=body.item_name.strip(),
+        price=body.price, rank=body.rank, quantity=body.quantity, memo=body.memo.strip(),
     )
     return {"ok": True, "id": listing_id}
 
