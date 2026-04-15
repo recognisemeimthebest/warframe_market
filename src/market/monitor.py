@@ -11,6 +11,7 @@ from src.market.history import (
     SurgeItem,
     backfill_from_statistics,
     cleanup_old_data,
+    get_alert_config,
     get_current_price,
     get_price_at,
     get_price_days_ago,
@@ -101,11 +102,16 @@ async def scan_items(slugs: list[str], broadcast_fn=None) -> int:
     return saved
 
 
-def _detect_for_rank(slug: str, rank: int | None) -> list[SurgeItem]:
+def _detect_for_rank(slug: str, rank: int | None, thresholds: dict | None = None, min_price: float | None = None) -> list[SurgeItem]:
     """특정 slug+rank 조합의 급등 감지."""
+    if thresholds is None:
+        thresholds = SURGE_THRESHOLDS
+    if min_price is None:
+        min_price = _MIN_PRICE
+
     surges = []
     current = get_current_price(slug, rank=rank)
-    if not current or current < _MIN_PRICE:
+    if not current or current < min_price:
         return surges
 
     checks: list[tuple[str, float | None]] = [
@@ -114,9 +120,9 @@ def _detect_for_rank(slug: str, rank: int | None) -> list[SurgeItem]:
         ("30d", get_price_days_ago(slug, days_ago=30, rank=rank)),
     ]
     for period, old_price in checks:
-        if old_price and old_price >= _MIN_PRICE:
+        if old_price and old_price >= min_price:
             pct = ((current - old_price) / old_price) * 100
-            if pct >= SURGE_THRESHOLDS[period]:
+            if pct >= thresholds.get(period, SURGE_THRESHOLDS[period]):
                 surges.append(SurgeItem(
                     slug=slug, period=period, rank=rank,
                     old_price=old_price, new_price=current, change_pct=pct,
@@ -125,15 +131,20 @@ def _detect_for_rank(slug: str, rank: int | None) -> list[SurgeItem]:
 
 
 def detect_surges(slugs: list[str]) -> list[SurgeItem]:
-    """급등 감지. 전체 + 랭크별(0, MAX)로 비교."""
+    """급등 감지. 전체 + 랭크별(0, MAX)로 비교. DB 커스텀 기준 사용."""
+    cfg = get_alert_config()
+    thresholds = {
+        "1d": cfg["threshold_1d"],
+        "7d": cfg["threshold_7d"],
+        "30d": cfg["threshold_30d"],
+    }
+    min_price = float(cfg["min_price"])
+
     surges = []
     for slug in slugs:
-        # 전체 가격 급등 (rank=None)
-        surges.extend(_detect_for_rank(slug, rank=None))
-        # 랭크별 급등 — 랭크 데이터가 있는 아이템만
-        # 0랭과 MAX랭 스냅샷이 있으면 감지
+        surges.extend(_detect_for_rank(slug, rank=None, thresholds=thresholds, min_price=min_price))
         for rank in _get_stored_ranks(slug):
-            surges.extend(_detect_for_rank(slug, rank=rank))
+            surges.extend(_detect_for_rank(slug, rank=rank, thresholds=thresholds, min_price=min_price))
     return surges
 
 

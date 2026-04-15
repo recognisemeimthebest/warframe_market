@@ -26,6 +26,12 @@ def init_db() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     with _get_conn() as conn:
         conn.execute("""
+            CREATE TABLE IF NOT EXISTS alert_config (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+        """)
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS price_snapshot (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 slug TEXT NOT NULL,
@@ -209,6 +215,233 @@ def cleanup_old_data(keep_days: int = 90) -> int:
     if deleted:
         logger.info("오래된 스냅샷 %d개 삭제", deleted)
     return deleted
+
+
+_DEFAULT_ALERT_CONFIG = {
+    "threshold_1d": 20.0,
+    "threshold_7d": 30.0,
+    "threshold_30d": 50.0,
+    "min_price": 5,
+}
+
+
+def get_alert_config() -> dict:
+    """알림 기준 설정 조회. 없으면 기본값 반환."""
+    with _get_conn() as conn:
+        rows = conn.execute("SELECT key, value FROM alert_config").fetchall()
+    cfg = dict(_DEFAULT_ALERT_CONFIG)
+    for k, v in rows:
+        try:
+            cfg[k] = float(v) if "threshold" in k else int(v)
+        except ValueError:
+            pass
+    return cfg
+
+
+def save_alert_config(cfg: dict) -> None:
+    """알림 기준 설정 저장."""
+    with _get_conn() as conn:
+        for k, v in cfg.items():
+            conn.execute(
+                "INSERT OR REPLACE INTO alert_config (key, value) VALUES (?, ?)",
+                (k, str(v)),
+            )
+
+
+def get_price_trend(slug: str, days: int = 7) -> dict | None:
+    """최근 N일 가격 추세 계산.
+
+    Returns:
+        {
+            "direction": "up" | "down" | "flat",
+            "change_pct": float,        # 기간 변동률 (%)
+            "price_now": float,
+            "price_start": float,
+            "data_points": int,
+        }
+        None이면 데이터 부족.
+    """
+    now = datetime.now(timezone.utc)
+    cutoff = (now - timedelta(days=days)).isoformat()
+
+    with _get_conn() as conn:
+        rows = conn.execute(
+            """
+            SELECT scanned_at,
+                   COALESCE(sell_min, avg_price) AS price
+            FROM price_snapshot
+            WHERE slug = ? AND rank IS NULL AND scanned_at >= ?
+              AND COALESCE(sell_min, avg_price) IS NOT NULL
+            ORDER BY scanned_at ASC
+            """,
+            (slug, cutoff),
+        ).fetchall()
+
+    if len(rows) < 2:
+        return None
+
+    prices = [r[1] for r in rows if r[1] is not None]
+    if len(prices) < 2:
+        return None
+
+    price_start = prices[0]
+    price_now = prices[-1]
+
+    if price_start <= 0:
+        return None
+
+    change_pct = (price_now - price_start) / price_start * 100
+
+    if change_pct >= 5:
+        direction = "up"
+    elif change_pct <= -5:
+        direction = "down"
+    else:
+        direction = "flat"
+
+    return {
+        "direction": direction,
+        "change_pct": round(change_pct, 1),
+        "price_now": round(price_now, 1),
+        "price_start": round(price_start, 1),
+        "data_points": len(prices),
+    }
+
+
+def get_weekly_report() -> dict:
+    """지난 7일 시장 요약 리포트.
+
+    Returns:
+        {
+            "top_gainers": [...],   # 급등 TOP 5
+            "top_losers": [...],    # 급락 TOP 5
+            "surge_count": int,     # 7일간 급등 감지 건수
+            "most_surged": [...],   # 가장 많이 급등 감지된 아이템 TOP 3
+        }
+    """
+    from src.market.items import _slug_to_ko, _slug_to_en_name
+
+    now = datetime.now(timezone.utc)
+    week_ago = (now - timedelta(days=7)).isoformat()
+
+    with _get_conn() as conn:
+        # 지난 7일 급등 알림 건수 + 최다 급등 아이템
+        surge_count_row = conn.execute(
+            "SELECT COUNT(*) FROM surge_alert WHERE detected_at >= ?",
+            (week_ago,),
+        ).fetchone()
+        surge_count = surge_count_row[0] if surge_count_row else 0
+
+        most_surged_rows = conn.execute(
+            """
+            SELECT slug, COUNT(*) AS cnt, AVG(change_pct) AS avg_pct
+            FROM surge_alert
+            WHERE detected_at >= ? AND rank IS NULL
+            GROUP BY slug
+            ORDER BY cnt DESC, avg_pct DESC
+            LIMIT 3
+            """,
+            (week_ago,),
+        ).fetchall()
+
+        # 7일 변동률 계산 — 각 아이템의 7일 전/현재 가격 비교
+        # 서브쿼리로 각 slug별 첫 가격(7일 전)과 최신 가격 집계
+        gainers_rows = conn.execute(
+            """
+            WITH ranked AS (
+                SELECT slug,
+                       COALESCE(sell_min, avg_price) AS price,
+                       scanned_at,
+                       ROW_NUMBER() OVER (PARTITION BY slug ORDER BY scanned_at ASC) AS rn_asc,
+                       ROW_NUMBER() OVER (PARTITION BY slug ORDER BY scanned_at DESC) AS rn_desc
+                FROM price_snapshot
+                WHERE rank IS NULL
+                  AND scanned_at >= ?
+                  AND COALESCE(sell_min, avg_price) IS NOT NULL
+                  AND COALESCE(sell_min, avg_price) >= 5
+            ),
+            first_price AS (SELECT slug, price FROM ranked WHERE rn_asc = 1),
+            last_price  AS (SELECT slug, price FROM ranked WHERE rn_desc = 1)
+            SELECT f.slug,
+                   f.price AS price_start,
+                   l.price AS price_now,
+                   ROUND((l.price - f.price) * 100.0 / f.price, 1) AS change_pct
+            FROM first_price f
+            JOIN last_price l ON f.slug = l.slug
+            WHERE f.price > 0
+            ORDER BY change_pct DESC
+            LIMIT 5
+            """,
+            (week_ago,),
+        ).fetchall()
+
+        losers_rows = conn.execute(
+            """
+            WITH ranked AS (
+                SELECT slug,
+                       COALESCE(sell_min, avg_price) AS price,
+                       scanned_at,
+                       ROW_NUMBER() OVER (PARTITION BY slug ORDER BY scanned_at ASC) AS rn_asc,
+                       ROW_NUMBER() OVER (PARTITION BY slug ORDER BY scanned_at DESC) AS rn_desc
+                FROM price_snapshot
+                WHERE rank IS NULL
+                  AND scanned_at >= ?
+                  AND COALESCE(sell_min, avg_price) IS NOT NULL
+                  AND COALESCE(sell_min, avg_price) >= 5
+            ),
+            first_price AS (SELECT slug, price FROM ranked WHERE rn_asc = 1),
+            last_price  AS (SELECT slug, price FROM ranked WHERE rn_desc = 1)
+            SELECT f.slug,
+                   f.price AS price_start,
+                   l.price AS price_now,
+                   ROUND((l.price - f.price) * 100.0 / f.price, 1) AS change_pct
+            FROM first_price f
+            JOIN last_price l ON f.slug = l.slug
+            WHERE f.price > 0
+            ORDER BY change_pct ASC
+            LIMIT 5
+            """,
+            (week_ago,),
+        ).fetchall()
+
+    def _fmt(rows, *, gainers: bool) -> list[dict]:
+        result = []
+        for r in rows:
+            slug, p_start, p_now, pct = r
+            if gainers and pct <= 0:
+                continue
+            if not gainers and pct >= 0:
+                continue
+            ko = _slug_to_ko.get(slug, "")
+            en = _slug_to_en_name.get(slug, slug)
+            result.append({
+                "slug": slug,
+                "name": ko or en,
+                "price_start": round(p_start, 0),
+                "price_now": round(p_now, 0),
+                "change_pct": pct,
+            })
+        return result
+
+    most_surged = []
+    for r in most_surged_rows:
+        slug, cnt, avg_pct = r
+        ko = _slug_to_ko.get(slug, "")
+        en = _slug_to_en_name.get(slug, slug)
+        most_surged.append({
+            "slug": slug,
+            "name": ko or en,
+            "surge_count": cnt,
+            "avg_change_pct": round(avg_pct, 1),
+        })
+
+    return {
+        "top_gainers": _fmt(gainers_rows, gainers=True),
+        "top_losers": _fmt(losers_rows, gainers=False),
+        "surge_count": surge_count,
+        "most_surged": most_surged,
+        "generated_at": now.strftime("%Y-%m-%d %H:%M UTC"),
+    }
 
 
 def backfill_from_statistics(slug: str, stats_48h: list[dict], stats_90d: list[dict]) -> int:

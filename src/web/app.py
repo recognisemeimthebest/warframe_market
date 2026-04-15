@@ -18,7 +18,7 @@ from src.market.auction import (
     search_lich_auctions,
     search_riven_auctions,
 )
-from src.market.history import get_recent_surges, init_db, DB_PATH as HISTORY_DB_PATH
+from src.market.history import get_price_trend, get_recent_surges, init_db, DB_PATH as HISTORY_DB_PATH
 from src.market.items import (
     _slug_to_ko,
     _slug_to_en_name,
@@ -1251,6 +1251,7 @@ async def _handle_price_query(ws: WebSocket, query: str) -> None:
                 }
                 for rp in price.rank_prices
             ]
+        resp["trend"] = get_price_trend(price.slug)
         log_event("price_query", display_name, hit=True)
         await ws.send_text(json.dumps(resp))
         return

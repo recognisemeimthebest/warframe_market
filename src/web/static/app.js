@@ -269,8 +269,10 @@ function addPriceCard(price) {
             ? '<span class="vault-badge active">현역</span>'
             : "";
 
+    const trendHtml = trendBadgeHtml(price.trend);
+
     card.innerHTML = `
-        <div class="title"><a href="https://warframe.market/items/${price.slug}" target="_blank">${escapeHtml(price.item_name)}</a>${vaultBadge}</div>
+        <div class="title"><a href="https://warframe.market/items/${price.slug}" target="_blank">${escapeHtml(price.item_name)}</a>${vaultBadge}${trendHtml}</div>
         <div class="row"><span class="label">판매 최저가</span><span class="value">${formatPrice(price.sell_min, price.sell_count)}</span></div>
         <div class="row"><span class="label">구매 최고가</span><span class="value">${formatPrice(price.buy_max, price.buy_count)}</span></div>
         <div class="row"><span class="label">48시간 평균</span><span class="value">${avg48h}</span></div>
@@ -354,6 +356,7 @@ tabs.forEach((btn) => {
         if (tab === "surges") fetchSurges();
         if (tab === "world") fetchWorldState();
         if (tab === "modding") renderModdingTab();
+        if (tab === "report") loadWeeklyReport();
 
         activeTab = tab;
     });
@@ -3260,6 +3263,113 @@ async function renderIncarnon(search = "") {
     }
 }
 
+// ── 급등 감지 기준 설정 ──────────────────────────────────────────────────────
+async function loadSurgeThresholds() {
+    try {
+        const r = await fetch("/api/alert-config");
+        if (!r.ok) return;
+        const cfg = await r.json();
+        document.getElementById("surge-thr-1d").value = cfg.threshold_1d ?? 20;
+        document.getElementById("surge-thr-7d").value = cfg.threshold_7d ?? 30;
+        document.getElementById("surge-thr-30d").value = cfg.threshold_30d ?? 50;
+        document.getElementById("surge-thr-minprice").value = cfg.min_price ?? 5;
+    } catch {}
+}
+
+async function saveSurgeThresholds() {
+    const body = {
+        threshold_1d: parseFloat(document.getElementById("surge-thr-1d").value),
+        threshold_7d: parseFloat(document.getElementById("surge-thr-7d").value),
+        threshold_30d: parseFloat(document.getElementById("surge-thr-30d").value),
+        min_price: parseInt(document.getElementById("surge-thr-minprice").value),
+    };
+    const msg = document.getElementById("surge-thr-msg");
+    try {
+        const r = await fetch("/api/alert-config", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+        });
+        const data = await r.json();
+        msg.textContent = data.error ? "저장 실패: " + data.message : "저장됨!";
+        setTimeout(() => { msg.textContent = ""; }, 2000);
+    } catch {
+        msg.textContent = "서버 오류";
+    }
+}
+
+// ── 가격 추세 뱃지 ──────────────────────────────────────────────────────────
+function trendBadgeHtml(trend) {
+    if (!trend) return "";
+    const icons = { up: "▲", down: "▼", flat: "→" };
+    const labels = { up: "상승", down: "하락", flat: "횡보" };
+    const cls = { up: "trend-up", down: "trend-down", flat: "trend-flat" };
+    const sign = trend.change_pct > 0 ? "+" : "";
+    return `<span class="trend-badge ${cls[trend.direction]}">${icons[trend.direction]} ${labels[trend.direction]} ${sign}${trend.change_pct}% (7일)</span>`;
+}
+
+// addPriceCard에서 trend 뱃지 삽입 (기존 함수 패치)
+const _origAddPriceCard = addPriceCard;
+// trend는 WebSocket 응답에 포함될 수 있으므로 price 객체에서 읽음
+
+// ── 주간 리포트 ─────────────────────────────────────────────────────────────
+async function loadWeeklyReport() {
+    const el = document.getElementById("report-content");
+    el.innerHTML = '<p class="report-loading">데이터 집계 중...</p>';
+    try {
+        const r = await fetch("/api/report/weekly");
+        const data = await r.json();
+        renderWeeklyReport(data, el);
+    } catch {
+        el.innerHTML = '<p class="report-loading">데이터를 불러오지 못했습니다.</p>';
+    }
+}
+
+function renderWeeklyReport(data, el) {
+    const sign = (v) => (v >= 0 ? "+" : "") + v + "%";
+    const arrow = (v) => v >= 5 ? "▲" : v <= -5 ? "▼" : "→";
+    const cls = (v) => v >= 5 ? "trend-up" : v <= -5 ? "trend-down" : "trend-flat";
+
+    const makeRows = (items) => items.length === 0
+        ? '<div class="report-empty">데이터 없음 (수집 중)</div>'
+        : items.map(it => `
+            <div class="report-row">
+                <span class="report-name">${escapeHtml(it.name)}</span>
+                <span class="report-prices">${it.price_start}p → ${it.price_now}p</span>
+                <span class="report-pct ${cls(it.change_pct)}">${arrow(it.change_pct)} ${sign(it.change_pct)}</span>
+            </div>`).join("");
+
+    const mostSurgedHtml = data.most_surged.length === 0
+        ? '<div class="report-empty">없음</div>'
+        : data.most_surged.map(it => `
+            <div class="report-row">
+                <span class="report-name">${escapeHtml(it.name)}</span>
+                <span class="report-surge-cnt">${it.surge_count}회 급등</span>
+                <span class="report-pct trend-up">평균 +${it.avg_change_pct}%</span>
+            </div>`).join("");
+
+    el.innerHTML = `
+        <div class="report-meta">기준: 최근 7일 · 생성: ${escapeHtml(data.generated_at)}</div>
+
+        <div class="report-section">
+            <div class="report-section-title">🚀 급등 TOP 5 (7일)</div>
+            ${makeRows(data.top_gainers)}
+        </div>
+
+        <div class="report-section">
+            <div class="report-section-title">📉 급락 TOP 5 (7일)</div>
+            ${makeRows(data.top_losers)}
+        </div>
+
+        <div class="report-section">
+            <div class="report-section-title">⚡ 급등 감지 최다 아이템</div>
+            <div class="report-total">이번 주 총 ${data.surge_count}건 감지</div>
+            ${mostSurgedHtml}
+        </div>
+    `;
+}
+
 // ── 초기화 ──
 applyPalette();
 connect();
+loadSurgeThresholds();

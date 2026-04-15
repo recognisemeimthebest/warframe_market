@@ -577,5 +577,33 @@ footer { padding: 12px 16px; background: var(--surface); border-top: 1px solid v
 .modding-cat-warning { background: rgba(255,180,0,0.12); border: 1px solid rgba(255,180,0,0.4); border-radius: 8px; padding: 7px 10px; font-size: 12px; color: #ffb400; margin-bottom: 6px; }
 .modding-subtype-tag { font-size: 11px; padding: 2px 7px; border-radius: 10px; background: rgba(77,184,255,0.12); color: var(--primary); font-weight: 600; margin: 0 4px; }
 
-main::-webkit-scrollbar, #messages::-webkit-scrollbar, #surge-list::-webkit-scrollbar, #trade-list::-webkit-scrollbar, #world-list::-webkit-scrollbar, #chat-watchlist::-webkit-scrollbar, #chat-auction::-webkit-scrollbar, #farming-results::-webkit-scrollbar, #modding-content::-webkit-scrollbar, #relic-results::-webkit-scrollbar, #chat-skins::-webkit-scrollbar { width: 4px; }
-main::-webkit-scrollbar-thumb, #messages::-webkit-scrollbar-thumb, #surge-list::-webkit-scrollbar-thumb, #trade-list::-webkit-scrollbar-thumb, #world-list::-webkit-scrollbar-thumb, #chat-watchlist::-webkit-scrollbar-thumb, #chat-auction::-webkit-scrollbar-thumb, #farming-results::-webkit-scrollbar-thumb, #modding-content::-webkit-scrollbar-thumb, #relic-results::-webkit-scrollbar-thumb, #chat-skins::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+/* ── 가격 추세 뱃지 ── */
+.trend-badge { display: inline-block; font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 8px; margin-left: 5px; vertical-align: middle; }
+.trend-up { background: rgba(0,200,100,0.15); color: #00c864; }
+.trend-down { background: rgba(255,80,80,0.15); color: #ff5050; }
+.trend-flat { background: rgba(150,150,150,0.12); color: var(--text-muted); }
+
+/* ── 설정 패널 급등 기준 ── */
+.surge-thr-input { width: 70px; padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font-size: 13px; text-align: right; }
+.surge-thr-save-btn { margin-top: 8px; width: 100%; padding: 7px; border-radius: 8px; border: none; background: var(--primary); color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+.surge-thr-save-btn:hover { opacity: 0.85; }
+
+/* ── 주간 리포트 탭 ── */
+#tab-report { padding: 12px; overflow-y: auto; }
+.report-refresh-btn { float: right; padding: 5px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--primary); font-size: 12px; font-weight: 600; cursor: pointer; margin-bottom: 10px; }
+.report-refresh-btn:hover { background: var(--primary); color: #fff; }
+.report-meta { font-size: 11px; color: var(--text-muted); margin-bottom: 12px; clear: both; }
+.report-loading { color: var(--text-muted); font-size: 13px; text-align: center; padding: 20px 0; }
+.report-section { background: var(--surface); border-radius: 10px; padding: 12px; margin-bottom: 12px; border: 1px solid var(--border); }
+.report-section-title { font-size: 13px; font-weight: 700; margin-bottom: 8px; color: var(--text); }
+.report-total { font-size: 11px; color: var(--text-muted); margin-bottom: 6px; }
+.report-row { display: flex; align-items: center; justify-content: space-between; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 12px; }
+.report-row:last-child { border-bottom: none; }
+.report-name { flex: 1; font-weight: 500; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 8px; }
+.report-prices { font-size: 11px; color: var(--text-muted); margin-right: 8px; white-space: nowrap; }
+.report-pct { font-weight: 700; font-size: 12px; white-space: nowrap; }
+.report-surge-cnt { font-size: 11px; color: var(--text-muted); margin-right: 8px; }
+.report-empty { font-size: 12px; color: var(--text-muted); text-align: center; padding: 10px 0; }
+
+main::-webkit-scrollbar, #messages::-webkit-scrollbar, #surge-list::-webkit-scrollbar, #trade-list::-webkit-scrollbar, #world-list::-webkit-scrollbar, #chat-watchlist::-webkit-scrollbar, #chat-auction::-webkit-scrollbar, #farming-results::-webkit-scrollbar, #modding-content::-webkit-scrollbar, #relic-results::-webkit-scrollbar, #chat-skins::-webkit-scrollbar, #tab-report::-webkit-scrollbar { width: 4px; }
+main::-webkit-scrollbar-thumb, #messages::-webkit-scrollbar-thumb, #surge-list::-webkit-scrollbar-thumb, #trade-list::-webkit-scrollbar-thumb, #world-list::-webkit-scrollbar-thumb, #chat-watchlist::-webkit-scrollbar-thumb, #chat-auction::-webkit-scrollbar-thumb, #farming-results::-webkit-scrollbar-thumb, #modding-content::-webkit-scrollbar-thumb, #relic-results::-webkit-scrollbar-thumb, #chat-skins::-webkit-scrollbar-thumb, #tab-report::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }

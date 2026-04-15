@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>워프봇</title>
-    <link rel="stylesheet" href="/static/style.css?v=20260415f">
+    <link rel="stylesheet" href="/static/style.css?v=20260415g">
     <link rel="manifest" href="/static/manifest.json">
     <meta name="theme-color" content="#4db8ff">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -62,6 +62,28 @@
                     <div class="settings-sub-label" id="palette-label">다크 팔레트</div>
                     <div class="palette-grid" id="palette-grid"></div>
                 </div>
+                <div class="settings-section">
+                    <div class="settings-section-title">급등 감지 기준</div>
+                    <div class="settings-hint">급등으로 판단하는 최소 변동률을 설정합니다.</div>
+                    <div class="settings-row">
+                        <span>1일 기준 (%)</span>
+                        <input type="number" id="surge-thr-1d" class="surge-thr-input" min="5" max="200" value="20">
+                    </div>
+                    <div class="settings-row">
+                        <span>7일 기준 (%)</span>
+                        <input type="number" id="surge-thr-7d" class="surge-thr-input" min="5" max="200" value="30">
+                    </div>
+                    <div class="settings-row">
+                        <span>30일 기준 (%)</span>
+                        <input type="number" id="surge-thr-30d" class="surge-thr-input" min="5" max="200" value="50">
+                    </div>
+                    <div class="settings-row">
+                        <span>최소 가격 (p)</span>
+                        <input type="number" id="surge-thr-minprice" class="surge-thr-input" min="1" max="1000" value="5">
+                    </div>
+                    <button class="surge-thr-save-btn" onclick="saveSurgeThresholds()">저장</button>
+                    <div id="surge-thr-msg" class="settings-hint" style="color:var(--accent);"></div>
+                </div>
                 <div class="settings-section" id="install-section" style="display:none;">
                     <div class="settings-section-title">앱 설치</div>
                     <div class="settings-hint">홈 화면에 추가하면 앱처럼 사용할 수 있습니다.</div>
@@ -77,6 +99,7 @@
             <button class="tab" data-tab="farming">파밍</button>
             <button class="tab" data-tab="modding">모딩 공유</button>
             <button class="tab" data-tab="relic">렐릭</button>
+            <button class="tab" data-tab="report">주간 리포트</button>
         </nav>
 
         <!-- 시세 조회 탭 -->
@@ -151,6 +174,14 @@
             <div id="modding-content"></div>
         </main>
 
+        <!-- 주간 리포트 탭 -->
+        <main id="tab-report" class="tab-content">
+            <div id="report-header">
+                <button class="report-refresh-btn" onclick="loadWeeklyReport()">새로고침</button>
+            </div>
+            <div id="report-content"><p class="report-loading">로딩 중...</p></div>
+        </main>
+
         <!-- 렐릭 기대 수익 탭 -->
         <main id="tab-relic" class="tab-content">
             <div id="relic-search-area">
@@ -188,7 +219,7 @@
 
     </div>
 
-    <script src="/static/app.js?v=20260415f"></script>
+    <script src="/static/app.js?v=20260415g"></script>
     <script>
         if ("serviceWorker" in navigator) {
             navigator.serviceWorker.register("/static/sw.js").catch(() => {});
