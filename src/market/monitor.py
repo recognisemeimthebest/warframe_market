@@ -75,6 +75,7 @@ async def scan_items(slugs: list[str], broadcast_fn=None) -> int:
             save_snapshot(
                 slug=slug,
                 sell_min=price.sell_min,
+                sell_2nd=price.sell_2nd,
                 sell_count=price.sell_count,
                 buy_max=price.buy_max,
                 buy_count=price.buy_count,

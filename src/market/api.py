@@ -34,6 +34,7 @@ class ItemPrice:
     item_name: str
     slug: str
     sell_min: int | None = None
+    sell_2nd: int | None = None       # 두 번째 저렴한 온라인 판매가 (이상치 내성)
     sell_count: int = 0
     buy_max: int | None = None
     buy_count: int = 0
@@ -148,6 +149,7 @@ async def get_item_price(slug: str, item_name: str = "") -> ItemPrice | None:
         item_name=item_name or slug,
         slug=slug,
         sell_min=sell_orders[0]["platinum"] if sell_orders else None,
+        sell_2nd=sell_orders[1]["platinum"] if len(sell_orders) > 1 else None,
         sell_count=len(sell_orders),
         buy_max=buy_orders[0]["platinum"] if buy_orders else None,
         buy_count=len(buy_orders),

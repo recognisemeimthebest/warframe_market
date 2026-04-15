@@ -31,6 +31,7 @@ def init_db() -> None:
                 slug TEXT NOT NULL,
                 rank INTEGER,
                 sell_min INTEGER,
+                sell_2nd INTEGER,
                 sell_count INTEGER DEFAULT 0,
                 buy_max INTEGER,
                 buy_count INTEGER DEFAULT 0,
@@ -39,6 +40,11 @@ def init_db() -> None:
                 scanned_at TEXT NOT NULL
             )
         """)
+        # 기존 DB 마이그레이션 (sell_2nd 컬럼 없는 경우)
+        try:
+            conn.execute("ALTER TABLE price_snapshot ADD COLUMN sell_2nd INTEGER")
+        except Exception:
+            pass  # 이미 존재
         conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_snapshot_slug_rank_time
             ON price_snapshot (slug, rank, scanned_at)
@@ -65,14 +71,15 @@ def init_db() -> None:
 def save_snapshot(slug: str, sell_min: int | None, sell_count: int,
                   buy_max: int | None, buy_count: int,
                   avg_price: float | None, volume: int,
-                  rank: int | None = None) -> None:
+                  rank: int | None = None,
+                  sell_2nd: int | None = None) -> None:
     """시세 스냅샷 1개 저장. rank=None이면 전체, 0이면 0랭, N이면 N랭."""
     now = datetime.now(timezone.utc).isoformat()
     with _get_conn() as conn:
         conn.execute(
-            "INSERT INTO price_snapshot (slug, rank, sell_min, sell_count, buy_max, buy_count, avg_price, volume, scanned_at)"
-            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (slug, rank, sell_min, sell_count, buy_max, buy_count, avg_price, volume, now),
+            "INSERT INTO price_snapshot (slug, rank, sell_min, sell_2nd, sell_count, buy_max, buy_count, avg_price, volume, scanned_at)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (slug, rank, sell_min, sell_2nd, sell_count, buy_max, buy_count, avg_price, volume, now),
         )
 
 
