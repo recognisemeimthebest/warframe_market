@@ -2040,6 +2040,11 @@ async function renderModdingTab() {
     const container = document.getElementById("modding-content");
     container.innerHTML = "";
 
+    // 주간 베스트 (아이템 목록 화면에서만 표시)
+    if (!moddingSelectedItem) {
+        await renderModdingWeeklyBest(container);
+    }
+
     const cats = document.createElement("div");
     cats.className = "modding-cats";
     MODDING_CATEGORIES.forEach((cat) => {
@@ -2056,6 +2061,46 @@ async function renderModdingTab() {
     } else {
         await renderModdingItemList(container);
     }
+}
+
+async function renderModdingWeeklyBest(container) {
+    try {
+        const res = await fetch("/api/modding/weekly-best?limit=5");
+        const json = await res.json();
+        const items = json.data || [];
+        if (!items.length) return;
+
+        const section = document.createElement("div");
+        section.className = "modding-weekly-best";
+        section.innerHTML = '<div class="modding-weekly-best-title">🏆 주간 베스트 모딩</div>';
+
+        const rankClasses = ["gold", "silver", "bronze"];
+        const rankLabels = ["1", "2", "3", "4", "5"];
+
+        items.forEach((item, idx) => {
+            const card = document.createElement("div");
+            card.className = "modding-best-card";
+            const rankClass = rankClasses[idx] || "";
+            const catLabel = MODDING_CATEGORIES.find((c) => c.key === item.category)?.label || item.category;
+            card.innerHTML = `
+                <div class="modding-best-rank ${rankClass}">${rankLabels[idx]}</div>
+                <div class="modding-best-info">
+                    <div class="modding-best-name">${escapeHtml(item.item_name)}</div>
+                    <div class="modding-best-meta">${escapeHtml(catLabel)}${item.sub_type ? " · " + escapeHtml(item.sub_type) : ""} · ${escapeHtml(item.author)}</div>
+                </div>
+                <div class="modding-best-likes">♥ ${item.likes}</div>
+            `;
+            card.onclick = () => {
+                moddingCategory = item.category;
+                moddingSelectedItem = item.item_name;
+                moddingFormOpen = false;
+                renderModdingTab();
+            };
+            section.appendChild(card);
+        });
+
+        container.appendChild(section);
+    } catch { /* 베스트 없으면 그냥 넘어감 */ }
 }
 
 async function renderModdingItemList(container) {
@@ -2146,6 +2191,7 @@ async function renderModdingDetail(container) {
             }
             const subTypeTag = s.sub_type ? `<span class="modding-subtype-tag">${escapeHtml(s.sub_type)}</span>` : "";
             const lockIcon = s.has_password ? ' <span style="font-size:10px;opacity:0.5;" title="비밀번호 보호">🔒</span>' : "";
+            const alreadyLiked = isModdingLiked(s.id);
             card.innerHTML = `
                 <div class="modding-card-top">
                     <span class="modding-card-author">${escapeHtml(s.author)}${lockIcon}</span>
@@ -2158,6 +2204,11 @@ async function renderModdingDetail(container) {
                 </div>
                 <div class="modding-card-memo" id="modding-memo-${s.id}">${s.memo ? escapeHtml(s.memo) : ""}</div>
                 ${imagesHtml}
+                <div style="margin-top:8px;">
+                    <button class="modding-like-btn${alreadyLiked ? " liked" : ""}" data-share-id="${s.id}"${alreadyLiked ? " disabled" : ""}>
+                        ♥ <span class="like-count">${s.likes || 0}</span>
+                    </button>
+                </div>
             `;
             // 파일명 목록을 카드에 저장 (수정 모달에서 참조)
             card.dataset.imageFilenames = JSON.stringify(
@@ -2165,6 +2216,9 @@ async function renderModdingDetail(container) {
             );
             card.querySelector(".modding-edit-btn").addEventListener("click", () => openModdingAuthModal(s.id, s.author, "edit", card));
             card.querySelector(".modding-delete-btn").addEventListener("click", () => openModdingAuthModal(s.id, s.author, "delete", card));
+            if (!alreadyLiked) {
+                card.querySelector(".modding-like-btn").addEventListener("click", () => likeModdingShare(s.id));
+            }
             container.appendChild(card);
         });
     } catch {
@@ -2332,6 +2386,44 @@ function renderModdingUploadPreview() {
 function removeModdingImage(idx) {
     moddingFormImages.splice(idx, 1);
     renderModdingUploadPreview();
+}
+
+// ── 좋아요 ──
+
+function _getModdingLikedSet() {
+    try { return new Set(JSON.parse(localStorage.getItem("modding_liked") || "[]")); }
+    catch { return new Set(); }
+}
+
+function isModdingLiked(shareId) {
+    return _getModdingLikedSet().has(shareId);
+}
+
+async function likeModdingShare(shareId) {
+    const btn = document.querySelector(`.modding-like-btn[data-share-id="${shareId}"]`);
+    if (!btn || btn.disabled) return;
+    btn.disabled = true;
+
+    try {
+        const res = await fetch(`/api/modding/shares/${shareId}/like`, { method: "POST" });
+        const json = await res.json();
+        if (json.ok) {
+            // localStorage에 저장 (새로고침 후에도 비활성화 유지)
+            const liked = _getModdingLikedSet();
+            liked.add(shareId);
+            localStorage.setItem("modding_liked", JSON.stringify([...liked]));
+            // UI 즉시 업데이트
+            btn.classList.add("liked");
+            btn.querySelector(".like-count").textContent = json.likes;
+        } else if (json.msg === "already_liked") {
+            // 서버에서도 중복 감지 → 그냥 liked 표시
+            btn.classList.add("liked");
+        } else {
+            btn.disabled = false;
+        }
+    } catch {
+        btn.disabled = false;
+    }
 }
 
 async function submitModdingShare() {

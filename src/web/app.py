@@ -55,11 +55,13 @@ from src.market.watchlist import (
 from src.modding.share import (
     IMAGES_DIR,
     SUBTYPES,
+    add_like,
     create_share,
     delete_share,
     update_share,
     get_items_in_category,
     get_shares,
+    get_weekly_best,
     init_modding_db,
     save_image,
 )
@@ -939,8 +941,32 @@ async def api_modding_shares(category: str = "warframe", item_name: str = "", li
             "author": s.author, "memo": s.memo, "created_at": s.created_at,
             "sub_type": s.sub_type, "has_password": s.has_password,
             "images": [f"/api/modding/images/{fname}" for fname in s.images],
+            "likes": s.likes,
         }
         for s in shares
+    ]}
+
+
+@app.post("/api/modding/shares/{share_id}/like")
+async def api_modding_like(share_id: int, request: Request):
+    """모딩 공유 좋아요. IP 기반 중복 방지."""
+    # X-Forwarded-For 헤더 우선, 없으면 직접 연결 IP
+    forwarded = request.headers.get("x-forwarded-for")
+    ip = forwarded.split(",")[0].strip() if forwarded else (request.client.host if request.client else "unknown")
+    result = add_like(share_id, ip)
+    return result
+
+
+@app.get("/api/modding/weekly-best")
+async def api_modding_weekly_best(limit: int = 5):
+    """주간 베스트 모딩 (최근 7일 좋아요 기준)."""
+    items = get_weekly_best(limit=limit)
+    return {"data": [
+        {
+            **item,
+            "images": [f"/api/modding/images/{fname}" for fname in item["images"]],
+        }
+        for item in items
     ]}
 
 

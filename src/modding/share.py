@@ -1,11 +1,11 @@
-"""모딩 공유 — SQLite DB + 이미지 저장 + CRUD."""
+"""모딩 공유 — SQLite DB + 이미지 저장 + CRUD + 좋아요."""
 
 import hashlib
 import logging
 import sqlite3
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from src.config import DATA_DIR
@@ -77,6 +77,15 @@ def init_modding_db() -> None:
             ON modding_share (category, item_name)
         """)
         conn.execute("""
+            CREATE TABLE IF NOT EXISTS modding_likes (
+                share_id INTEGER NOT NULL,
+                voter_key TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (share_id, voter_key),
+                FOREIGN KEY (share_id) REFERENCES modding_share(id) ON DELETE CASCADE
+            )
+        """)
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS modding_image (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 share_id INTEGER NOT NULL,
@@ -111,6 +120,7 @@ class ModdingShare:
     sub_type: str = ""
     images: list[str] = field(default_factory=list)  # 파일명 목록
     has_password: bool = False  # 비밀번호 설정 여부 (hash는 외부 노출 안 함)
+    likes: int = 0
 
 
 def create_share(
@@ -241,27 +251,35 @@ def update_share(
     return cursor.rowcount > 0
 
 
+_SHARES_SELECT = (
+    "SELECT ms.id, ms.category, ms.item_name, ms.author, ms.memo, ms.created_at,"
+    " ms.sub_type, ms.password_hash, COUNT(ml.share_id) AS likes"
+    " FROM modding_share ms"
+    " LEFT JOIN modding_likes ml ON ms.id = ml.share_id"
+)
+
+
 def get_shares(category: str = "", item_name: str = "", limit: int = 50) -> list[ModdingShare]:
     """모딩 공유 목록 조회. category 빈 문자열이면 전체 카테고리 조회."""
     with _get_conn() as conn:
         if category and item_name:
             rows = conn.execute(
-                "SELECT id, category, item_name, author, memo, created_at, sub_type, password_hash"
-                " FROM modding_share WHERE category = ? AND item_name = ?"
-                " ORDER BY created_at DESC LIMIT ?",
+                _SHARES_SELECT +
+                " WHERE ms.category = ? AND ms.item_name = ?"
+                " GROUP BY ms.id ORDER BY ms.created_at DESC LIMIT ?",
                 (category, item_name, limit),
             ).fetchall()
         elif category:
             rows = conn.execute(
-                "SELECT id, category, item_name, author, memo, created_at, sub_type, password_hash"
-                " FROM modding_share WHERE category = ?"
-                " ORDER BY created_at DESC LIMIT ?",
+                _SHARES_SELECT +
+                " WHERE ms.category = ?"
+                " GROUP BY ms.id ORDER BY ms.created_at DESC LIMIT ?",
                 (category, limit),
             ).fetchall()
         else:
             rows = conn.execute(
-                "SELECT id, category, item_name, author, memo, created_at, sub_type, password_hash"
-                " FROM modding_share ORDER BY created_at DESC LIMIT ?",
+                _SHARES_SELECT +
+                " GROUP BY ms.id ORDER BY ms.created_at DESC LIMIT ?",
                 (limit,),
             ).fetchall()
 
@@ -277,9 +295,67 @@ def get_shares(category: str = "", item_name: str = "", limit: int = 50) -> list
                 sub_type=r[6] or "",
                 images=[img[0] for img in images],
                 has_password=r[7] is not None,
+                likes=r[8],
             ))
 
     return shares
+
+
+def add_like(share_id: int, voter_key: str) -> dict:
+    """좋아요 추가. 이미 누른 경우 already_liked 반환."""
+    hashed = hashlib.sha256(voter_key.encode()).hexdigest()[:32]
+    with _get_conn() as conn:
+        row = conn.execute(
+            "SELECT id FROM modding_share WHERE id = ?", (share_id,)
+        ).fetchone()
+        if not row:
+            return {"ok": False, "msg": "존재하지 않는 게시글입니다."}
+        existing = conn.execute(
+            "SELECT 1 FROM modding_likes WHERE share_id = ? AND voter_key = ?",
+            (share_id, hashed),
+        ).fetchone()
+        if existing:
+            return {"ok": False, "msg": "already_liked"}
+        now = datetime.now(timezone.utc).isoformat()
+        conn.execute(
+            "INSERT INTO modding_likes (share_id, voter_key, created_at) VALUES (?, ?, ?)",
+            (share_id, hashed, now),
+        )
+        count = conn.execute(
+            "SELECT COUNT(*) FROM modding_likes WHERE share_id = ?", (share_id,)
+        ).fetchone()[0]
+    return {"ok": True, "likes": count}
+
+
+def get_weekly_best(limit: int = 5) -> list[dict]:
+    """최근 7일 좋아요 기준 상위 게시글."""
+    since = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    with _get_conn() as conn:
+        rows = conn.execute(
+            "SELECT ms.id, ms.category, ms.item_name, ms.author, ms.memo,"
+            " ms.created_at, ms.sub_type, COUNT(ml.share_id) AS like_count"
+            " FROM modding_share ms"
+            " INNER JOIN modding_likes ml ON ms.id = ml.share_id"
+            " WHERE ml.created_at >= ?"
+            " GROUP BY ms.id"
+            " ORDER BY like_count DESC, ms.created_at DESC"
+            " LIMIT ?",
+            (since, limit),
+        ).fetchall()
+
+        result = []
+        for r in rows:
+            images = conn.execute(
+                "SELECT filename FROM modding_image WHERE share_id = ? ORDER BY sort_order",
+                (r[0],),
+            ).fetchall()
+            result.append({
+                "id": r[0], "category": r[1], "item_name": r[2],
+                "author": r[3], "memo": r[4] or "", "created_at": r[5],
+                "sub_type": r[6] or "", "likes": r[7],
+                "images": [img[0] for img in images],
+            })
+    return result
 
 
 def get_items_in_category(category: str) -> list[dict]:

@@ -418,6 +418,26 @@ footer { padding: 12px 16px; background: var(--surface); border-top: 1px solid v
 .modding-action-btn:hover { opacity: 1; background: var(--bg); }
 .modding-card-actions { display: flex; gap: 2px; margin-left: auto; }
 
+/* ── 모딩 좋아요 버튼 ── */
+.modding-like-btn { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; background: none; border: 1px solid var(--border); border-radius: 20px; font-size: 12px; color: var(--text-muted); cursor: pointer; transition: all 0.15s; user-select: none; }
+.modding-like-btn:hover:not(:disabled) { border-color: #e91e63; color: #e91e63; background: rgba(233,30,99,0.07); }
+.modding-like-btn.liked { border-color: #e91e63; color: #e91e63; background: rgba(233,30,99,0.1); }
+.modding-like-btn:disabled { cursor: default; }
+
+/* ── 주간 베스트 모딩 ── */
+.modding-weekly-best { margin-bottom: 16px; }
+.modding-weekly-best-title { font-size: 13px; font-weight: 700; color: var(--primary); margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+.modding-best-card { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 6px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; transition: border-color 0.15s; }
+.modding-best-card:hover { border-color: var(--primary); }
+.modding-best-rank { font-size: 15px; font-weight: 800; color: var(--text-muted); min-width: 22px; text-align: center; }
+.modding-best-rank.gold { color: #ffd700; }
+.modding-best-rank.silver { color: #c0c0c0; }
+.modding-best-rank.bronze { color: #cd7f32; }
+.modding-best-info { flex: 1; min-width: 0; }
+.modding-best-name { font-size: 13px; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.modding-best-meta { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+.modding-best-likes { font-size: 12px; color: #e91e63; font-weight: 600; white-space: nowrap; }
+
 /* ── 모딩 인증 모달 ── */
 .modding-auth-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 1000; display: flex; align-items: center; justify-content: center; }
 .modding-auth-box { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 20px; width: min(380px, 92vw); max-height: 90vh; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
