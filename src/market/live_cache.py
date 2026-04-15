@@ -1,17 +1,30 @@
-"""라이브 시세 캐시 — 20분마다 prime/arcane 슬러그 실시간 조회.
+"""라이브 시세 캐시 — 30분마다 prime/arcane 슬러그 실시간 조회.
 
-set-arbitrage에서 snapshot 대신 사용. online/ingame 유저 주문만 반영.
+set/spread 차익탐지에서 snapshot 대신 사용. online/ingame 유저 주문만 반영.
+- 전용 세마포어(1) + 1req/sec로 hourly_scan과 API 경합 방지
+- 서버 시작 후 10분 딜레이 (backfill/hourly_scan 완료 대기)
 """
 
 import asyncio
 import logging
 from datetime import datetime, timezone
 
-from src.market.api import fetch_item_orders
+import httpx
+
+from src.config import MARKET_API_BASE, MARKET_RATE_LIMIT
 
 logger = logging.getLogger(__name__)
 
-REFRESH_INTERVAL = 20 * 60  # 20분
+REFRESH_INTERVAL = 30 * 60   # 30분
+STARTUP_DELAY    = 10 * 60   # 서버 시작 후 10분 뒤 첫 실행
+_LIVE_RATE       = 1.5        # req/sec — hourly_scan과 공존 가능한 느린 속도
+_LIVE_SEM        = asyncio.Semaphore(1)  # 동시 요청 1개
+
+_HEADERS = {
+    "Accept": "application/json",
+    "Platform": "pc",
+    "Language": "en",
+}
 
 # slug → {"sell_min": int|None, "buy_max": int|None, "sell_count": int}
 _cache: dict[str, dict] = {}
@@ -57,11 +70,27 @@ def _parse_orders(orders: list[dict]) -> dict:
     }
 
 
+async def _fetch_orders_slow(slug: str) -> list[dict]:
+    """전용 세마포어 + 느린 레이트로 주문 조회 (hourly_scan과 경합 방지)."""
+    url = f"https://api.warframe.market/v2/orders/item/{slug}"
+    async with _LIVE_SEM:
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                r = await client.get(url, headers=_HEADERS)
+                if r.status_code == 429:
+                    logger.warning("라이브 캐시 429 — %s, 5초 대기", slug)
+                    await asyncio.sleep(5)
+                    return []
+                r.raise_for_status()
+                return r.json().get("data", [])
+        except Exception:
+            return []
+        finally:
+            await asyncio.sleep(1 / _LIVE_RATE)  # 1.5req/sec 유지
+
+
 async def refresh_prime_cache() -> int:
     """prime/arcane 슬러그 전체의 라이브 시세를 갱신."""
-    global _cache, _cache_updated_at
-
-    # 순환 import 방지 — 함수 안에서 import
     from src.market.monitor import get_popular_slugs
 
     slugs = get_popular_slugs()
@@ -74,7 +103,7 @@ async def refresh_prime_cache() -> int:
 
     for slug in slugs:
         try:
-            orders = await fetch_item_orders(slug)
+            orders = await _fetch_orders_slow(slug)
             if orders:
                 new_cache[slug] = _parse_orders(orders)
         except Exception:
@@ -88,7 +117,9 @@ async def refresh_prime_cache() -> int:
 
 
 async def run_live_cache_loop() -> None:
-    """백그라운드 루프: 서버 시작 즉시 첫 갱신 후 20분마다 반복."""
+    """백그라운드 루프: 시작 10분 뒤 첫 갱신 후 30분마다 반복."""
+    logger.info("라이브 캐시 루프 대기 중 (%d분 후 첫 갱신)", STARTUP_DELAY // 60)
+    await asyncio.sleep(STARTUP_DELAY)
     while True:
         try:
             await refresh_prime_cache()
