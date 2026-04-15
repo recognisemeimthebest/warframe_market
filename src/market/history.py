@@ -311,32 +311,82 @@ def get_price_trend(slug: str, days: int = 7) -> dict | None:
 def get_weekly_report() -> dict:
     """지난 7일 시장 요약 리포트.
 
-    Returns:
-        {
-            "top_gainers": [...],   # 급등 TOP 5
-            "top_losers": [...],    # 급락 TOP 5
-            "surge_count": int,     # 7일간 급등 감지 건수
-            "most_surged": [...],   # 가장 많이 급등 감지된 아이템 TOP 3
-        }
+    가격 기준:
+    - 일반 아이템 (rank=NULL, 랭크 변종 없음): avg_price (실거래 통계) 전용
+    - 모드/아케인 랭크 0: sell_min, 판매자 2명 이상 스냅샷만
+    - 모드/아케인 MAX랭: sell_min, 판매자 2명 이상 스냅샷만
     """
     from src.market.items import _slug_to_ko, _slug_to_en_name
 
     now = datetime.now(timezone.utc)
     week_ago = (now - timedelta(days=7)).isoformat()
 
+    # 공통 CTE — 각 기준으로 첫/마지막 가격 추출
+    _ITEM_CTE = """
+        WITH ranked AS (
+            SELECT slug,
+                   avg_price AS price,
+                   scanned_at,
+                   ROW_NUMBER() OVER (PARTITION BY slug ORDER BY scanned_at ASC)  AS rn_asc,
+                   ROW_NUMBER() OVER (PARTITION BY slug ORDER BY scanned_at DESC) AS rn_desc
+            FROM price_snapshot
+            WHERE rank IS NULL
+              AND scanned_at >= ?
+              AND avg_price IS NOT NULL
+              AND avg_price >= 5
+              -- 랭크 변종이 있는 아이템(모드/아케인)은 제외
+              AND slug NOT IN (
+                  SELECT DISTINCT slug FROM price_snapshot WHERE rank IS NOT NULL
+              )
+        ),
+        first_price AS (SELECT slug, price FROM ranked WHERE rn_asc  = 1),
+        last_price  AS (SELECT slug, price FROM ranked WHERE rn_desc = 1)
+        SELECT f.slug,
+               f.price AS price_start,
+               l.price AS price_now,
+               ROUND((l.price - f.price) * 100.0 / f.price, 1) AS change_pct
+        FROM first_price f
+        JOIN last_price l ON f.slug = l.slug
+        WHERE f.price > 0
+    """
+
+    # 랭크별 CTE — sell_min 사용, 판매자 2명 이상인 스냅샷만
+    _RANK_CTE = """
+        WITH ranked AS (
+            SELECT slug,
+                   sell_min AS price,
+                   scanned_at,
+                   ROW_NUMBER() OVER (PARTITION BY slug ORDER BY scanned_at ASC)  AS rn_asc,
+                   ROW_NUMBER() OVER (PARTITION BY slug ORDER BY scanned_at DESC) AS rn_desc
+            FROM price_snapshot
+            WHERE rank = ?
+              AND scanned_at >= ?
+              AND sell_min IS NOT NULL
+              AND sell_min >= 1
+              AND sell_count >= 2
+        ),
+        first_price AS (SELECT slug, price FROM ranked WHERE rn_asc  = 1),
+        last_price  AS (SELECT slug, price FROM ranked WHERE rn_desc = 1)
+        SELECT f.slug,
+               f.price AS price_start,
+               l.price AS price_now,
+               ROUND((l.price - f.price) * 100.0 / f.price, 1) AS change_pct
+        FROM first_price f
+        JOIN last_price l ON f.slug = l.slug
+        WHERE f.price > 0
+    """
+
     with _get_conn() as conn:
-        # 지난 7일 급등 알림 건수 + 최다 급등 아이템
-        surge_count_row = conn.execute(
+        surge_count = conn.execute(
             "SELECT COUNT(*) FROM surge_alert WHERE detected_at >= ?",
             (week_ago,),
-        ).fetchone()
-        surge_count = surge_count_row[0] if surge_count_row else 0
+        ).fetchone()[0]
 
         most_surged_rows = conn.execute(
             """
             SELECT slug, COUNT(*) AS cnt, AVG(change_pct) AS avg_pct
             FROM surge_alert
-            WHERE detected_at >= ? AND rank IS NULL
+            WHERE detected_at >= ?
             GROUP BY slug
             ORDER BY cnt DESC, avg_pct DESC
             LIMIT 3
@@ -344,67 +394,88 @@ def get_weekly_report() -> dict:
             (week_ago,),
         ).fetchall()
 
-        # 7일 변동률 계산 — 각 아이템의 7일 전/현재 가격 비교
-        # 서브쿼리로 각 slug별 첫 가격(7일 전)과 최신 가격 집계
-        gainers_rows = conn.execute(
+        # 일반 아이템 — avg_price 기반 실거래 통계
+        item_gainers = conn.execute(
+            _ITEM_CTE + " ORDER BY change_pct DESC LIMIT 5", (week_ago,)
+        ).fetchall()
+        item_losers = conn.execute(
+            _ITEM_CTE + " ORDER BY change_pct ASC LIMIT 5", (week_ago,)
+        ).fetchall()
+
+        # 모드/아케인 랭크 0
+        # 현재 DB에 저장된 0랭 슬러그로 MAX랭 rank 값 추출
+        max_rank_rows = conn.execute(
+            "SELECT DISTINCT slug, MAX(rank) FROM price_snapshot WHERE rank IS NOT NULL GROUP BY slug",
+        ).fetchall()
+        max_ranks: dict[str, int] = {r[0]: r[1] for r in max_rank_rows}
+
+        rank0_gainers = conn.execute(
+            _RANK_CTE + " ORDER BY change_pct DESC LIMIT 5", (0, week_ago)
+        ).fetchall()
+        rank0_losers = conn.execute(
+            _RANK_CTE + " ORDER BY change_pct ASC LIMIT 5", (0, week_ago)
+        ).fetchall()
+
+        # 모드/아케인 MAX랭 — slug마다 max rank가 달라서 개별 쿼리 대신
+        # rank IS NOT NULL 중 최대 rank끼리 비교
+        rankmax_gainers = conn.execute(
             """
             WITH ranked AS (
-                SELECT slug,
-                       COALESCE(sell_min, avg_price) AS price,
-                       scanned_at,
-                       ROW_NUMBER() OVER (PARTITION BY slug ORDER BY scanned_at ASC) AS rn_asc,
-                       ROW_NUMBER() OVER (PARTITION BY slug ORDER BY scanned_at DESC) AS rn_desc
-                FROM price_snapshot
-                WHERE rank IS NULL
-                  AND scanned_at >= ?
-                  AND COALESCE(sell_min, avg_price) IS NOT NULL
-                  AND COALESCE(sell_min, avg_price) >= 5
+                SELECT p.slug,
+                       p.sell_min AS price,
+                       p.scanned_at,
+                       ROW_NUMBER() OVER (PARTITION BY p.slug ORDER BY p.scanned_at ASC)  AS rn_asc,
+                       ROW_NUMBER() OVER (PARTITION BY p.slug ORDER BY p.scanned_at DESC) AS rn_desc
+                FROM price_snapshot p
+                INNER JOIN (
+                    SELECT slug, MAX(rank) AS max_rank
+                    FROM price_snapshot WHERE rank IS NOT NULL GROUP BY slug
+                ) m ON p.slug = m.slug AND p.rank = m.max_rank
+                WHERE p.scanned_at >= ?
+                  AND p.sell_min IS NOT NULL
+                  AND p.sell_min >= 1
+                  AND p.sell_count >= 2
             ),
-            first_price AS (SELECT slug, price FROM ranked WHERE rn_asc = 1),
+            first_price AS (SELECT slug, price FROM ranked WHERE rn_asc  = 1),
             last_price  AS (SELECT slug, price FROM ranked WHERE rn_desc = 1)
-            SELECT f.slug,
-                   f.price AS price_start,
-                   l.price AS price_now,
-                   ROUND((l.price - f.price) * 100.0 / f.price, 1) AS change_pct
-            FROM first_price f
-            JOIN last_price l ON f.slug = l.slug
+            SELECT f.slug, f.price, l.price,
+                   ROUND((l.price - f.price) * 100.0 / f.price, 1)
+            FROM first_price f JOIN last_price l ON f.slug = l.slug
             WHERE f.price > 0
-            ORDER BY change_pct DESC
-            LIMIT 5
+            ORDER BY 4 DESC LIMIT 5
+            """,
+            (week_ago,),
+        ).fetchall()
+        rankmax_losers = conn.execute(
+            """
+            WITH ranked AS (
+                SELECT p.slug,
+                       p.sell_min AS price,
+                       p.scanned_at,
+                       ROW_NUMBER() OVER (PARTITION BY p.slug ORDER BY p.scanned_at ASC)  AS rn_asc,
+                       ROW_NUMBER() OVER (PARTITION BY p.slug ORDER BY p.scanned_at DESC) AS rn_desc
+                FROM price_snapshot p
+                INNER JOIN (
+                    SELECT slug, MAX(rank) AS max_rank
+                    FROM price_snapshot WHERE rank IS NOT NULL GROUP BY slug
+                ) m ON p.slug = m.slug AND p.rank = m.max_rank
+                WHERE p.scanned_at >= ?
+                  AND p.sell_min IS NOT NULL
+                  AND p.sell_min >= 1
+                  AND p.sell_count >= 2
+            ),
+            first_price AS (SELECT slug, price FROM ranked WHERE rn_asc  = 1),
+            last_price  AS (SELECT slug, price FROM ranked WHERE rn_desc = 1)
+            SELECT f.slug, f.price, l.price,
+                   ROUND((l.price - f.price) * 100.0 / f.price, 1)
+            FROM first_price f JOIN last_price l ON f.slug = l.slug
+            WHERE f.price > 0
+            ORDER BY 4 ASC LIMIT 5
             """,
             (week_ago,),
         ).fetchall()
 
-        losers_rows = conn.execute(
-            """
-            WITH ranked AS (
-                SELECT slug,
-                       COALESCE(sell_min, avg_price) AS price,
-                       scanned_at,
-                       ROW_NUMBER() OVER (PARTITION BY slug ORDER BY scanned_at ASC) AS rn_asc,
-                       ROW_NUMBER() OVER (PARTITION BY slug ORDER BY scanned_at DESC) AS rn_desc
-                FROM price_snapshot
-                WHERE rank IS NULL
-                  AND scanned_at >= ?
-                  AND COALESCE(sell_min, avg_price) IS NOT NULL
-                  AND COALESCE(sell_min, avg_price) >= 5
-            ),
-            first_price AS (SELECT slug, price FROM ranked WHERE rn_asc = 1),
-            last_price  AS (SELECT slug, price FROM ranked WHERE rn_desc = 1)
-            SELECT f.slug,
-                   f.price AS price_start,
-                   l.price AS price_now,
-                   ROUND((l.price - f.price) * 100.0 / f.price, 1) AS change_pct
-            FROM first_price f
-            JOIN last_price l ON f.slug = l.slug
-            WHERE f.price > 0
-            ORDER BY change_pct ASC
-            LIMIT 5
-            """,
-            (week_ago,),
-        ).fetchall()
-
-    def _fmt(rows, *, gainers: bool) -> list[dict]:
+    def _fmt(rows, *, gainers: bool, rank_label: str = "") -> list[dict]:
         result = []
         for r in rows:
             slug, p_start, p_now, pct = r
@@ -414,9 +485,10 @@ def get_weekly_report() -> dict:
                 continue
             ko = _slug_to_ko.get(slug, "")
             en = _slug_to_en_name.get(slug, slug)
+            name = (ko or en) + (f" [{rank_label}]" if rank_label else "")
             result.append({
                 "slug": slug,
-                "name": ko or en,
+                "name": name,
                 "price_start": round(p_start, 0),
                 "price_now": round(p_now, 0),
                 "change_pct": pct,
@@ -436,8 +508,12 @@ def get_weekly_report() -> dict:
         })
 
     return {
-        "top_gainers": _fmt(gainers_rows, gainers=True),
-        "top_losers": _fmt(losers_rows, gainers=False),
+        "top_gainers": _fmt(item_gainers, gainers=True),
+        "top_losers": _fmt(item_losers, gainers=False),
+        "rank0_gainers": _fmt(rank0_gainers, gainers=True, rank_label="랭크0"),
+        "rank0_losers": _fmt(rank0_losers, gainers=False, rank_label="랭크0"),
+        "rankmax_gainers": _fmt(rankmax_gainers, gainers=True, rank_label="MAX"),
+        "rankmax_losers": _fmt(rankmax_losers, gainers=False, rank_label="MAX"),
         "surge_count": surge_count,
         "most_surged": most_surged,
         "generated_at": now.strftime("%Y-%m-%d %H:%M UTC"),

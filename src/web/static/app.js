@@ -3348,18 +3348,39 @@ function renderWeeklyReport(data, el) {
                 <span class="report-pct trend-up">평균 +${it.avg_change_pct}%</span>
             </div>`).join("");
 
+    // 랭크 섹션 — 데이터 있을 때만 표시
+    const hasRank0 = (data.rank0_gainers?.length || data.rank0_losers?.length);
+    const hasRankMax = (data.rankmax_gainers?.length || data.rankmax_losers?.length);
+
+    const rank0Html = !hasRank0 ? "" : `
+        <div class="report-section">
+            <div class="report-section-title">🔵 모드/아케인 랭크 0 변동</div>
+            <div class="report-sub-label">급등</div>${makeRows(data.rank0_gainers)}
+            <div class="report-sub-label">급락</div>${makeRows(data.rank0_losers)}
+        </div>`;
+
+    const rankMaxHtml = !hasRankMax ? "" : `
+        <div class="report-section">
+            <div class="report-section-title">🟡 모드/아케인 MAX랭 변동</div>
+            <div class="report-sub-label">급등</div>${makeRows(data.rankmax_gainers)}
+            <div class="report-sub-label">급락</div>${makeRows(data.rankmax_losers)}
+        </div>`;
+
     el.innerHTML = `
-        <div class="report-meta">기준: 최근 7일 · 생성: ${escapeHtml(data.generated_at)}</div>
+        <div class="report-meta">기준: 최근 7일 실거래가 · 생성: ${escapeHtml(data.generated_at)}</div>
 
         <div class="report-section">
-            <div class="report-section-title">🚀 급등 TOP 5 (7일)</div>
+            <div class="report-section-title">🚀 급등 TOP 5 (일반 아이템)</div>
             ${makeRows(data.top_gainers)}
         </div>
 
         <div class="report-section">
-            <div class="report-section-title">📉 급락 TOP 5 (7일)</div>
+            <div class="report-section-title">📉 급락 TOP 5 (일반 아이템)</div>
             ${makeRows(data.top_losers)}
         </div>
+
+        ${rank0Html}
+        ${rankMaxHtml}
 
         <div class="report-section">
             <div class="report-section-title">⚡ 급등 감지 최다 아이템</div>
