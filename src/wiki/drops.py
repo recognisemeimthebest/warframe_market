@@ -10,6 +10,8 @@ from pathlib import Path
 
 import httpx
 
+from src.http_client import get_client
+
 
 def _strip_html(text: str) -> str:
     """HTML 태그 제거."""
@@ -92,9 +94,9 @@ async def fetch_item_description(name: str) -> tuple[str, str]:
 
     desc, wiki = "", ""
     try:
-        async with httpx.AsyncClient(timeout=8, follow_redirects=True,
-                                     headers={"Platform": "pc", "Language": "ko"}) as c:
-            r = await c.get(f"https://api.warframe.market/v2/items/{slug}")
+        client = get_client()
+        r = await client.get(f"https://api.warframe.market/v2/items/{slug}",
+                             headers={"Platform": "pc", "Language": "ko"}, timeout=8)
         if r.status_code == 200:
             i18n = r.json().get("data", {}).get("i18n", {})
             ko = i18n.get("ko", {})
@@ -114,10 +116,10 @@ async def fetch_item_description(name: str) -> tuple[str, str]:
 async def refresh_drop_table() -> int:
     """드롭 테이블 다운로드 + 캐시."""
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            r = await client.get(_DROP_TABLE_URL)
-            r.raise_for_status()
-            data = r.json()
+        client = get_client()
+        r = await client.get(_DROP_TABLE_URL, timeout=60)
+        r.raise_for_status()
+        data = r.json()
     except Exception:
         logger.exception("드롭 테이블 다운로드 실패")
         return 0

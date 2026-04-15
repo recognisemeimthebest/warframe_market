@@ -177,7 +177,7 @@ async def refresh_part_quantities() -> int:
     """component 태그 아이템의 quantityInSet을 API에서 가져와 캐시.
     quantityInSet > 1 인 것만 저장. 백그라운드 1회 실행용."""
     import asyncio
-    import httpx
+    from src.http_client import get_client
 
     cache_path = DATA_DIR / "items.json"
     if not cache_path.exists():
@@ -194,15 +194,15 @@ async def refresh_part_quantities() -> int:
     async def _fetch(slug: str) -> None:
         async with sem:
             try:
-                async with httpx.AsyncClient(timeout=10, follow_redirects=True) as c:
-                    r = await c.get(
-                        f"https://api.warframe.market/v2/items/{slug}",
-                        headers={"Platform": "pc", "Language": "en"},
-                    )
-                    if r.status_code == 200:
-                        qty = r.json().get("data", {}).get("quantityInSet")
-                        if qty and qty > 1:
-                            new_qty[slug] = int(qty)
+                client = get_client()
+                r = await client.get(
+                    f"https://api.warframe.market/v2/items/{slug}",
+                    headers={"Platform": "pc", "Language": "en"},
+                )
+                if r.status_code == 200:
+                    qty = r.json().get("data", {}).get("quantityInSet")
+                    if qty and qty > 1:
+                        new_qty[slug] = int(qty)
             except Exception:
                 pass
             finally:
@@ -272,14 +272,14 @@ async def refresh_items_cache() -> int:
 
 async def refresh_ko_names() -> int:
     """WFCD i18n 데이터에서 한국어 이름을 갱신."""
-    import httpx
+    from src.http_client import get_client
 
     url = "https://raw.githubusercontent.com/WFCD/warframe-items/master/data/json/i18n.json"
     try:
-        async with httpx.AsyncClient(timeout=60) as client:
-            resp = await client.get(url)
-            resp.raise_for_status()
-            i18n_data: dict = resp.json()
+        client = get_client()
+        resp = await client.get(url, timeout=60)
+        resp.raise_for_status()
+        i18n_data: dict = resp.json()
     except Exception:
         logger.exception("WFCD i18n 다운로드 실패")
         return 0

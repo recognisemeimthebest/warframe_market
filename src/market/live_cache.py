@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 import httpx
 
 from src.config import MARKET_API_BASE, MARKET_RATE_LIMIT
+from src.http_client import get_client
 
 logger = logging.getLogger(__name__)
 
@@ -75,14 +76,14 @@ async def _fetch_orders_slow(slug: str) -> list[dict]:
     url = f"https://api.warframe.market/v2/orders/item/{slug}"
     async with _LIVE_SEM:
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                r = await client.get(url, headers=_HEADERS)
-                if r.status_code == 429:
-                    logger.warning("라이브 캐시 429 — %s, 5초 대기", slug)
-                    await asyncio.sleep(5)
-                    return []
-                r.raise_for_status()
-                return r.json().get("data", [])
+            client = get_client()
+            r = await client.get(url, headers=_HEADERS)
+            if r.status_code == 429:
+                logger.warning("라이브 캐시 429 — %s, 5초 대기", slug)
+                await asyncio.sleep(5)
+                return []
+            r.raise_for_status()
+            return r.json().get("data", [])
         except Exception:
             return []
         finally:

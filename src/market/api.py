@@ -5,6 +5,7 @@ from dataclasses import dataclass
 import httpx
 
 from src.config import MARKET_API_BASE, MARKET_RATE_LIMIT
+from src.http_client import get_client
 from src.market.vault import is_vaulted
 
 logger = logging.getLogger(__name__)
@@ -46,10 +47,11 @@ class ItemPrice:
     vaulted: bool | None = None       # True=단종, False=현역, None=프라임 아님
 
 
-async def _get(client: httpx.AsyncClient, url: str) -> dict | None:
-    """rate-limited GET 요청."""
+async def _get(url: str) -> dict | None:
+    """rate-limited GET 요청. 공유 httpx client 사용."""
     async with _semaphore:
         try:
+            client = get_client()
             r = await client.get(url, headers=_HEADERS)
             r.raise_for_status()
             return r.json()
@@ -65,31 +67,28 @@ async def _get(client: httpx.AsyncClient, url: str) -> dict | None:
 
 async def fetch_all_items() -> list[dict]:
     """전체 아이템 목록을 가져온다. (v2 API)"""
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        data = await _get(client, "https://api.warframe.market/v2/items")
-        if not data:
-            return []
-        return data.get("data", [])
+    data = await _get("https://api.warframe.market/v2/items")
+    if not data:
+        return []
+    return data.get("data", [])
 
 
 async def fetch_item_orders(slug: str) -> list[dict]:
     """아이템 주문 목록을 가져온다. (v2 API)"""
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        url = f"https://api.warframe.market/v2/orders/item/{slug}"
-        data = await _get(client, url)
-        if not data:
-            return []
-        return data.get("data", [])
+    url = f"https://api.warframe.market/v2/orders/item/{slug}"
+    data = await _get(url)
+    if not data:
+        return []
+    return data.get("data", [])
 
 
 async def fetch_item_statistics(slug: str) -> dict | None:
     """아이템 통계를 가져온다. (v1 API — 아직 v1만 제공)"""
-    async with httpx.AsyncClient(timeout=15.0) as client:
-        url = f"{MARKET_API_BASE}/items/{slug}/statistics"
-        data = await _get(client, url)
-        if not data:
-            return None
-        return data.get("payload", {}).get("statistics_closed", {})
+    url = f"{MARKET_API_BASE}/items/{slug}/statistics"
+    data = await _get(url)
+    if not data:
+        return None
+    return data.get("payload", {}).get("statistics_closed", {})
 
 
 def _calc_rank_price(orders: list[dict], rank: int) -> RankPrice:

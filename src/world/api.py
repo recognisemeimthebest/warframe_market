@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 
 import httpx
 
+from src.http_client import get_client
+
 logger = logging.getLogger(__name__)
 
 _WS_URL = "https://content.warframe.com/dynamic/worldState.php"
@@ -34,31 +36,31 @@ async def _load_mappings():
         return
 
     base = "https://raw.githubusercontent.com/WFCD/warframe-worldstate-data/master/data"
-    async with httpx.AsyncClient(timeout=15, follow_redirects=True) as c:
-        try:
-            r1, r2, r3 = await asyncio.gather(
-                c.get(f"{base}/solNodes.json"),
-                c.get(f"{base}/missionTypes.json"),
-                c.get(f"{base}/fissureModifiers.json"),
-            )
-            _sol_nodes = r1.json()
-            _mission_types = r2.json()
-            _fissure_mods = r3.json()
-            _mapping_loaded = True
-            logger.info("월드 매핑 로드: nodes=%d, missions=%d, fissures=%d",
-                        len(_sol_nodes), len(_mission_types), len(_fissure_mods))
-        except Exception:
-            logger.warning("월드 매핑 로드 실패", exc_info=True)
+    c = get_client()
+    try:
+        r1, r2, r3 = await asyncio.gather(
+            c.get(f"{base}/solNodes.json"),
+            c.get(f"{base}/missionTypes.json"),
+            c.get(f"{base}/fissureModifiers.json"),
+        )
+        _sol_nodes = r1.json()
+        _mission_types = r2.json()
+        _fissure_mods = r3.json()
+        _mapping_loaded = True
+        logger.info("월드 매핑 로드: nodes=%d, missions=%d, fissures=%d",
+                    len(_sol_nodes), len(_mission_types), len(_fissure_mods))
+    except Exception:
+        logger.warning("월드 매핑 로드 실패", exc_info=True)
 
 
 async def _fetch_worldstate() -> dict | None:
     """raw worldState 다운로드."""
     async with _semaphore:
         try:
-            async with httpx.AsyncClient(timeout=_TIMEOUT, follow_redirects=True) as c:
-                r = await c.get(_WS_URL)
-                r.raise_for_status()
-                return r.json()
+            client = get_client()
+            r = await client.get(_WS_URL, timeout=_TIMEOUT)
+            r.raise_for_status()
+            return r.json()
         except Exception:
             logger.error("worldState 다운로드 실패", exc_info=True)
             return None
@@ -344,10 +346,10 @@ _WFSTAT_URL = "https://api.warframestat.us/pc"
 async def get_void_trader() -> dict:
     """키티어 (보이드 상인) 현재 재고."""
     try:
-        async with httpx.AsyncClient(timeout=15, follow_redirects=True, headers={"User-Agent": "warframe-chatbot/1.0"}) as c:
-            r = await c.get(f"{_WFSTAT_URL}/voidTrader")
-            r.raise_for_status()
-            d = r.json()
+        client = get_client()
+        r = await client.get(f"{_WFSTAT_URL}/voidTrader")
+        r.raise_for_status()
+        d = r.json()
     except Exception:
         logger.exception("키티어 데이터 조회 실패")
         return {"active": False, "error": True}
@@ -387,10 +389,10 @@ async def get_void_trader() -> dict:
 async def get_steel_path() -> dict:
     """테신 스틸패스 스토어."""
     try:
-        async with httpx.AsyncClient(timeout=15, follow_redirects=True, headers={"User-Agent": "warframe-chatbot/1.0"}) as c:
-            r = await c.get(f"{_WFSTAT_URL}/steelPath")
-            r.raise_for_status()
-            d = r.json()
+        client = get_client()
+        r = await client.get(f"{_WFSTAT_URL}/steelPath")
+        r.raise_for_status()
+        d = r.json()
     except Exception:
         logger.exception("스틸패스 데이터 조회 실패")
         return {"error": True}

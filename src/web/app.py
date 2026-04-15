@@ -80,6 +80,7 @@ from src.world.api import (
 )
 
 from src.config import VAPID_PUBLIC_KEY
+from src.http_client import close_client
 from src.web.push import delete_subscription, init_push_db, save_subscription, send_push_all
 from src.market.learned_aliases import delete_alias, init_aliases_db, list_aliases, save_alias
 from src.analytics import init_analytics_db, log_event, get_summary
@@ -163,6 +164,7 @@ async def shutdown() -> None:
         _monitor_task.cancel()
     if _watchlist_task:
         _watchlist_task.cancel()
+    await close_client()
 
 
 @app.get("/")

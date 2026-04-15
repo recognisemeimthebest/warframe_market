@@ -5,6 +5,7 @@ import logging
 from datetime import datetime, timezone
 
 from src.market.api import get_item_price
+from src.http_client import get_client
 import httpx
 
 from src.market.history import (
@@ -223,9 +224,8 @@ async def backfill_statistics(slugs: list[str]) -> None:
         async with sem:
             try:
                 url = f"{MARKET_API_BASE}/items/{slug}/statistics"
-                async with httpx.AsyncClient(timeout=15, follow_redirects=True,
-                                             headers={"Platform": "pc", "Language": "en"}) as c:
-                    r = await c.get(url)
+                client = get_client()
+                r = await client.get(url, headers={"Platform": "pc", "Language": "en"})
                 if r.status_code != 200:
                     return
                 payload = r.json().get("payload", {}).get("statistics_closed", {})

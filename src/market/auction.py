@@ -7,6 +7,7 @@ from difflib import SequenceMatcher
 import httpx
 
 from src.config import MARKET_API_BASE, MARKET_RATE_LIMIT
+from src.http_client import get_client
 
 logger = logging.getLogger(__name__)
 
@@ -100,13 +101,13 @@ EPHEMERA_BY_ELEMENT = {
 
 
 async def _get(url: str) -> dict | None:
-    """rate-limited GET."""
+    """rate-limited GET. 공유 httpx client 사용."""
     async with _semaphore:
         try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
-                r = await client.get(url, headers=_HEADERS)
-                r.raise_for_status()
-                return r.json()
+            client = get_client()
+            r = await client.get(url, headers=_HEADERS)
+            r.raise_for_status()
+            return r.json()
         except httpx.HTTPStatusError as e:
             logger.error("경매 API HTTP %s: %s", e.response.status_code, url)
             return None
