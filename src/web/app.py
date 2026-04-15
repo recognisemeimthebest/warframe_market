@@ -79,6 +79,7 @@ from src.world.api import (
 from src.config import VAPID_PUBLIC_KEY
 from src.web.push import delete_subscription, init_push_db, save_subscription, send_push_all
 from src.market.learned_aliases import delete_alias, init_aliases_db, list_aliases, save_alias
+from src.analytics import init_analytics_db, log_event, get_summary
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +136,7 @@ async def startup() -> None:
     init_modding_db()
     init_push_db()
     init_aliases_db()
+    init_analytics_db()
 
     # statistics 백필 (서버 최초 시작 시 히스토리 채우기)
     asyncio.create_task(backfill_statistics(get_popular_slugs()))
@@ -484,6 +486,7 @@ async def api_arbitrage(limit: int = 40):
         items.append(entry)
 
     items.sort(key=lambda x: x["discount_pct"], reverse=True)
+    log_event("arbitrage_view", hit=bool(items))
     return {"data": items[:limit]}
 
 
@@ -615,7 +618,9 @@ async def api_relic_value(name: str = Query(""), ref: str = Query("Radiant")):
     """렐릭 기대 수익 계산."""
     result = await get_relic_value(name, ref)
     if not result:
+        log_event("relic_calc", name, hit=False)
         return {"ok": False, "msg": "렐릭을 찾을 수 없습니다."}
+    log_event("relic_calc", name, hit=True)
     return {
         "ok": True,
         "data": {
@@ -644,6 +649,7 @@ async def api_skins_search(q: str = Query(""), skin_type: str = Query("warframe"
     if not q.strip():
         return {"data": []}
     results = await search_skins(q.strip(), skin_type)
+    log_event("skin_search", q.strip(), hit=bool(results))
     return {"data": results}
 
 
@@ -802,6 +808,7 @@ async def api_farming(q: str = "", limit: int = 5):
             display_name = q
             slug = ""
         if vault_status is True:
+            log_event("farming_search", q, hit=False)
             return {"data": [{
                 "name": display_name,
                 "slug": slug,
@@ -825,6 +832,7 @@ async def api_farming(q: str = "", limit: int = 5):
             r["description"] = desc
         if not r.get("wiki_url"):
             r["wiki_url"] = wiki
+    log_event("farming_search", q, hit=bool(results))
     return {"data": results}
 
 
@@ -1060,6 +1068,12 @@ async def api_admin_delete_alias(query: str = Query("")):
     return {"ok": ok}
 
 
+@app.get("/api/admin/analytics")
+async def api_admin_analytics(days: int = 7):
+    """기능별 사용 통계 요약."""
+    return get_summary(days)
+
+
 # ── Web Push API ──
 
 @app.get("/api/push/vapid-public-key")
@@ -1230,6 +1244,7 @@ async def _handle_price_query(ws: WebSocket, query: str) -> None:
                 }
                 for rp in price.rank_prices
             ]
+        log_event("price_query", display_name, hit=True)
         await ws.send_text(json.dumps(resp))
         return
 
@@ -1237,12 +1252,14 @@ async def _handle_price_query(ws: WebSocket, query: str) -> None:
     candidates = search_items(query, limit=5)
     if candidates:
         suggestions = [{"slug": c.slug, "name": c.name, "ko_name": c.ko_name} for c in candidates]
+        log_event("price_query", query, hit=False)
         await ws.send_text(json.dumps({
             "type": "suggest",
             "query": query,
             "items": suggestions,
         }))
     else:
+        log_event("price_query", query, hit=False)
         await ws.send_text(json.dumps({
             "type": "chat",
             "text": f'"{query}"에 해당하는 아이템을 찾지 못했어요.\n영문 이름이나 다른 표현으로 다시 시도해보세요!',
