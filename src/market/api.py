@@ -95,13 +95,13 @@ def _calc_rank_price(orders: list[dict], rank: int) -> RankPrice:
     sells = sorted(
         [o for o in orders if o["type"] == "sell"
          and o.get("user", {}).get("status") in active_statuses
-         and o.get("mod_rank") == rank],
+         and o.get("rank") == rank],
         key=lambda o: o["platinum"],
     )
     buys = sorted(
         [o for o in orders if o["type"] == "buy"
          and o.get("user", {}).get("status") in active_statuses
-         and o.get("mod_rank") == rank],
+         and o.get("rank") == rank],
         key=lambda o: o["platinum"],
         reverse=True,
     )
@@ -161,8 +161,8 @@ async def get_item_price(slug: str, item_name: str = "") -> ItemPrice | None:
             price.avg_48h = latest.get("avg_price")
             price.volume_48h = latest.get("volume", 0)
 
-    # 모드/아케인 랭크 감지 — 주문에 mod_rank가 있으면 랭크별 가격 계산
-    ranks_in_orders = [o.get("mod_rank") for o in orders if o.get("mod_rank") is not None]
+    # 모드/아케인 랭크 감지 — 주문에 rank가 있으면 랭크별 가격 계산
+    ranks_in_orders = [o.get("rank") for o in orders if o.get("rank") is not None]
     if ranks_in_orders:
         max_rank = max(ranks_in_orders)
         price.max_rank = max_rank
