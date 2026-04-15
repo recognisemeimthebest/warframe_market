@@ -268,10 +268,10 @@ def get_price_trend(slug: str, days: int = 7) -> dict | None:
         rows = conn.execute(
             """
             SELECT scanned_at,
-                   COALESCE(sell_min, avg_price) AS price
+                   COALESCE(avg_price, sell_min) AS price
             FROM price_snapshot
             WHERE slug = ? AND rank IS NULL AND scanned_at >= ?
-              AND COALESCE(sell_min, avg_price) IS NOT NULL
+              AND COALESCE(avg_price, sell_min) IS NOT NULL
             ORDER BY scanned_at ASC
             """,
             (slug, cutoff),
