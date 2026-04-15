@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import re
 import time
 
 import httpx
@@ -42,11 +43,34 @@ _cache: dict[str, tuple[float, list[dict]]] = {}
 _CACHE_TTL = 3600  # 1시간
 
 
+def _has_korean(text: str) -> bool:
+    return any("\uAC00" <= ch <= "\uD7A3" or "\u3131" <= ch <= "\u318E" for ch in text)
+
+
+def _ko_to_en_query(query: str) -> str:
+    """한글 쿼리를 영문 이름으로 변환. 변환 실패 시 원문 반환."""
+    try:
+        from src.market.items import search_items
+        results = search_items(query, limit=1)
+        if results and results[0].score >= 0.55:
+            en = results[0].name
+            # " Set" 접미어 제거 (위키 검색용)
+            en = re.sub(r"\s+Set$", "", en, flags=re.IGNORECASE).strip()
+            return en
+    except Exception:
+        pass
+    return query
+
+
 async def search_skins(query: str, skin_type: str = "warframe") -> list[dict]:
     """
     쿼리와 타입으로 스킨 검색.
+    한글 입력 시 자동으로 영문 이름으로 변환.
     반환: [{"name": str, "image": str, "page": str, "type": str}]
     """
+    if _has_korean(query):
+        query = _ko_to_en_query(query)
+
     cache_key = f"{query.lower()}:{skin_type}"
     if cache_key in _cache:
         ts, data = _cache[cache_key]
