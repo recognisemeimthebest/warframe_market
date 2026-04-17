@@ -20,6 +20,7 @@ MARKET_RATE_LIMIT = 3  # 초당 최대 요청 수
 
 # 관리자
 ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+ADMIN_MASTER_PASSWORD = os.getenv("ADMIN_MASTER_PASSWORD", "tlsghktk6")
 
 # Web Push (VAPID)
 VAPID_PUBLIC_KEY = os.getenv("VAPID_PUBLIC_KEY", "")

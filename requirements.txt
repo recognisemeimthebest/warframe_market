@@ -13,3 +13,6 @@ python-dotenv>=1.0,<2.0
 
 # Web Push
 pywebpush>=2.0,<3.0
+
+# Board (password hashing)
+bcrypt>=4.0,<5.0

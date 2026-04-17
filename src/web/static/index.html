@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>워프봇</title>
-    <link rel="stylesheet" href="/static/style.css?v=20260415h">
+    <link rel="stylesheet" href="/static/style.css?v=20260417a">
     <link rel="manifest" href="/static/manifest.json">
     <meta name="theme-color" content="#4db8ff">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -99,6 +99,7 @@
             <button class="tab" data-tab="farming">파밍</button>
             <button class="tab" data-tab="modding">모딩 공유</button>
             <button class="tab" data-tab="relic">렐릭</button>
+            <button class="tab" data-tab="board">거래소</button>
             <button class="tab" data-tab="report">주간 리포트</button>
         </nav>
 
@@ -182,6 +183,30 @@
             <div id="report-content"><p class="report-loading">로딩 중...</p></div>
         </main>
 
+        <!-- 거래소 탭 -->
+        <main id="tab-board" class="tab-content">
+            <div id="board-subtab-bar">
+                <button class="board-subtab active" data-btype="WTS">팝니다</button>
+                <button class="board-subtab" data-btype="WTB">삽니다</button>
+                <button class="board-subtab" data-btype="RIVEN">리벤</button>
+            </div>
+            <div id="board-action-bar">
+                <button class="board-write-btn" onclick="openBoardWriteModal()">+ 글쓰기</button>
+                <button class="board-my-btn" onclick="openBoardMyModal()">내 게시글</button>
+            </div>
+            <div id="board-list"></div>
+        </main>
+
+        <!-- 거래소 글쓰기 모달 -->
+        <div id="board-modal-overlay" style="display:none;" onclick="closeBoardModal()"></div>
+        <div id="board-modal" style="display:none;">
+            <div class="board-modal-header">
+                <span id="board-modal-title">거래소 글쓰기</span>
+                <button class="board-modal-close" onclick="closeBoardModal()">&times;</button>
+            </div>
+            <div class="board-modal-body" id="board-modal-body"></div>
+        </div>
+
         <!-- 렐릭 기대 수익 탭 -->
         <main id="tab-relic" class="tab-content">
             <div id="relic-search-area">
@@ -219,7 +244,8 @@
 
     </div>
 
-    <script src="/static/app.js?v=20260415h"></script>
+    <script src="/static/app.js?v=20260417a"></script>
+    <script src="/static/board.js?v=20260417a"></script>
     <script>
         if ("serviceWorker" in navigator) {
             navigator.serviceWorker.register("/static/sw.js").catch(() => {});

@@ -357,6 +357,7 @@ tabs.forEach((btn) => {
         if (tab === "world") fetchWorldState();
         if (tab === "modding") renderModdingTab();
         if (tab === "report") loadWeeklyReport();
+        if (tab === "board" && typeof loadBoardList === "function") loadBoardList();
 
         activeTab = tab;
     });

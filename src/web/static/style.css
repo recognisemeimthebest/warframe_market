@@ -628,3 +628,74 @@ footer { padding: 12px 16px; background: var(--surface); border-top: 1px solid v
 
 main::-webkit-scrollbar, #messages::-webkit-scrollbar, #surge-list::-webkit-scrollbar, #trade-list::-webkit-scrollbar, #world-list::-webkit-scrollbar, #chat-watchlist::-webkit-scrollbar, #chat-auction::-webkit-scrollbar, #farming-results::-webkit-scrollbar, #modding-content::-webkit-scrollbar, #relic-results::-webkit-scrollbar, #chat-skins::-webkit-scrollbar, #tab-report::-webkit-scrollbar { width: 4px; }
 main::-webkit-scrollbar-thumb, #messages::-webkit-scrollbar-thumb, #surge-list::-webkit-scrollbar-thumb, #trade-list::-webkit-scrollbar-thumb, #world-list::-webkit-scrollbar-thumb, #chat-watchlist::-webkit-scrollbar-thumb, #chat-auction::-webkit-scrollbar-thumb, #farming-results::-webkit-scrollbar-thumb, #modding-content::-webkit-scrollbar-thumb, #relic-results::-webkit-scrollbar-thumb, #chat-skins::-webkit-scrollbar-thumb, #tab-report::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+/* ── 거래소 ── */
+#board-subtab-bar { display: flex; gap: 8px; padding: 12px 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
+.board-subtab { flex: 1; padding: 8px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 16px; color: var(--text-muted); font-size: 13px; font-weight: 600; cursor: pointer; }
+.board-subtab.active { background: rgba(77,184,255,0.15); border-color: var(--primary); color: var(--primary); }
+
+#board-action-bar { display: flex; gap: 8px; padding: 8px 16px 0; }
+.board-write-btn, .board-my-btn { flex: 1; padding: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; color: var(--text); font-size: 13px; font-weight: 600; cursor: pointer; }
+.board-write-btn { background: rgba(77,184,255,0.15); border-color: var(--primary); color: var(--primary); }
+
+#board-list { padding: 12px 16px; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+.board-empty { text-align: center; color: var(--text-muted); font-size: 13px; padding: 24px 12px; }
+
+.board-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
+.board-card.btype-WTS { border-left: 3px solid var(--green); }
+.board-card.btype-WTB { border-left: 3px solid var(--orange); }
+.board-card.btype-RIVEN { border-left: 3px solid #b58aff; }
+.board-card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+.board-type-tag { font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: 700; }
+.board-type-tag.t-WTS { background: rgba(76,175,80,0.2); color: var(--green); }
+.board-type-tag.t-WTB { background: rgba(255,152,0,0.2); color: var(--orange); }
+.board-type-tag.t-RIVEN { background: rgba(181,138,255,0.2); color: #b58aff; }
+.board-item-name { flex: 1; font-size: 14px; font-weight: 600; word-break: break-all; }
+.board-price { font-size: 14px; font-weight: 700; color: var(--primary); }
+.board-meta { display: flex; gap: 6px; font-size: 11px; color: var(--text-muted); margin: 6px 0; }
+.board-note { font-size: 12px; color: var(--text); padding: 6px 8px; background: var(--bg); border-radius: 6px; margin: 4px 0 8px; word-break: break-word; }
+.board-riven { font-size: 12px; color: var(--text-muted); margin: 4px 0; }
+.board-riven b { color: var(--text); }
+.board-riven-stats { list-style: none; padding-left: 0; margin-top: 4px; }
+.board-riven-stats li { font-size: 12px; color: var(--green); padding: 1px 0; }
+.board-riven-stats li.neg { color: var(--red); }
+
+.board-actions { display: flex; gap: 6px; margin-top: 8px; }
+.board-btn { padding: 6px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 12px; cursor: pointer; }
+.board-btn.primary { background: rgba(77,184,255,0.15); border-color: var(--primary); color: var(--primary); }
+.board-btn.danger { background: rgba(255,107,107,0.15); border-color: var(--red); color: var(--red); }
+.board-btn.full { width: 100%; padding: 10px; font-size: 14px; font-weight: 600; }
+
+/* 모달 */
+#board-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 100; }
+#board-modal { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(92vw, 480px); max-height: 90vh; background: var(--surface); border: 1px solid var(--border); border-radius: 14px; z-index: 101; display: flex; flex-direction: column; }
+.board-modal-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); font-weight: 600; color: var(--primary); }
+.board-modal-close { background: none; border: none; color: var(--text-muted); font-size: 22px; cursor: pointer; padding: 0 4px; }
+.board-modal-body { padding: 16px; overflow-y: auto; }
+
+.board-form { display: flex; flex-direction: column; gap: 10px; }
+.board-form label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--text-muted); }
+.board-form input, .board-form select, .board-form textarea {
+    padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px;
+    background: var(--bg); color: var(--text); font-size: 13px; font-family: inherit;
+}
+.board-form input:focus, .board-form select:focus, .board-form textarea:focus { outline: none; border-color: var(--primary); }
+.board-form textarea { resize: vertical; }
+.board-form-row { display: flex; gap: 8px; }
+.board-form-row > label, .board-form-row > select, .board-form-row > input { flex: 1; }
+.board-form-msg { font-size: 12px; color: var(--orange); min-height: 16px; }
+
+.board-riven-fieldset { border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
+.board-riven-fieldset legend { font-size: 12px; color: var(--primary); padding: 0 6px; }
+.riven-stat-row { align-items: center; }
+
+/* 내 게시글 */
+#board-my-results { margin-top: 12px; display: flex; flex-direction: column; gap: 8px; }
+.board-my-card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px; }
+.board-my-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.board-my-actions { margin-top: 6px; }
+.board-my-contacts { margin-top: 8px; }
+.board-unread-badge { background: var(--red); color: #fff; border-radius: 10px; padding: 2px 8px; font-size: 11px; font-weight: 700; }
+.board-contact-item { padding: 8px; border-bottom: 1px solid var(--border); font-size: 12px; }
+.board-contact-item.unread { background: rgba(77,184,255,0.05); }
+.board-contact-time { color: var(--text-muted); font-size: 11px; margin-left: 6px; }

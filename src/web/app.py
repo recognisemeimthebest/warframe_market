@@ -24,6 +24,7 @@ from src.market.items import (
     resolve_item,
     search_items,
 )
+from src.market.board import init_board_db
 from src.market.learned_aliases import init_aliases_db, save_alias
 from src.market.live_cache import run_live_cache_loop
 from src.market.monitor import backfill_statistics, get_popular_slugs, run_monitor
@@ -49,6 +50,7 @@ from src.web.routes.watchlist import router as watchlist_router
 from src.web.routes.modding import router as modding_router
 from src.web.routes.admin import router as admin_router
 from src.web.routes.push import router as push_router
+from src.web.routes.board import router as board_router
 
 logger = logging.getLogger(__name__)
 
@@ -97,6 +99,7 @@ async def lifespan(app: FastAPI):
     init_watchlist_db()
     init_modding_db()
     init_push_db()
+    init_board_db()
     init_aliases_db()
     init_analytics_db()
 
@@ -129,6 +132,7 @@ app.include_router(watchlist_router)
 app.include_router(modding_router)
 app.include_router(admin_router)
 app.include_router(push_router)
+app.include_router(board_router)
 
 
 # ── 페이지 서빙 ──
