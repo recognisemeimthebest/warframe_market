@@ -422,20 +422,27 @@ def search_items(query: str, limit: int = 5) -> list[SearchResult]:
                 seen_slugs.add(slug)
 
     # 6. 영문 부분 매칭 + 퍼지 매칭
+    q_tokens = set(q_lower.split())
     for en_name, slug in _en_name_to_slug.items():
         if slug in seen_slugs:
             continue
         ko = _slug_to_ko.get(slug, "")
-        # 부분 문자열 포함 (영문)
+        en_tokens = set(en_name.split())
+        # 쿼리 토큰 커버리지: 쿼리 단어들이 후보 이름에 얼마나 들어 있는지
+        token_coverage = len(q_tokens & en_tokens) / max(len(q_tokens), 1)
+
+        # 부분 문자열 포함 (영문) — 토큰 커버리지로 보정
         if q_lower in en_name or en_name in q_lower:
-            score = SequenceMatcher(None, q_lower, en_name).ratio()
+            base = SequenceMatcher(None, q_lower, en_name).ratio()
+            score = (base + token_coverage) / 2
             candidates.append(SearchResult(
-                slug=slug, name=_slug_to_en_name.get(slug, slug), score=max(score, 0.7), ko_name=ko,
+                slug=slug, name=_slug_to_en_name.get(slug, slug), score=max(score, 0.7 * token_coverage + 0.1), ko_name=ko,
             ))
             seen_slugs.add(slug)
             continue
-        # 퍼지 매칭
-        score = SequenceMatcher(None, q_lower, en_name).ratio()
+        # 퍼지 매칭 — 토큰 커버리지가 낮으면 점수 깎기
+        base = SequenceMatcher(None, q_lower, en_name).ratio()
+        score = base * (0.4 + 0.6 * token_coverage)
         if score >= 0.45:
             candidates.append(SearchResult(
                 slug=slug, name=_slug_to_en_name.get(slug, slug), score=score, ko_name=ko,
