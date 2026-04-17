@@ -3,6 +3,22 @@
 
 let currentBoardType = "WTS";
 let _rivenOptionsCache = null;
+const _marketPriceCache = {};   // itemName → {sell_min, buy_max, ts}
+const MARKET_CACHE_TTL = 3 * 60 * 1000; // 3분
+
+async function fetchMarketPrice(itemName) {
+    const now = Date.now();
+    const cached = _marketPriceCache[itemName];
+    if (cached && now - cached.ts < MARKET_CACHE_TTL) return cached;
+    try {
+        const res = await fetch(`/api/price/${encodeURIComponent(itemName)}`);
+        const json = await res.json();
+        if (!json.ok) return null;
+        const entry = { sell_min: json.sell_min, buy_max: json.buy_max, ts: now };
+        _marketPriceCache[itemName] = entry;
+        return entry;
+    } catch { return null; }
+}
 
 const _boardTypeLabel = { WTS: "팝니다", WTB: "삽니다", RIVEN: "리벤" };
 
@@ -49,9 +65,11 @@ function renderBoardList(posts) {
         return;
     }
     el.innerHTML = "";
+    const itemsToFetch = [];
     posts.forEach((p) => {
         const card = document.createElement("div");
         card.className = `board-card btype-${p.type}`;
+        itemsToFetch.push(p.item_name);
         const typeLabel = _boardTypeLabel[p.type] || p.type;
         const rivenInfo = p.riven ? renderRivenSummary(p.riven) : "";
         const noteHtml = p.note ? `<div class="board-note">${escapeHtml(p.note)}</div>` : "";
@@ -60,6 +78,10 @@ function renderBoardList(posts) {
                 <span class="board-type-tag t-${p.type}">${escapeHtml(typeLabel)}</span>
                 <span class="board-item-name">${escapeHtml(p.item_name)}</span>
                 <span class="board-price">${p.price.toLocaleString()}p</span>
+            </div>
+            <div class="board-market-row">
+                <span class="board-market-label">마켓 최저가</span>
+                <span class="board-market-price" data-item="${escapeHtml(p.item_name)}">조회 중...</span>
             </div>
             ${rivenInfo}
             <div class="board-meta">
@@ -77,6 +99,29 @@ function renderBoardList(posts) {
             </div>
         `;
         el.appendChild(card);
+    });
+
+    // 마켓 최저가 비동기 채우기 (중복 아이템 한 번만 조회)
+    const unique = [...new Set(itemsToFetch)];
+    unique.forEach(async (itemName) => {
+        const data = await fetchMarketPrice(itemName);
+        document.querySelectorAll(`.board-market-price[data-item="${CSS.escape(itemName)}"]`).forEach((span) => {
+            if (!data) { span.textContent = "조회 불가"; span.style.color = "var(--text-muted)"; return; }
+            const diff = data.sell_min != null ? (() => {
+                const card = span.closest(".board-card");
+                if (!card) return null;
+                const myPrice = parseInt(card.querySelector(".board-price")?.textContent?.replace(/[^\d]/g, "") || "0", 10);
+                return myPrice - data.sell_min;
+            })() : null;
+            let diffHtml = "";
+            if (diff !== null && !isNaN(diff)) {
+                const sign = diff > 0 ? "+" : "";
+                const color = diff > 0 ? "var(--red)" : diff < 0 ? "var(--green)" : "var(--text-muted)";
+                diffHtml = ` <span style="font-size:11px;color:${color}">(${sign}${diff}p)</span>`;
+            }
+            span.innerHTML = `${data.sell_min != null ? data.sell_min.toLocaleString() + "p" : "—"}${diffHtml}`;
+            span.style.color = "var(--primary)";
+        });
     });
 }
 
@@ -160,6 +205,7 @@ async function openBoardWriteModal() {
     `);
     document.getElementById("board-write-form").addEventListener("submit", _onBoardWriteSubmit);
     if (isRiven) _wireRivenForm();
+    _wireMarketPreview("board-write-form");
 }
 
 function _buildRivenFormHtml(opts) {
@@ -351,6 +397,7 @@ async function openBoardEditModal(postId) {
         </form>
     `);
     if (isRiven && p.riven) _prefillRivenForm(p.riven);
+    _wireMarketPreview("board-edit-form");
     document.getElementById("board-edit-form").addEventListener("submit", async (ev) => {
         ev.preventDefault();
         const form = ev.target;
@@ -518,5 +565,35 @@ function renderMyPosts(posts, password) {
             } catch { target.innerHTML = "네트워크 오류"; }
         });
         el.appendChild(div);
+    });
+}
+
+// ── 폼 내 마켓 최저가 미리보기 ──
+
+function _wireMarketPreview(formId) {
+    const form = document.getElementById(formId);
+    if (!form) return;
+    // 미리보기 영역 삽입 (item_name input 바로 아래)
+    const itemInput = form.querySelector('[name="item_name"]');
+    if (!itemInput) return;
+    const preview = document.createElement("div");
+    preview.className = "board-market-preview";
+    preview.textContent = "";
+    itemInput.parentNode.insertBefore(preview, itemInput.nextSibling);
+
+    let _timer = null;
+    itemInput.addEventListener("input", () => {
+        clearTimeout(_timer);
+        const val = itemInput.value.trim();
+        if (!val) { preview.textContent = ""; return; }
+        preview.textContent = "마켓 조회 중...";
+        _timer = setTimeout(async () => {
+            const data = await fetchMarketPrice(val);
+            if (!data) { preview.textContent = ""; return; }
+            const parts = [];
+            if (data.sell_min != null) parts.push(`팔기 최저 ${data.sell_min.toLocaleString()}p`);
+            if (data.buy_max != null) parts.push(`사기 최고 ${data.buy_max.toLocaleString()}p`);
+            preview.textContent = parts.length ? `현재 마켓: ${parts.join(" / ")}` : "";
+        }, 400);
     });
 }
