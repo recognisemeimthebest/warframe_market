@@ -338,30 +338,54 @@ const chatFooter = document.getElementById("chat-footer");
 const farmingFooter = document.getElementById("farming-footer");
 let activeTab = "chat";
 
+function _activateTab(tab, pushHistory = true) {
+    if (!document.getElementById("tab-" + tab)) return;
+    if (tab === activeTab && pushHistory) return;
+
+    tabs.forEach((b) => b.classList.remove("active"));
+    const btn = document.querySelector(`.tab[data-tab="${tab}"]`);
+    if (btn) btn.classList.add("active");
+    document.getElementById("tab-" + activeTab).classList.remove("active");
+    document.getElementById("tab-" + tab).classList.add("active");
+
+    chatFooter.style.display = "none";
+    farmingFooter.style.display = "none";
+
+    if (tab === "chat") chatFooter.style.display = chatMode === "chat" ? "" : "none";
+    if (tab === "farming") { farmingFooter.style.display = ""; renderFarmingWelcome(); }
+    if (tab === "surges") fetchSurges();
+    if (tab === "world") fetchWorldState();
+    if (tab === "modding") renderModdingTab();
+    if (tab === "report") loadWeeklyReport();
+    if (tab === "board" && typeof loadBoardList === "function") loadBoardList();
+
+    if (pushHistory) {
+        history.pushState({ tab }, "", "?tab=" + tab);
+    }
+    activeTab = tab;
+}
+
 tabs.forEach((btn) => {
-    btn.addEventListener("click", () => {
-        const tab = btn.dataset.tab;
-        if (tab === activeTab) return;
-
-        tabs.forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
-        document.getElementById("tab-" + activeTab).classList.remove("active");
-        document.getElementById("tab-" + tab).classList.add("active");
-
-        chatFooter.style.display = "none";
-        farmingFooter.style.display = "none";
-
-        if (tab === "chat") chatFooter.style.display = chatMode === "chat" ? "" : "none";
-        if (tab === "farming") { farmingFooter.style.display = ""; renderFarmingWelcome(); }
-        if (tab === "surges") fetchSurges();
-        if (tab === "world") fetchWorldState();
-        if (tab === "modding") renderModdingTab();
-        if (tab === "report") loadWeeklyReport();
-        if (tab === "board" && typeof loadBoardList === "function") loadBoardList();
-
-        activeTab = tab;
-    });
+    btn.addEventListener("click", () => _activateTab(btn.dataset.tab));
 });
+
+// 뒤로가기 → 이전 탭으로 복원 (앱 종료 방지)
+window.addEventListener("popstate", (e) => {
+    const tab = (e.state && e.state.tab) || "chat";
+    _activateTab(tab, false);
+});
+
+// 최초 로드 시 URL 파라미터로 탭 복원
+(function () {
+    const params = new URLSearchParams(location.search);
+    const tab = params.get("tab");
+    if (tab && document.getElementById("tab-" + tab)) {
+        _activateTab(tab, false);
+        history.replaceState({ tab }, "", "?tab=" + tab);
+    } else {
+        history.replaceState({ tab: "chat" }, "", location.href);
+    }
+})();
 
 
 // ── 시세 조회 모드 전환 (채팅 / 시세 감시 / 경매) ──
