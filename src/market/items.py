@@ -68,11 +68,14 @@ def _load_ko_names() -> int:
         mapping: dict[str, str] = json.loads(ko_path.read_text(encoding="utf-8"))
         for slug, ko_name in mapping.items():
             _slug_to_ko[slug] = ko_name
-            _ko_to_slug[ko_name.lower()] = slug
-            # 띄어쓰기 제거 버전도 등록
+            # en_name 없는 slug는 이미 저장된 값을 덮어쓰지 않음
+            key = ko_name.lower()
+            if key not in _ko_to_slug or slug in _slug_to_en_name:
+                _ko_to_slug[key] = slug
             no_space = ko_name.replace(" ", "").lower()
-            if no_space != ko_name.lower():
-                _ko_to_slug[no_space] = slug
+            if no_space != key:
+                if no_space not in _ko_to_slug or slug in _slug_to_en_name:
+                    _ko_to_slug[no_space] = slug
         logger.info("한글 이름 로드: %d개", len(mapping))
         return len(mapping)
     except Exception:
@@ -217,6 +220,21 @@ async def refresh_part_quantities() -> int:
     return len(new_qty)
 
 
+def _fix_ko_slug_mapping() -> None:
+    """_ko_to_slug 항목 중 en_name 없는 slug를 같은 한글명의 en_name 있는 slug로 교체."""
+    # 한글명 → en_name 있는 slug 역인덱스
+    ko_to_valid: dict[str, str] = {}
+    for slug, ko in _slug_to_ko.items():
+        if slug in _slug_to_en_name:
+            ko_to_valid[ko.lower()] = slug
+            ko_to_valid[ko.replace(" ", "").lower()] = slug
+
+    for key in list(_ko_to_slug.keys()):
+        slug = _ko_to_slug[key]
+        if slug not in _slug_to_en_name and key in ko_to_valid:
+            _ko_to_slug[key] = ko_to_valid[key]
+
+
 def _load_items_cache() -> bool:
     """로컬 캐시에서 아이템 목록 로드."""
     cache_path = DATA_DIR / "items.json"
@@ -230,6 +248,7 @@ def _load_items_cache() -> bool:
             if en_name:
                 _en_name_to_slug[en_name.lower()] = slug
                 _slug_to_en_name[slug] = en_name
+        _fix_ko_slug_mapping()
         logger.info("아이템 캐시 로드: %d개", len(_en_name_to_slug))
         return True
     except Exception:
@@ -266,6 +285,7 @@ async def refresh_items_cache() -> int:
             _en_name_to_slug[en_name.lower()] = slug
             _slug_to_en_name[slug] = en_name
 
+    _fix_ko_slug_mapping()
     logger.info("아이템 캐시 갱신: %d개", len(_en_name_to_slug))
     return len(_en_name_to_slug)
 
@@ -313,10 +333,13 @@ async def refresh_ko_names() -> int:
     _ko_to_slug.clear()
     for slug, ko_name in ko_map.items():
         _slug_to_ko[slug] = ko_name
-        _ko_to_slug[ko_name.lower()] = slug
+        key = ko_name.lower()
+        if key not in _ko_to_slug or slug in _slug_to_en_name:
+            _ko_to_slug[key] = slug
         no_space = ko_name.replace(" ", "").lower()
-        if no_space != ko_name.lower():
-            _ko_to_slug[no_space] = slug
+        if no_space != key:
+            if no_space not in _ko_to_slug or slug in _slug_to_en_name:
+                _ko_to_slug[no_space] = slug
     _generate_part_ko_names()
     _load_ko_aliases()
 
