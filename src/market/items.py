@@ -342,6 +342,7 @@ async def refresh_ko_names() -> int:
                 _ko_to_slug[no_space] = slug
     _generate_part_ko_names()
     _load_ko_aliases()
+    _fix_ko_slug_mapping()
 
     logger.info("한글 이름 갱신: %d개", len(ko_map))
     return len(ko_map)
