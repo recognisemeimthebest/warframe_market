@@ -19,6 +19,7 @@ from src.market.live_cache import _cache as _live_cache_all, get_live_price
 from src.market.relic import get_relic_value, search_relics
 from src.market.vault import is_vaulted, is_vaulted_by_name
 from src.market.item_meta import get_item_meta, get_arcane_meta
+from src.market.builds import get_builds, get_build_detail, _slug_to_overframe
 from src.wiki.drops import fetch_item_description, search_farming, search_resources
 from src.http_client import get_client
 
@@ -430,3 +431,72 @@ async def api_items_search(q: str = "", limit: int = 10):
         {"slug": r.slug, "name": r.name, "ko_name": r.ko_name, "score": round(r.score, 3)}
         for r in results
     ]}
+
+
+# ── 워프레임 타입 키워드 (slug에 이 단어가 없으면 weapon으로 분류) ──
+_FRAME_KEYWORDS = {
+    "ash", "atlas", "banshee", "baruuk", "caliban", "chroma", "citrine", "cyte-09",
+    "dagath", "ember", "equinox", "excalibur", "frost", "gara", "garuda", "gauss",
+    "grendel", "gyre", "harrow", "hildryn", "hydroid", "inaros", "ivara", "jade",
+    "khora", "kullervo", "lavos", "limbo", "loki", "mag", "mesa", "mirage",
+    "nekros", "nezha", "nidus", "nova", "nyx", "oberon", "octavia", "protea",
+    "qorvex", "revenant", "rhino", "saryn", "sevagoth", "styanax", "titania",
+    "trinity", "valkyr", "vauban", "volt", "voruna", "wisp", "wukong", "xaku",
+    "yareli", "zephyr", "dante", "koumei", "cyte",
+}
+
+
+def _guess_item_type(slug: str) -> str:
+    """slug에서 워프레임인지 무기인지 추정."""
+    parts = set(slug.replace("-", "_").split("_"))
+    # prime/blueprint/neuroptics 등 제거 후 프레임명 확인
+    clean = parts - {"prime", "set", "blueprint", "neuroptics", "chassis", "systems", "systems_blueprint"}
+    for kw in _FRAME_KEYWORDS:
+        if kw in clean or any(kw in p for p in clean):
+            return "warframe"
+    return "weapon"
+
+
+@router.get("/ref-builds")
+async def api_ref_builds(q: str = "", item_type: str = "", limit: int = 6):
+    """overframe.gg 참고 빌드 조회."""
+    if not q.strip():
+        return {"ok": False, "msg": "검색어 필요"}
+
+    resolved = resolve_item(q.strip())
+    if not resolved:
+        return {"ok": False, "msg": f"'{q}' 아이템을 찾을 수 없습니다"}
+
+    slug, display_name = resolved
+    ko_name = _slug_to_ko.get(slug, "")
+    of_slug = _slug_to_overframe(slug)
+
+    # item_type 자동 감지 (명시적 파라미터 우선)
+    if item_type not in ("warframe", "weapon"):
+        item_type = _guess_item_type(of_slug)
+
+    builds = await get_builds(of_slug, item_type, limit=limit)
+    if not builds:
+        # 워프레임으로 못 찾으면 무기로 재시도
+        alt_type = "weapon" if item_type == "warframe" else "warframe"
+        builds = await get_builds(of_slug, alt_type, limit=limit)
+        if builds:
+            item_type = alt_type
+
+    return {
+        "ok": True,
+        "slug": slug,
+        "display_name": display_name,
+        "ko_name": ko_name,
+        "item_type": item_type,
+        "data": builds,
+    }
+
+
+@router.get("/ref-builds/{build_id}")
+async def api_ref_build_detail(build_id: int):
+    """overframe.gg 빌드 상세."""
+    detail = await get_build_detail(build_id)
+    if not detail:
+        return {"ok": False, "msg": "빌드를 불러오지 못했습니다"}
+    return {"ok": True, "data": detail}

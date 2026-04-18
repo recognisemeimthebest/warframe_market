@@ -42,6 +42,7 @@ from src.web.push import init_push_db, send_push_all
 from src.config import DATA_DIR
 from src.wiki.drops import load_drop_table, refresh_drop_table
 from src.market.item_meta import refresh_item_meta, ensure_loaded as ensure_meta_loaded
+from src.market.builds import _get_cached_builds as _warm_builds_cache
 
 # 라우터 import
 from src.web.routes.trade import router as trade_router
@@ -112,6 +113,10 @@ async def lifespan(app: FastAPI):
     init_board_db()
     init_aliases_db()
     init_analytics_db()
+
+    # overframe.gg 빌드 캐시 미리 로드 (첫 번째 참고빌드 검색 응답 속도 개선)
+    asyncio.create_task(_warm_builds_cache())
+    logger.info("overframe.gg 빌드 캐시 — 백그라운드 워밍 시작")
 
     # 백그라운드 태스크 시작
     asyncio.create_task(backfill_statistics(get_popular_slugs()))

@@ -2146,6 +2146,91 @@ function _renderLichCards(container, items, from) {
     }
 }
 
+// ── 모딩 서브탭 전환 ──
+let moddingSubTab = "share";
+document.querySelectorAll(".modding-sub").forEach((btn) => {
+    btn.addEventListener("click", () => {
+        const sub = btn.dataset.msub;
+        if (sub === moddingSubTab) return;
+        document.querySelectorAll(".modding-sub").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById("modding-sub-share").style.display = sub === "share" ? "" : "none";
+        document.getElementById("modding-sub-ref").style.display   = sub === "ref"   ? "" : "none";
+        moddingSubTab = sub;
+        if (sub === "share") renderModdingTab();
+    });
+});
+
+// ── 참고 빌드 (overframe.gg) ──
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && document.activeElement?.id === "ref-build-input") searchRefBuilds();
+});
+
+async function searchRefBuilds() {
+    const q = document.getElementById("ref-build-input").value.trim();
+    if (!q) return;
+    const el = document.getElementById("ref-build-results");
+    el.innerHTML = '<div class="surge-empty">검색 중...</div>';
+    try {
+        const res = await fetch(`/api/ref-builds?q=${encodeURIComponent(q)}&limit=6`);
+        const json = await res.json();
+        if (!json.ok) {
+            el.innerHTML = `<div class="surge-empty">${escapeHtml(json.msg || "결과 없음")}</div>`;
+            return;
+        }
+        renderRefBuilds(el, json);
+    } catch {
+        el.innerHTML = '<div class="surge-empty">불러오기 실패</div>';
+    }
+}
+
+function renderRefBuilds(el, json) {
+    el.innerHTML = "";
+    const header = document.createElement("div");
+    header.className = "ref-build-header";
+    const typeLbl = json.item_type === "warframe" ? "워프레임" : "무기";
+    const nameHtml = json.ko_name
+        ? `${escapeHtml(json.ko_name)} <span class="ref-build-en">${escapeHtml(json.display_name)}</span>`
+        : escapeHtml(json.display_name);
+    const ofBase = json.item_type === "warframe"
+        ? "https://overframe.gg/builds/warframes/"
+        : "https://overframe.gg/builds/weapons/";
+    header.innerHTML = `<span class="ref-build-type-badge">${typeLbl}</span>${nameHtml} <a class="ref-build-src" href="${ofBase}" target="_blank">via overframe.gg ↗</a>`;
+    el.appendChild(header);
+
+    if (!json.data || !json.data.length) {
+        el.insertAdjacentHTML("beforeend",
+            `<div class="surge-empty">인기 빌드 목록에 없습니다.<br><a href="${ofBase}" target="_blank" style="color:var(--accent)">overframe.gg에서 직접 검색하기 ↗</a></div>`
+        );
+        return;
+    }
+
+    json.data.forEach((b) => {
+        const card = document.createElement("div");
+        card.className = "ref-build-card";
+        const statsHtml = (b.stats || []).map(s =>
+            `<span class="ref-build-stat"><span class="ref-build-stat-label">${escapeHtml(s.label)}</span><span class="ref-build-stat-val">${escapeHtml(s.value)}</span></span>`
+        ).join("");
+        const costParts = [
+            b.formas != null ? `Forma ${b.formas}` : "",
+            b.pt_cost ? `${b.pt_cost}p` : "",
+            b.endo_cost ? `엔도 ${b.endo_cost.toLocaleString()}` : "",
+            b.guide_len > 0 ? `📖 ${b.guide_len}단어` : "",
+        ].filter(Boolean).join(" · ");
+        const buildUrl = (b.url && /^https:\/\/overframe\.gg\//.test(b.url)) ? b.url : ofBase;
+        card.innerHTML = `
+            <div class="ref-build-title">
+                <a href="${buildUrl}" target="_blank" rel="noopener">${escapeHtml(b.title || "빌드")}</a>
+                <span class="ref-build-score">▲ ${b.score || 0}</span>
+            </div>
+            ${b.author ? `<div class="ref-build-author">by ${escapeHtml(b.author)}</div>` : ""}
+            ${costParts ? `<div class="ref-build-cost">${escapeHtml(costParts)}</div>` : ""}
+            ${statsHtml ? `<div class="ref-build-stats">${statsHtml}</div>` : ""}
+        `;
+        el.appendChild(card);
+    });
+}
+
 // ── 모딩 공유 ──
 const MODDING_CATEGORIES = [
     { key: "warframe", label: "워프레임" },
