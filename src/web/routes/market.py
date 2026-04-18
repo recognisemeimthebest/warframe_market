@@ -457,28 +457,38 @@ def _guess_item_type(slug: str) -> str:
     return "weapon"
 
 
+# 컴포넌트 접미사 — 빌드 검색 시 우선순위 하향
+_COMPONENT_SFXS = (
+    "_neuroptics", "_chassis", "_systems", "_blueprint",
+    "_neuroptics_blueprint", "_chassis_blueprint", "_systems_blueprint",
+)
+
+
 @router.get("/ref-builds")
 async def api_ref_builds(q: str = "", item_type: str = "", limit: int = 6):
     """overframe.gg 참고 빌드 조회."""
     if not q.strip():
         return {"ok": False, "msg": "검색어 필요"}
 
-    resolved = resolve_item(q.strip())
-    if not resolved:
+    # 빌드 검색: 컴포넌트(뉴로옵틱스/섀시 등)보다 세트/본체를 우선 반환
+    results = search_items(q.strip(), limit=20)
+    if not results or results[0].score < 0.55:
         return {"ok": False, "msg": f"'{q}' 아이템을 찾을 수 없습니다"}
 
-    slug, display_name = resolved
-    ko_name = _slug_to_ko.get(slug, "")
+    non_comp = [r for r in results
+                if not any(r.slug.endswith(s) for s in _COMPONENT_SFXS)
+                and r.score >= 0.55]
+    best = non_comp[0] if non_comp else results[0]
+
+    slug = best.slug
+    display_name = best.name
+    ko_name = best.ko_name or _slug_to_ko.get(slug, "")
     of_slug = _slug_to_overframe(slug)
 
-    # ── 표시명 보정 ───────────────────────────────────────────────────────
-    # resolve_item이 컴포넌트(뉴로옵틱스/섀시/시스템즈 등)를 반환한 경우,
-    # of_slug는 이미 본체 slug (예: rhino-prime)으로 정규화되어 있으므로
-    # 해당 slug 기반의 상위 아이템명으로 표시명을 보정합니다.
+    # ── 표시명 정규화 (" 세트" / " Set" 제거) ─────────────────────────────
     base_ms = of_slug.replace("-", "_")
     set_slug = base_ms + "_set"
     if set_slug in _slug_to_ko:
-        # 세트 이름에서 " 세트" / " Set" 제거 → 본체명으로 사용
         ko_name = _slug_to_ko[set_slug].replace(" 세트", "").strip()
         en_raw = _slug_to_en_name.get(set_slug, display_name)
         display_name = en_raw.replace(" Set", "").strip()
