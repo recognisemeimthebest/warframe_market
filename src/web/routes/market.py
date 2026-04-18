@@ -508,6 +508,14 @@ async def api_ref_builds(q: str = "", item_type: str = "", limit: int = 6):
         if builds:
             item_type = alt_type
 
+    # 빌드가 아예 없으면 — 모드/자원/릴릭 등 빌드 대상이 아닌 아이템일 가능성
+    if not builds:
+        name_hint = ko_name or display_name
+        return {
+            "ok": False,
+            "msg": f"'{name_hint}'의 빌드를 찾을 수 없습니다.\n워프레임 또는 무기 이름으로 검색해주세요.",
+        }
+
     return {
         "ok": True,
         "slug": slug,
