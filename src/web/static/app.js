@@ -227,6 +227,11 @@ function escapeHtml(str) {
     el.textContent = str;
     return el.innerHTML;
 }
+// 줄바꿈(\n)을 <br>로 변환하는 안전한 HTML 출력
+function safeHtml(str) {
+    if (!str) return "";
+    return escapeHtml(str).replace(/\n/g, "<br>");
+}
 
 function addMessage(text, sender) {
     const div = document.createElement("div");
@@ -1396,7 +1401,7 @@ function buildMetaHtml(meta) {
     }[meta.rarity] || meta.rarity;
     const typeLabel = meta.item_type ? `<span class="farming-meta-type">${escapeHtml(meta.item_type)}</span>` : "";
     const rarityBadge = meta.rarity ? `<span class="farming-meta-rarity ${rarityClass}">${rarityLabel}</span>` : "";
-    const effect = meta.max_effect ? `<div class="farming-meta-effect">✦ ${escapeHtml(meta.max_effect)}</div>` : "";
+    const effect = meta.max_effect ? `<div class="farming-meta-effect">✦ ${safeHtml(meta.max_effect)}</div>` : "";
     return `<div class="farming-meta-row">${typeLabel}${rarityBadge}</div>${effect}`;
 }
 
@@ -1451,7 +1456,7 @@ function buildFarmingCard(item) {
             ${nameDisplay}${farmVaultBadge}
         </div>
         ${metaHtml}
-        ${item.description ? `<div class="farming-card-desc">${escapeHtml(item.description)}</div>` : ""}
+        ${item.description ? `<div class="farming-card-desc">${safeHtml(item.description)}</div>` : ""}
         ${item.drops && item.drops.length ? `<div class="farming-card-sub">${item.drops.length}개 파밍 위치</div>` : ""}
         ${dropsHtml}
     `;
