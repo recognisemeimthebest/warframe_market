@@ -2283,8 +2283,9 @@ function openBuildModal(buildId, title, buildUrl) {
             body.innerHTML = `
                 ${d.author ? `<div class="bm-author">by ${escapeHtml(d.author)}</div>` : ""}
                 ${costParts ? `<div class="bm-cost">${escapeHtml(costParts)}</div>` : ""}
-                ${statsHtml ? `<div class="bm-stats">${statsHtml}</div>`
-                            : '<div class="build-modal-loading">스탯 정보 없음</div>'}
+                ${statsHtml ? `<div class="bm-section-label">빌드 스탯</div><div class="bm-stats">${statsHtml}</div>` : ""}
+                ${d.desc ? `<div class="bm-section-label">빌드 설명</div><div class="bm-desc">${escapeHtml(d.desc)}</div>` : ""}
+                ${!statsHtml && !d.desc ? '<div class="build-modal-loading">상세 정보 없음</div>' : ""}
             `;
         })
         .catch(() => {

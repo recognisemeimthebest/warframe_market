@@ -116,6 +116,16 @@ def _build_summary(raw: dict, item_type: str) -> dict:
     if url and not url.startswith("http"):
         url = f"https://overframe.gg{url}"
 
+    # description 마크다운 → 첫 단락만 (모달 요약용)
+    # 헤더(#)·빈줄·코드블록 제거 후 첫 의미 있는 텍스트 최대 300자
+    desc_raw = raw.get("description") or ""
+    desc_lines = [l.strip() for l in desc_raw.splitlines()
+                  if l.strip() and not l.strip().startswith("#")
+                  and not l.strip().startswith("```")]
+    desc_short = " ".join(desc_lines)[:300].strip()
+    if len(" ".join(desc_lines)) > 300:
+        desc_short += "…"
+
     return {
         "id":        raw.get("id"),
         "title":     raw.get("title", ""),
@@ -127,6 +137,7 @@ def _build_summary(raw: dict, item_type: str) -> dict:
         "author":    (raw.get("author") or {}).get("username", ""),
         "stats":     stats,
         "guide_len": raw.get("guide_wordcount", 0),
+        "desc":      desc_short,   # 빌드 요약 설명 (모달용)
     }
 
 
