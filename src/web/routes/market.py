@@ -471,6 +471,21 @@ async def api_ref_builds(q: str = "", item_type: str = "", limit: int = 6):
     ko_name = _slug_to_ko.get(slug, "")
     of_slug = _slug_to_overframe(slug)
 
+    # ── 표시명 보정 ───────────────────────────────────────────────────────
+    # resolve_item이 컴포넌트(뉴로옵틱스/섀시/시스템즈 등)를 반환한 경우,
+    # of_slug는 이미 본체 slug (예: rhino-prime)으로 정규화되어 있으므로
+    # 해당 slug 기반의 상위 아이템명으로 표시명을 보정합니다.
+    base_ms = of_slug.replace("-", "_")
+    set_slug = base_ms + "_set"
+    if set_slug in _slug_to_ko:
+        # 세트 이름에서 " 세트" / " Set" 제거 → 본체명으로 사용
+        ko_name = _slug_to_ko[set_slug].replace(" 세트", "").strip()
+        en_raw = _slug_to_en_name.get(set_slug, display_name)
+        display_name = en_raw.replace(" Set", "").strip()
+    elif base_ms in _slug_to_ko:
+        ko_name = _slug_to_ko[base_ms]
+        display_name = _slug_to_en_name.get(base_ms, display_name)
+
     # item_type 자동 감지 (명시적 파라미터 우선)
     if item_type not in ("warframe", "weapon"):
         item_type = _guess_item_type(of_slug)
