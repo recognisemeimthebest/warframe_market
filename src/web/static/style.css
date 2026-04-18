@@ -345,6 +345,30 @@ footer { padding: 12px 16px; background: var(--surface); border-top: 1px solid v
 .vault-notice-icon { font-size: 20px; flex-shrink: 0; }
 .vault-notice-text { font-size: 13px; color: var(--text-muted); line-height: 1.6; }
 .vault-notice-text small { font-size: 11px; }
+/* 모드/아케인 메타 */
+.farming-card-type.arcane { background: rgba(156,39,176,0.2); color: #ce93d8; }
+.farming-meta-row { display: flex; align-items: center; gap: 6px; margin: 4px 0 6px; flex-wrap: wrap; }
+.farming-meta-type { font-size: 11px; color: var(--text-muted); }
+.farming-meta-rarity { font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 4px; }
+.rarity-common    { background: rgba(158,158,158,0.2); color: #bdbdbd; }
+.rarity-uncommon  { background: rgba(76,175,80,0.2);   color: var(--green); }
+.rarity-rare      { background: rgba(255,152,0,0.2);   color: var(--orange); }
+.rarity-legendary { background: rgba(77,184,255,0.2);  color: var(--primary); }
+.rarity-peculiar  { background: rgba(233,30,99,0.2);   color: #f48fb1; }
+.farming-meta-effect { font-size: 12px; color: #ffd54f; margin-bottom: 6px; line-height: 1.5; }
+/* 리벤 경매 섹션 */
+.farming-riven-section { margin-top: 10px; border-top: 1px solid var(--border); padding-top: 8px; }
+.farming-riven-title { font-size: 12px; font-weight: 700; color: var(--text-muted); margin-bottom: 6px; }
+.farming-riven-loading { font-size: 12px; color: var(--text-muted); }
+.farming-riven-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 12px; flex-wrap: wrap; }
+.farming-riven-row:last-child { border-bottom: none; }
+.farming-riven-price { font-weight: 700; color: var(--orange); min-width: 48px; }
+.farming-riven-attrs { flex: 1; color: var(--text); }
+.farming-riven-seller { color: var(--primary); font-size: 11px; }
+.farming-riven-meta { font-size: 11px; color: var(--text-muted); }
+.riven-stat-pos { color: var(--green); margin-right: 4px; }
+.riven-stat-neg { color: var(--red); margin-right: 4px; }
+.riven-neg-sep { color: var(--text-muted); margin: 0 2px; }
 .farming-name-ko { font-size: 13px; font-weight: 400; color: var(--text-muted); margin-left: 4px; }
 .farming-mission-tag { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: rgba(255,255,255,0.07); color: var(--text-muted); margin-left: 4px; }
 .farming-drop-tip { font-size: 12px; color: var(--text-muted); margin-top: 3px; padding-left: 2px; line-height: 1.4; }

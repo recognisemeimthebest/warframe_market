@@ -1343,11 +1343,68 @@ function renderFarmingResults(items, query) {
     el.appendChild(suggest);
 }
 
+// ── 리벤 경매 섹션 렌더 ──
+async function renderRivenSection(card, weaponSlug) {
+    const section = document.createElement("div");
+    section.className = "farming-riven-section";
+    section.innerHTML = '<div class="farming-riven-title">⚔️ 리벤 경매 (최저가)</div><div class="farming-riven-loading">불러오는 중...</div>';
+    card.appendChild(section);
+
+    try {
+        const res = await fetch(`/api/riven/auctions?weapon=${encodeURIComponent(weaponSlug)}&limit=5`);
+        const json = await res.json();
+        if (!json.ok || !json.data || !json.data.length) {
+            section.querySelector(".farming-riven-loading").textContent = "리벤 경매 없음";
+            return;
+        }
+        const rows = json.data.map((a) => {
+            const price = a.buyout_price != null ? `${a.buyout_price}p` : (a.starting_price != null ? `${a.starting_price}p~` : "?");
+            const stats = (a.attributes || [])
+                .filter(x => x.positive)
+                .map(x => `<span class="riven-stat-pos">${escapeHtml(x.url_name.replace(/_/g, " "))}</span>`)
+                .join(" ");
+            const neg = (a.attributes || [])
+                .filter(x => !x.positive)
+                .map(x => `<span class="riven-stat-neg">${escapeHtml(x.url_name.replace(/_/g, " "))}</span>`)
+                .join(" ");
+            return `<div class="farming-riven-row">
+                <span class="farming-riven-price">${escapeHtml(price)}</span>
+                <span class="farming-riven-attrs">${stats}${neg ? " <span class=\"riven-neg-sep\">—</span>" + neg : ""}</span>
+                <span class="farming-riven-seller">${escapeHtml(a.owner)}</span>
+                <span class="farming-riven-meta">MR${a.mastery_level ?? "?"} · ${a.re_rolls ?? 0}롤</span>
+            </div>`;
+        }).join("");
+        section.innerHTML = `<div class="farming-riven-title">⚔️ 리벤 경매 (온라인)</div>${rows}`;
+    } catch {
+        section.querySelector(".farming-riven-loading").textContent = "경매 로드 실패";
+    }
+}
+
+// ── 모드/아케인 메타 배지 HTML ──
+function buildMetaHtml(meta) {
+    if (!meta) return "";
+    const rarityClass = {
+        "Common": "rarity-common",
+        "Uncommon": "rarity-uncommon",
+        "Rare": "rarity-rare",
+        "Legendary": "rarity-legendary",
+        "Peculiar": "rarity-peculiar",
+    }[meta.rarity] || "rarity-common";
+    const rarityLabel = {
+        "Common": "일반", "Uncommon": "고급", "Rare": "희귀",
+        "Legendary": "전설", "Peculiar": "특수",
+    }[meta.rarity] || meta.rarity;
+    const typeLabel = meta.item_type ? `<span class="farming-meta-type">${escapeHtml(meta.item_type)}</span>` : "";
+    const rarityBadge = meta.rarity ? `<span class="farming-meta-rarity ${rarityClass}">${rarityLabel}</span>` : "";
+    const effect = meta.max_effect ? `<div class="farming-meta-effect">✦ ${escapeHtml(meta.max_effect)}</div>` : "";
+    return `<div class="farming-meta-row">${typeLabel}${rarityBadge}</div>${effect}`;
+}
+
 function buildFarmingCard(item) {
     const card = document.createElement("div");
     card.className = "farming-card";
 
-    const typeLabels = { prime: "프라임", mod: "모드", frame: "워프레임", weapon: "무기", resource: "소재", other: "" };
+    const typeLabels = { prime: "프라임", mod: "모드", frame: "워프레임", weapon: "무기", resource: "소재", arcane: "아케인", other: "" };
     const typeCls = item.type || "other";
 
     let dropsHtml = "";
@@ -1386,11 +1443,14 @@ function buildFarmingCard(item) {
             ? '<span class="vault-badge active">현역</span>'
             : "";
 
+    const metaHtml = buildMetaHtml(item.meta || null);
+
     card.innerHTML = `
         <div class="farming-card-title">
             ${typeCls !== "other" ? `<span class="farming-card-type ${typeCls}">${typeLabels[typeCls] || typeCls}</span>` : ""}
             ${nameDisplay}${farmVaultBadge}
         </div>
+        ${metaHtml}
         ${item.description ? `<div class="farming-card-desc">${escapeHtml(item.description)}</div>` : ""}
         ${item.drops && item.drops.length ? `<div class="farming-card-sub">${item.drops.length}개 파밍 위치</div>` : ""}
         ${dropsHtml}
@@ -1400,6 +1460,12 @@ function buildFarmingCard(item) {
     wiki.style.cssText = "margin-top:8px;font-size:11px;color:var(--text-muted);text-align:right;";
     wiki.innerHTML = '출처: <a href="' + escapeHtml(wikiHref) + '" target="_blank" style="color:var(--primary);">Warframe Wiki</a>';
     card.appendChild(wiki);
+
+    // 무기/프라임 → 리벤 경매 섹션 비동기 추가
+    if (typeCls === "weapon" || typeCls === "prime") {
+        const slug = item.slug || item.name.toLowerCase().replace(/ /g, "_");
+        renderRivenSection(card, slug);
+    }
 
     return card;
 }

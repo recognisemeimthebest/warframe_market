@@ -40,6 +40,7 @@ from src.market.relic import _build_relic_cache
 from src.modding.share import init_modding_db
 from src.web.push import init_push_db, send_push_all
 from src.wiki.drops import load_drop_table, refresh_drop_table
+from src.market.item_meta import refresh_item_meta, ensure_loaded as ensure_meta_loaded
 
 # 라우터 import
 from src.web.routes.trade import router as trade_router
@@ -84,6 +85,14 @@ async def lifespan(app: FastAPI):
             logger.warning("드롭 테이블 다운로드 실패", exc_info=True)
     logger.info("드롭 테이블 로드: %d개", drop_count)
     _build_relic_cache()
+
+    # 모드/아케인 메타 로드
+    ensure_meta_loaded()
+    if not (DATA_DIR / "mods_meta.json").exists():
+        asyncio.create_task(refresh_item_meta())
+        logger.info("모드 메타 캐시 없음 — 백그라운드에서 갱신 시작")
+    else:
+        logger.info("모드 메타 캐시 로드 완료")
 
     # 부품 수량 캐시
     qty_count = load_part_quantities()

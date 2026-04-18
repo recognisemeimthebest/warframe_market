@@ -18,7 +18,9 @@ from src.market.items import (
 from src.market.live_cache import _cache as _live_cache_all, get_live_price
 from src.market.relic import get_relic_value, search_relics
 from src.market.vault import is_vaulted, is_vaulted_by_name
+from src.market.item_meta import get_item_meta, get_arcane_meta
 from src.wiki.drops import fetch_item_description, search_farming, search_resources
+from src.http_client import get_client
 
 router = APIRouter(prefix="/api", tags=["market"])
 
@@ -350,8 +352,72 @@ async def api_farming(q: str = "", limit: int = 5):
             r["description"] = desc
         if not r.get("wiki_url"):
             r["wiki_url"] = wiki
+
+    # 모드 / 아케인 메타 enrichment
+    for r in results:
+        t = r.get("type", "")
+        if t in ("mod", "arcane"):
+            meta = get_item_meta(r["name"]) or get_arcane_meta(r["name"])
+            if meta:
+                r["meta"] = meta
+        elif t == "other":
+            # type 불명확한 경우도 아케인일 수 있음
+            meta = get_arcane_meta(r["name"]) or get_item_meta(r["name"])
+            if meta:
+                r["meta"] = meta
+                r["type"] = "arcane" if "arcane" in meta.get("item_type", "").lower() else "mod"
+
     log_event("farming_search", q, hit=bool(results))
     return {"data": results}
+
+
+@router.get("/item-meta")
+async def api_item_meta(name: str = ""):
+    """모드 또는 아케인 메타데이터 조회."""
+    if not name.strip():
+        return {"ok": False, "msg": "name 필요"}
+    meta = get_item_meta(name.strip()) or get_arcane_meta(name.strip())
+    if not meta:
+        return {"ok": False, "msg": "메타 없음"}
+    return {"ok": True, "data": meta}
+
+
+@router.get("/riven/auctions")
+async def api_riven_auctions(weapon: str = "", limit: int = 5):
+    """warframe.market 리벤 경매 검색."""
+    if not weapon.strip():
+        return {"ok": False, "msg": "weapon slug 필요"}
+    try:
+        client = get_client()
+        url = "https://api.warframe.market/v1/auctions/search"
+        params = {
+            "type": "riven",
+            "weapon_url_name": weapon.strip(),
+            "sort_by": "price_asc",
+        }
+        r = await client.get(url, params=params, timeout=10.0,
+                             headers={"Accept": "application/json", "Language": "en"})
+        r.raise_for_status()
+        auctions = r.json().get("payload", {}).get("auctions", [])
+        # 온라인/인게임 + visible 필터
+        visible = [a for a in auctions
+                   if a.get("visible") and a.get("owner", {}).get("status") in ("ingame", "online")]
+        result = []
+        for a in visible[:limit]:
+            item = a.get("item", {})
+            result.append({
+                "buyout_price": a.get("buyout_price"),
+                "starting_price": a.get("starting_price"),
+                "owner": a.get("owner", {}).get("ingame_name", ""),
+                "mod_rank": item.get("mod_rank"),
+                "re_rolls": item.get("re_rolls"),
+                "mastery_level": item.get("mastery_level"),
+                "polarity": item.get("polarity", ""),
+                "attributes": item.get("attributes", []),
+            })
+        return {"ok": True, "data": result}
+    except Exception as e:
+        return {"ok": False, "msg": str(e)}
 
 
 @router.get("/items/search")
