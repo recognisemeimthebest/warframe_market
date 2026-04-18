@@ -2208,9 +2208,6 @@ function renderRefBuilds(el, json) {
     json.data.forEach((b) => {
         const card = document.createElement("div");
         card.className = "ref-build-card";
-        const statsHtml = (b.stats || []).map(s =>
-            `<span class="ref-build-stat"><span class="ref-build-stat-label">${escapeHtml(s.label)}</span><span class="ref-build-stat-val">${escapeHtml(s.value)}</span></span>`
-        ).join("");
         const costParts = [
             b.formas != null ? `Forma ${b.formas}` : "",
             b.pt_cost ? `${b.pt_cost}p` : "",
@@ -2220,15 +2217,87 @@ function renderRefBuilds(el, json) {
         const buildUrl = (b.url && /^https:\/\/overframe\.gg\//.test(b.url)) ? b.url : ofBase;
         card.innerHTML = `
             <div class="ref-build-title">
-                <a href="${buildUrl}" target="_blank" rel="noopener">${escapeHtml(b.title || "빌드")}</a>
+                <span class="ref-build-name">${escapeHtml(b.title || "빌드")}</span>
                 <span class="ref-build-score">▲ ${b.score || 0}</span>
             </div>
             ${b.author ? `<div class="ref-build-author">by ${escapeHtml(b.author)}</div>` : ""}
             ${costParts ? `<div class="ref-build-cost">${escapeHtml(costParts)}</div>` : ""}
-            ${statsHtml ? `<div class="ref-build-stats">${statsHtml}</div>` : ""}
         `;
+        card.style.cursor = "pointer";
+        card.addEventListener("click", () => openBuildModal(b.id, b.title, buildUrl));
         el.appendChild(card);
     });
+}
+
+// ── 참고 빌드 상세 모달 ────────────────────────────────────────────────────
+function openBuildModal(buildId, title, buildUrl) {
+    let overlay = document.getElementById("build-modal-overlay");
+    if (!overlay) {
+        overlay = document.createElement("div");
+        overlay.id = "build-modal-overlay";
+        overlay.onclick = closeBuildModal;
+        document.body.appendChild(overlay);
+
+        const modal = document.createElement("div");
+        modal.id = "build-modal";
+        modal.innerHTML = `
+            <div class="build-modal-header">
+                <span id="build-modal-title"></span>
+                <button class="build-modal-close" onclick="closeBuildModal()">&times;</button>
+            </div>
+            <div class="build-modal-body" id="build-modal-body"></div>
+            <div class="build-modal-footer">
+                <a id="build-modal-link" href="#" target="_blank" rel="noopener">overframe.gg에서 전체 보기 ↗</a>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    }
+
+    document.getElementById("build-modal-title").textContent = title || "빌드";
+    document.getElementById("build-modal-link").href = buildUrl;
+    document.getElementById("build-modal-body").innerHTML = '<div class="build-modal-loading">로딩 중...</div>';
+    document.getElementById("build-modal-overlay").style.display = "block";
+    document.getElementById("build-modal").style.display = "flex";
+
+    fetch(`/api/ref-builds/${buildId}`)
+        .then(r => r.json())
+        .then(json => {
+            const body = document.getElementById("build-modal-body");
+            if (!json.ok || !json.data) {
+                body.innerHTML = '<div class="build-modal-loading">스탯을 불러오지 못했습니다.</div>';
+                return;
+            }
+            const d = json.data;
+            const statsHtml = (d.stats || []).map(s =>
+                `<div class="bm-stat-row">
+                    <span class="bm-stat-label">${escapeHtml(s.label)}</span>
+                    <span class="bm-stat-val">${escapeHtml(s.value)}</span>
+                </div>`
+            ).join("");
+            const costParts = [
+                d.formas != null ? `Forma ${d.formas}` : "",
+                d.pt_cost ? `${d.pt_cost}p` : "",
+                d.endo_cost ? `엔도 ${d.endo_cost.toLocaleString()}` : "",
+                d.guide_len > 0 ? `📖 가이드 ${d.guide_len}단어` : "",
+            ].filter(Boolean).join("  ·  ");
+            body.innerHTML = `
+                ${d.author ? `<div class="bm-author">by ${escapeHtml(d.author)}</div>` : ""}
+                ${costParts ? `<div class="bm-cost">${escapeHtml(costParts)}</div>` : ""}
+                ${statsHtml ? `<div class="bm-stats">${statsHtml}</div>`
+                            : '<div class="build-modal-loading">스탯 정보 없음</div>'}
+            `;
+        })
+        .catch(() => {
+            const body = document.getElementById("build-modal-body");
+            if (body) body.innerHTML = '<div class="build-modal-loading">불러오기 실패</div>';
+        });
+}
+
+function closeBuildModal() {
+    const overlay = document.getElementById("build-modal-overlay");
+    const modal   = document.getElementById("build-modal");
+    if (overlay) overlay.style.display = "none";
+    if (modal)   modal.style.display   = "none";
 }
 
 // ── 모딩 공유 ──
