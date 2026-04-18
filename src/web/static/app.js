@@ -227,10 +227,14 @@ function escapeHtml(str) {
     el.textContent = str;
     return el.innerHTML;
 }
-// 줄바꿈(\n)을 <br>로 변환하는 안전한 HTML 출력
+// 줄바꿈을 <br>로 변환하는 안전한 HTML 출력
+// - 실제 개행문자(0x0A) 처리
+// - WFCD 리터럴 \n (백슬래시+n 2글자) 처리
 function safeHtml(str) {
     if (!str) return "";
-    return escapeHtml(str).replace(/\n/g, "<br>");
+    return escapeHtml(str)
+        .replace(/\\n/g, "<br>")
+        .replace(/\n/g, "<br>");
 }
 
 function addMessage(text, sender) {

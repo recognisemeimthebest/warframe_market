@@ -25,12 +25,17 @@ _last_loaded: float = 0.0
 
 
 def _max_effect(level_stats: list) -> str:
-    """풀랭크(마지막 레벨) 효과 텍스트. 여러 줄이면 ' / ' 연결."""
+    """풀랭크(마지막 레벨) 효과 텍스트. 여러 줄이면 줄바꿈으로 연결."""
     if not level_stats:
         return ""
     last = level_stats[-1]
     stats = last.get("stats", [])
-    return " / ".join(stats) if stats else ""
+    if not stats:
+        return ""
+    text = "\n".join(stats)
+    # WFCD 데이터의 리터럴 \n(백슬래시+n) → 실제 개행문자로 변환
+    text = text.replace("\\n", "\n")
+    return text
 
 
 def _build_index(items: list[dict], index: dict) -> None:
