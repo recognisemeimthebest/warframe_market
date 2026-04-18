@@ -16,34 +16,38 @@ logger = logging.getLogger(__name__)
 _BASE = "https://overframe.gg/api/v1"
 
 # 주요 스탯 한글 레이블
+# overframe.gg API 실제 키: 워프레임 → AVATAR_*, 무기 → WEAPON_*
 _STAT_KO: dict[str, str] = {
+    # 무기
     "WEAPON_CRIT_CHANCE":       "치명타 확률",
-    "WEAPON_CRIT_MULTIPLIER":   "치명타 배수",
+    "WEAPON_CRIT_DAMAGE":       "치명타 배수",
     "WEAPON_FIRE_RATE":         "발사속도",
-    "WEAPON_STATUS_CHANCE":     "상태이상 확률",
-    "WEAPON_TOTAL_DAMAGE":      "총 데미지",
+    "WEAPON_PROC_CHANCE":       "상태이상 확률",
+    "WEAPON_DAMAGE_AMOUNT":     "기본 데미지",
     "WEAPON_RELOAD_TIME":       "장전 시간",
     "WEAPON_AMMO_MAX":          "최대 탄약",
-    "WEAPON_ZOOM":              "줌",
-    "WARFRAME_SHIELD_MAX":      "실드",
-    "WARFRAME_HEALTH_MAX":      "체력",
-    "WARFRAME_ARMOR":           "방어도",
-    "WARFRAME_ENERGY_MAX":      "에너지",
-    "WARFRAME_SPRINT_SPEED":    "이동속도",
-    "ABILITY_STRENGTH":         "어빌리티 위력",
-    "ABILITY_DURATION":         "어빌리티 지속시간",
-    "ABILITY_RANGE":            "어빌리티 범위",
-    "ABILITY_EFFICIENCY":       "어빌리티 효율",
+    "WEAPON_CLIP_MAX":          "탄창",
+    # 워프레임 (AVATAR_ 접두사)
+    "AVATAR_SHIELD_MAX":        "실드",
+    "AVATAR_HEALTH_MAX":        "체력",
+    "AVATAR_ARMOUR":            "방어도",
+    "AVATAR_POWER_MAX":         "에너지",
+    "AVATAR_SPRINT_SPEED":      "이동속도",
+    "AVATAR_ABILITY_STRENGTH":  "어빌리티 위력",
+    "AVATAR_ABILITY_DURATION":  "어빌리티 지속시간",
+    "AVATAR_ABILITY_RANGE":     "어빌리티 범위",
+    "AVATAR_ABILITY_EFFICIENCY": "어빌리티 효율",
 }
 
 _SHOW_STATS_WEAPON = [
-    "WEAPON_TOTAL_DAMAGE", "WEAPON_CRIT_CHANCE",
-    "WEAPON_CRIT_MULTIPLIER", "WEAPON_STATUS_CHANCE", "WEAPON_FIRE_RATE",
+    "WEAPON_DAMAGE_AMOUNT", "WEAPON_CRIT_CHANCE",
+    "WEAPON_CRIT_DAMAGE", "WEAPON_PROC_CHANCE", "WEAPON_FIRE_RATE",
+    "WEAPON_CLIP_MAX", "WEAPON_RELOAD_TIME",
 ]
 _SHOW_STATS_FRAME = [
-    "WARFRAME_HEALTH_MAX", "WARFRAME_SHIELD_MAX", "WARFRAME_ARMOR",
-    "WARFRAME_ENERGY_MAX", "ABILITY_STRENGTH", "ABILITY_DURATION",
-    "ABILITY_RANGE", "ABILITY_EFFICIENCY",
+    "AVATAR_HEALTH_MAX", "AVATAR_SHIELD_MAX", "AVATAR_ARMOUR",
+    "AVATAR_POWER_MAX", "AVATAR_ABILITY_STRENGTH", "AVATAR_ABILITY_DURATION",
+    "AVATAR_ABILITY_RANGE", "AVATAR_ABILITY_EFFICIENCY",
 ]
 
 # ── 전역 캐시 ──────────────────────────────────────────────────────────────
@@ -68,11 +72,19 @@ def _get_lock() -> asyncio.Lock:
 
 def _fmt_stat(key: str, val: float) -> str:
     """스탯 값 포매팅."""
-    if "CHANCE" in key or "SPEED" in key or "EFFICIENCY" in key \
+    # 배수/속도 계열: 소수점 표시
+    if key in ("WEAPON_CRIT_DAMAGE", "AVATAR_SPRINT_SPEED"):
+        return f"{val:.2f}x"
+    # 비율 계열: 백분율 (0~1 범위 → %)
+    if "CHANCE" in key or "EFFICIENCY" in key \
             or "STRENGTH" in key or "DURATION" in key or "RANGE" in key:
+        # API 값이 이미 퍼센트(예: 1.275 = 127.5%)인지, 0-1 범위인지 구분
+        # AVATAR_ABILITY_* 는 곱수(1.0 기준), WEAPON_*_CHANCE 는 0~1 소수
+        if "WEAPON" in key and "CHANCE" in key:
+            return f"{val * 100:.1f}%"
+        if "AVATAR_ABILITY" in key:
+            return f"{val * 100:.0f}%"
         return f"{val:.0f}%"
-    if key == "WEAPON_CRIT_MULTIPLIER":
-        return f"{val:.1f}x"
     return f"{val:.0f}"
 
 
@@ -183,9 +195,9 @@ async def get_build_detail(build_id: int) -> dict | None:
         )
         r.raise_for_status()
         raw = r.json()
-        # warframe/weapon 타입 추정 (warframe 스탯 존재 여부로 판단)
+        # warframe/weapon 타입 추정 (AVATAR_ 스탯 존재 여부로 판단)
         stats_raw = raw.get("stats") or {}
-        item_type = "warframe" if "WARFRAME_HEALTH_MAX" in stats_raw else "weapon"
+        item_type = "warframe" if "AVATAR_HEALTH_MAX" in stats_raw else "weapon"
         return _build_summary(raw, item_type)
     except Exception as e:
         logger.warning("overframe.gg 빌드 상세 실패 (%d): %s", build_id, e)
