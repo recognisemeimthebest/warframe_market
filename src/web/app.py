@@ -39,6 +39,7 @@ from src.market.watchlist import init_watchlist_db, run_watchlist_monitor
 from src.market.relic import _build_relic_cache
 from src.modding.share import init_modding_db
 from src.web.push import init_push_db, send_push_all
+from src.config import DATA_DIR
 from src.wiki.drops import load_drop_table, refresh_drop_table
 from src.market.item_meta import refresh_item_meta, ensure_loaded as ensure_meta_loaded
 
