@@ -94,19 +94,18 @@
 
         <nav id="tabs">
             <button class="tab active" data-tab="chat">시세 조회</button>
-            <button class="tab" data-tab="surges">급등 알림</button>
             <button class="tab" data-tab="world">월드</button>
             <button class="tab" data-tab="farming">파밍</button>
             <button class="tab" data-tab="modding">모딩 공유</button>
-            <button class="tab" data-tab="relic">렐릭</button>
             <button class="tab" data-tab="board">거래소</button>
-            <button class="tab" data-tab="report">주간 리포트</button>
         </nav>
 
         <!-- 시세 조회 탭 -->
         <main id="tab-chat" class="tab-content active">
             <div id="chat-mode-bar">
-                <button class="chat-mode active" data-mode="chat">채팅</button>
+                <button class="chat-mode active" data-mode="chat">검색</button>
+                <button class="chat-mode" data-mode="surges">급등알림</button>
+                <button class="chat-mode" data-mode="report">주간리포트</button>
                 <button class="chat-mode" data-mode="watchlist">시세 감시</button>
                 <button class="chat-mode" data-mode="auction">경매</button>
                 <button class="chat-mode" data-mode="skins">스킨</button>
@@ -137,17 +136,23 @@
                 </div>
                 <div id="skin-results"></div>
             </div>
-        </main>
-
-        <!-- 급등 알림 탭 -->
-        <main id="tab-surges" class="tab-content">
-            <div id="surge-filters">
-                <button class="surge-filter active" data-period="">전체</button>
-                <button class="surge-filter" data-period="1d">1일</button>
-                <button class="surge-filter" data-period="7d">1주</button>
-                <button class="surge-filter" data-period="30d">1달</button>
+            <!-- 급등 알림 (시세 조회 서브탭) -->
+            <div id="chat-surges" style="display:none;">
+                <div id="surge-filters">
+                    <button class="surge-filter active" data-period="">전체</button>
+                    <button class="surge-filter" data-period="1d">1일</button>
+                    <button class="surge-filter" data-period="7d">1주</button>
+                    <button class="surge-filter" data-period="30d">1달</button>
+                </div>
+                <div id="surge-list"></div>
             </div>
-            <div id="surge-list"></div>
+            <!-- 주간 리포트 (시세 조회 서브탭) -->
+            <div id="chat-report" style="display:none;">
+                <div id="report-header">
+                    <button class="report-refresh-btn" onclick="loadWeeklyReport()">새로고침</button>
+                </div>
+                <div id="report-content"><p class="report-loading">로딩 중...</p></div>
+            </div>
         </main>
 
         <!-- 월드 상태 탭 -->
@@ -167,20 +172,36 @@
 
         <!-- 파밍 정보 탭 -->
         <main id="tab-farming" class="tab-content">
-            <div id="farming-results"></div>
+            <div id="farming-sub-bar">
+                <button class="farming-sub active" data-fsub="farming">파밍</button>
+                <button class="farming-sub" data-fsub="relic">렐릭</button>
+            </div>
+            <div id="farming-sub-farming">
+                <div id="farming-results"></div>
+            </div>
+            <div id="farming-sub-relic" style="display:none;">
+                <div id="relic-search-area">
+                    <div id="relic-input-row">
+                        <div style="flex:1;position:relative;">
+                            <input type="text" id="relic-input" placeholder="렐릭 이름 검색... (예: Axi A6)" autocomplete="off" oninput="onRelicInput()">
+                            <div id="relic-suggest" style="display:none;"></div>
+                        </div>
+                        <select id="relic-refine">
+                            <option value="Intact">Intact</option>
+                            <option value="Exceptional">Exceptional</option>
+                            <option value="Flawless">Flawless</option>
+                            <option value="Radiant" selected>Radiant</option>
+                        </select>
+                        <button onclick="loadRelicValue()">조회</button>
+                    </div>
+                </div>
+                <div id="relic-results"></div>
+            </div>
         </main>
 
         <!-- 모딩 공유 탭 -->
         <main id="tab-modding" class="tab-content">
             <div id="modding-content"></div>
-        </main>
-
-        <!-- 주간 리포트 탭 -->
-        <main id="tab-report" class="tab-content">
-            <div id="report-header">
-                <button class="report-refresh-btn" onclick="loadWeeklyReport()">새로고침</button>
-            </div>
-            <div id="report-content"><p class="report-loading">로딩 중...</p></div>
         </main>
 
         <!-- 거래소 탭 -->
@@ -206,27 +227,6 @@
             </div>
             <div class="board-modal-body" id="board-modal-body"></div>
         </div>
-
-        <!-- 렐릭 기대 수익 탭 -->
-        <main id="tab-relic" class="tab-content">
-            <div id="relic-search-area">
-                <div id="relic-input-row">
-                    <div style="flex:1;position:relative;">
-                        <input type="text" id="relic-input" placeholder="렐릭 이름 검색... (예: Axi A6)" autocomplete="off" oninput="onRelicInput()">
-                        <div id="relic-suggest" style="display:none;"></div>
-                    </div>
-                    <select id="relic-refine">
-                        <option value="Intact">Intact</option>
-                        <option value="Exceptional">Exceptional</option>
-                        <option value="Flawless">Flawless</option>
-                        <option value="Radiant" selected>Radiant</option>
-                    </select>
-                    <button onclick="loadRelicValue()">조회</button>
-                </div>
-            </div>
-            <div id="relic-results"></div>
-        </main>
-
 
         <footer id="farming-footer" style="display:none;">
             <form id="farming-form" onsubmit="return false;">

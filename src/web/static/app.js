@@ -361,11 +361,12 @@ function _activateTab(tab, pushHistory = true) {
     farmingFooter.style.display = "none";
 
     if (tab === "chat") chatFooter.style.display = chatMode === "chat" ? "" : "none";
-    if (tab === "farming") { farmingFooter.style.display = ""; renderFarmingWelcome(); }
-    if (tab === "surges") fetchSurges();
+    if (tab === "farming") {
+        farmingFooter.style.display = farmingSubTab === "farming" ? "" : "none";
+        if (farmingSubTab === "farming") renderFarmingWelcome();
+    }
     if (tab === "world") fetchWorldState();
     if (tab === "modding") renderModdingTab();
-    if (tab === "report") loadWeeklyReport();
     if (tab === "board" && typeof loadBoardList === "function") loadBoardList();
 
     if (pushHistory) {
@@ -397,8 +398,9 @@ window.addEventListener("popstate", (e) => {
 })();
 
 
-// ── 시세 조회 모드 전환 (채팅 / 시세 감시 / 경매) ──
+// ── 시세 조회 모드 전환 ──
 let chatMode = "chat";
+const _chatPanels = ["messages", "chat-watchlist", "chat-auction", "chat-skins", "chat-arbitrage", "chat-surges", "chat-report"];
 document.querySelectorAll(".chat-mode").forEach((btn) => {
     btn.addEventListener("click", () => {
         const mode = btn.dataset.mode;
@@ -407,18 +409,43 @@ document.querySelectorAll(".chat-mode").forEach((btn) => {
         document.querySelectorAll(".chat-mode").forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
 
-        document.getElementById("messages").style.display = mode === "chat" ? "" : "none";
-        document.getElementById("chat-watchlist").style.display = mode === "watchlist" ? "" : "none";
-        document.getElementById("chat-auction").style.display = mode === "auction" ? "" : "none";
-        document.getElementById("chat-skins").style.display = mode === "skins" ? "" : "none";
-        document.getElementById("chat-arbitrage").style.display = mode === "arbitrage" ? "" : "none";
-        chatFooter.style.display = mode === "chat" ? "" : "none";
+        _chatPanels.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = "none";
+        });
+        if (mode === "chat")      document.getElementById("messages").style.display = "";
+        if (mode === "watchlist") document.getElementById("chat-watchlist").style.display = "";
+        if (mode === "auction")   document.getElementById("chat-auction").style.display = "";
+        if (mode === "skins")     document.getElementById("chat-skins").style.display = "";
+        if (mode === "arbitrage") document.getElementById("chat-arbitrage").style.display = "";
+        if (mode === "surges")    document.getElementById("chat-surges").style.display = "";
+        if (mode === "report")    document.getElementById("chat-report").style.display = "";
 
+        chatFooter.style.display = mode === "chat" ? "" : "none";
         chatMode = mode;
+
         if (mode === "watchlist") renderWatchlist();
-        if (mode === "auction") renderAuctionView();
-        if (mode === "skins") renderSkinsTab();
+        if (mode === "auction")   renderAuctionView();
+        if (mode === "skins")     renderSkinsTab();
         if (mode === "arbitrage") renderArbitrageTab();
+        if (mode === "surges")    fetchSurges();
+        if (mode === "report")    loadWeeklyReport();
+    });
+});
+
+// ── 파밍 서브탭 전환 (파밍 / 렐릭) ──
+let farmingSubTab = "farming";
+document.querySelectorAll(".farming-sub").forEach((btn) => {
+    btn.addEventListener("click", () => {
+        const sub = btn.dataset.fsub;
+        if (sub === farmingSubTab) return;
+        document.querySelectorAll(".farming-sub").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        document.getElementById("farming-sub-farming").style.display = sub === "farming" ? "" : "none";
+        document.getElementById("farming-sub-relic").style.display   = sub === "relic"   ? "" : "none";
+        farmingFooter.style.display = sub === "farming" ? "" : "none";
+        farmingSubTab = sub;
+        if (sub === "farming") renderFarmingWelcome();
     });
 });
 

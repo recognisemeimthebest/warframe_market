@@ -327,6 +327,10 @@ footer { padding: 12px 16px; background: var(--surface); border-top: 1px solid v
 .farming-suggest { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 12px; }
 .farming-suggest-chip { padding: 6px 12px; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; color: var(--text); font-size: 12px; cursor: pointer; }
 .farming-suggest-chip:hover { border-color: var(--primary); color: var(--primary); }
+/* 파밍 서브탭 */
+#farming-sub-bar { display: flex; gap: 6px; padding: 8px 12px 0; }
+.farming-sub { padding: 5px 14px; border-radius: 16px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); font-size: 13px; cursor: pointer; }
+.farming-sub.active { background: var(--primary); color: #000; border-color: var(--primary); font-weight: 700; }
 .farming-card { padding: 14px; margin-bottom: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
 .farming-card-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
 .farming-card-title a { color: var(--primary); text-decoration: none; }
