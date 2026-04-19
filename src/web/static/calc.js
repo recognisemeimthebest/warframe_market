@@ -130,10 +130,10 @@ function renderCalc() {
     _updateWfStats();
 }
 
-// 슬롯 8 = 오라, 슬롯 9 = 엑실러스
+// 슬롯 0 = 오라, 슬롯 1 = 엑실러스, 슬롯 2-9 = 일반
 const _SLOT_META = {
-    8: { cls: 'calc-slot-aura',   tag: '오라',    tagCls: 'aura-tag',   labelCls: 'aura-label'   },
-    9: { cls: 'calc-slot-exilus', tag: '엑실러스', tagCls: 'exilus-tag', labelCls: 'exilus-label' },
+    0: { cls: 'calc-slot-aura',   tag: '오라',    tagCls: 'aura-tag',   labelCls: 'aura-label'   },
+    1: { cls: 'calc-slot-exilus', tag: '엑실러스', tagCls: 'exilus-tag', labelCls: 'exilus-label' },
 };
 
 // ── 모드 슬롯 그리드 ──
@@ -147,7 +147,7 @@ function renderModGrid() {
         const mod  = calcState.mods[i];
         const meta = _SLOT_META[i];
         const extraCls  = meta ? ` ${meta.cls}` : '';
-        const slotLabel = meta ? meta.tag : `모드 ${i + 1}`;
+        const slotLabel = meta ? meta.tag : `모드 ${i - 1}`;
 
         if (mod) {
             totalCost += (mod.rank || 0);
@@ -301,10 +301,10 @@ function openModSearch(idx) {
     calcState.activeSlotType = 'mod';
     calcState.activeSlotIdx = idx;
     let apiUrl, placeholder;
-    if (idx === 8) {
+    if (idx === 0) {
         apiUrl      = '/api/calc/mods?compat=AURA';
         placeholder = '오라 모드 이름...';
-    } else if (idx === 9) {
+    } else if (idx === 1) {
         apiUrl      = '/api/calc/mods?compat=EXILUS';
         placeholder = '엑실러스 모드 이름...';
     } else {
