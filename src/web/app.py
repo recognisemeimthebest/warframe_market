@@ -54,6 +54,7 @@ from src.web.routes.modding import router as modding_router
 from src.web.routes.admin import router as admin_router
 from src.web.routes.push import router as push_router
 from src.web.routes.board import router as board_router
+from src.web.routes.calc import router as calc_router
 
 logger = logging.getLogger(__name__)
 
@@ -148,6 +149,7 @@ app.include_router(modding_router)
 app.include_router(admin_router)
 app.include_router(push_router)
 app.include_router(board_router)
+app.include_router(calc_router)
 
 
 # ── 페이지 서빙 ──

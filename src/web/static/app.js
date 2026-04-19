@@ -2156,8 +2156,10 @@ document.querySelectorAll(".modding-sub").forEach((btn) => {
         btn.classList.add("active");
         document.getElementById("modding-sub-share").style.display = sub === "share" ? "" : "none";
         document.getElementById("modding-sub-ref").style.display   = sub === "ref"   ? "" : "none";
+        document.getElementById("modding-sub-calc").style.display  = sub === "calc"  ? "" : "none";
         moddingSubTab = sub;
         if (sub === "share") renderModdingTab();
+        if (sub === "calc") initCalc();
     });
 });
 

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>워프봇</title>
-    <link rel="stylesheet" href="/static/style.css?v=20260419e">
+    <link rel="stylesheet" href="/static/style.css?v=20260419f">
     <link rel="manifest" href="/static/manifest.json">
     <meta name="theme-color" content="#4db8ff">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -204,6 +204,7 @@
             <div id="modding-sub-bar">
                 <button class="modding-sub active" data-msub="share">채팅방 공유</button>
                 <button class="modding-sub" data-msub="ref">참고 빌드</button>
+                <button class="modding-sub" data-msub="calc">가상 모딩</button>
             </div>
             <div id="modding-sub-share">
                 <div id="modding-content"></div>
@@ -216,6 +217,9 @@
                     </div>
                 </div>
                 <div id="ref-build-results"></div>
+            </div>
+            <div id="modding-sub-calc" style="display:none;">
+                <div id="calc-container"></div>
             </div>
         </main>
 
@@ -259,8 +263,9 @@
 
     </div>
 
-    <script src="/static/app.js?v=20260419e"></script>
-    <script src="/static/board.js?v=20260419e"></script>
+    <script src="/static/app.js?v=20260419f"></script>
+    <script src="/static/board.js?v=20260419f"></script>
+    <script src="/static/calc.js?v=20260419f"></script>
     <script>
         if ("serviceWorker" in navigator) {
             navigator.serviceWorker.register("/static/sw.js").catch(() => {});
