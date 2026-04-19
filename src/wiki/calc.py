@@ -245,25 +245,49 @@ def _parse_mod_effects(mod: dict, rank: int | None = None) -> dict[str, float]:
 
 # ── 검색 API ────────────────────────────────────────────────────────────────
 
+# 워프레임 한글명 하드코딩 사전 (warframe.market에 기본형이 없는 워프레임 포함)
+_WF_KO_NAMES: dict[str, str] = {
+    "Ash":       "애쉬",       "Atlas":     "아틀라스",  "Banshee":   "밴시",
+    "Baruuk":    "바루크",     "Caliban":   "칼리반",    "Chroma":    "크로마",
+    "Citrine":   "시트린",     "Cyte-09":   "사이트-09", "Dagath":    "다가스",
+    "Dante":     "단테",       "Ember":     "엠버",      "Equinox":   "이퀴녹스",
+    "Excalibur": "엑스칼리버", "Follie":    "폴리",      "Frost":     "프로스트",
+    "Gara":      "가라",       "Garuda":    "가루다",    "Gauss":     "가우스",
+    "Grendel":   "그렌델",     "Gyre":      "자이어",    "Harrow":    "해로우",
+    "Hildryn":   "힐드린",     "Hydroid":   "하이드로이드", "Inaros":  "이나로스",
+    "Ivara":     "이바라",     "Jade":      "제이드",    "Khora":     "코라",
+    "Koumei":    "코우메이",   "Kullervo":  "쿨레르보",  "Lavos":     "라보스",
+    "Limbo":     "림보",       "Loki":      "로키",      "Mag":       "마그",
+    "Mesa":      "메사",       "Mirage":    "미라쥬",    "Nekros":    "네크로스",
+    "Nezha":     "나자",       "Nidus":     "나이더스",  "Nokko":     "노코",
+    "Nova":      "노바",       "Nyx":       "닉스",      "Oberon":    "오베론",
+    "Octavia":   "옥타비아",   "Oraxia":    "오락시아",  "Protea":    "프로테아",
+    "Qorvex":    "코르벡스",   "Revenant":  "레버넌트",  "Rhino":     "라이노",
+    "Saryn":     "사린",       "Sevagoth":  "세바고스",  "Styanax":   "스타이낙스",
+    "Temple":    "템플",       "Titania":   "티타니아",  "Trinity":   "트리니티",
+    "Uriel":     "우리엘",     "Valkyr":    "발키르",    "Vauban":    "보반",
+    "Volt":      "볼트",       "Voruna":    "보루나",    "Wisp":      "위스프",
+    "Wukong":    "오공",       "Xaku":      "자쿠",      "Yareli":    "야렐리",
+    "Zephyr":    "제피르",
+}
+
+
 def _get_ko_warframe_name(base_name: str, has_prime: bool) -> str:
     """워프레임 영문 기본명을 한글명으로 조회한다.
 
-    warframe.market에는 기본 워프레임이 없고 프라임 세트만 있으므로
-    "{name} Prime Set" → 한글명 → " 프라임 세트" 제거 순으로 시도한다.
+    1순위: 하드코딩 사전 (빠르고 신뢰성 높음)
+    2순위: warframe.market 프라임 세트 경유 역방향 매핑
     """
+    # 1. 하드코딩 사전
+    if base_name in _WF_KO_NAMES:
+        return _WF_KO_NAMES[base_name]
+
+    # 2. items.py 역방향 매핑 (프라임 세트 경유)
     try:
         from src.market.items import _en_name_to_slug, _slug_to_ko, _load_items_cache  # noqa: PLC0415
         if not _en_name_to_slug:
             _load_items_cache()
 
-        # 직접 기본명 조회 (거래 가능한 일부 워프레임)
-        slug = _en_name_to_slug.get(base_name.lower(), "")
-        if slug:
-            ko = _slug_to_ko.get(slug, "")
-            if ko:
-                return ko
-
-        # 프라임 세트를 통한 조회 → 접미사 제거
         if has_prime:
             slug = _en_name_to_slug.get((base_name + " prime set").lower(), "")
             if slug:
@@ -301,6 +325,9 @@ async def get_warframe_grouped_list() -> list[dict]:
 
     for wf in _warframes_cache:
         name: str = wf.get("name", "")
+        # 네크라멕 (MechSuits) 및 카테고리 없는 항목(헬민스 등) 제외 → 일반 워프레임만 포함
+        if wf.get("productCategory") != "Suits":
+            continue
         # 프라임·엄브라는 베이스 항목에서 처리
         if wf.get("isPrime", False) or name.endswith(" Umbra"):
             continue

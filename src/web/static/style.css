@@ -840,7 +840,7 @@ main::-webkit-scrollbar-thumb, #messages::-webkit-scrollbar-thumb, #surge-list::
 .calc-wf-stats span { font-size:11px; color:var(--text-muted); background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:2px 8px; }
 
 /* 모드 슬롯 그리드 */
-.calc-mod-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+.calc-mod-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; }
 .calc-slot { position:relative; border:1px dashed var(--border); border-radius:10px; padding:8px 6px; text-align:center; cursor:pointer; min-height:54px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; transition:background .15s,border-color .15s; }
 .calc-slot-empty:hover { background:var(--bg); border-color:var(--primary,#4db8ff); }
 .calc-slot-plus { font-size:18px; color:var(--text-muted); line-height:1; }
@@ -889,3 +889,38 @@ main::-webkit-scrollbar-thumb, #messages::-webkit-scrollbar-thumb, #surge-list::
 .calc-stat-final { font-weight:800; font-size:13px; color:var(--text); }
 .calc-stat-up    { color:#4caf7d; }
 .calc-stat-down  { color:#e57373; }
+
+/* 내 빌드 저장/불러오기 */
+.calc-builds-section { margin-top:10px; }
+.calc-save-row { display:flex; gap:6px; margin-bottom:8px; }
+.calc-build-name-input { flex:1; padding:7px 10px; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:12px; outline:none; min-width:0; }
+.calc-build-name-input:focus { border-color:var(--primary,#4db8ff); }
+.calc-save-btn { padding:7px 12px; background:var(--primary,#4db8ff); border:none; border-radius:8px; color:#0a1628; font-size:12px; font-weight:700; cursor:pointer; white-space:nowrap; flex-shrink:0; }
+.calc-save-btn:hover { opacity:.85; }
+.calc-builds-empty { text-align:center; color:var(--text-muted); font-size:11px; padding:10px 0; }
+.calc-build-item { display:flex; align-items:center; gap:6px; padding:7px 8px; background:var(--bg); border:1px solid var(--border); border-radius:8px; margin-bottom:5px; }
+.calc-build-item:hover { border-color:var(--primary,#4db8ff); }
+.calc-build-item-info { flex:1; cursor:pointer; min-width:0; }
+.calc-build-item-name { font-size:12px; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.calc-build-item-meta { font-size:10px; color:var(--text-muted); margin-top:1px; }
+.calc-build-delete-btn { background:none; border:none; color:var(--text-muted); font-size:16px; cursor:pointer; padding:0 2px; flex-shrink:0; line-height:1; }
+.calc-build-delete-btn:hover { color:var(--red,#ff6b6b); }
+
+/* 채팅방 공유 버튼 */
+.calc-share-btn { width:100%; margin-top:10px; padding:10px; background:var(--surface); border:1px solid var(--border); border-radius:10px; color:var(--primary,#4db8ff); font-size:13px; font-weight:600; cursor:pointer; display:block; }
+.calc-share-btn:hover { border-color:var(--primary,#4db8ff); background:rgba(77,184,255,.08); }
+
+/* 공유 팝업 모달 */
+.calc-share-popup { background:var(--surface); border:1px solid var(--border); border-radius:16px; width:92%; max-width:420px; max-height:85vh; overflow-y:auto; }
+.calc-share-popup-header { display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border-bottom:1px solid var(--border); font-size:15px; font-weight:700; }
+.calc-share-popup-header button { background:none; border:none; font-size:22px; color:var(--text-muted); cursor:pointer; line-height:1; }
+.calc-share-popup-body { padding:16px; display:flex; flex-direction:column; gap:12px; }
+.calc-share-field { display:flex; flex-direction:column; gap:4px; }
+.calc-share-field label { font-size:11px; color:var(--text-muted); font-weight:700; text-transform:uppercase; letter-spacing:.4px; }
+.calc-share-field input, .calc-share-field textarea { padding:8px 10px; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:12px; font-family:inherit; outline:none; resize:vertical; }
+.calc-share-field input:focus, .calc-share-field textarea:focus { border-color:var(--primary,#4db8ff); }
+.calc-share-btns { display:flex; gap:8px; justify-content:flex-end; margin-top:4px; }
+.calc-share-cancel { padding:8px 18px; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:var(--text-muted); font-size:13px; cursor:pointer; }
+.calc-share-submit { padding:8px 18px; background:var(--primary,#4db8ff); border:none; border-radius:8px; color:#0a1628; font-size:13px; font-weight:700; cursor:pointer; }
+.calc-share-submit:hover { opacity:.85; }
+.calc-share-submit:disabled { opacity:.5; cursor:not-allowed; }

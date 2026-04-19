@@ -60,6 +60,10 @@ function renderCalc() {
     const container = document.getElementById('calc-container');
     if (!container) return;
 
+    const selName   = calcState.warframeItem?.name || '';
+    const hasPrime  = calcState.warframeItem?.has_prime || false;
+    const isPrime   = calcState.isPrime;
+
     container.innerHTML = `
 <div class="calc-layout">
     <div class="calc-left">
@@ -69,11 +73,11 @@ function renderCalc() {
                 <select id="calc-wf-select" class="calc-wf-select" onchange="onCalcWfSelect(this.value)">
                     <option value="">-- 워프레임 선택 --</option>
                     ${calcState.warframeList.map(wf =>
-                        `<option value="${escapeHtml(wf.name)}">${escapeHtml(wf.ko_name || wf.name)}</option>`
+                        `<option value="${escapeHtml(wf.name)}"${wf.name === selName ? ' selected' : ''}>${escapeHtml(wf.ko_name || wf.name)}</option>`
                     ).join('')}
                 </select>
-                <label class="calc-prime-label" id="calc-prime-label">
-                    <input type="checkbox" id="calc-prime-chk" onchange="onCalcPrimeChange(this.checked)" disabled>
+                <label class="calc-prime-label${hasPrime ? '' : ' calc-prime-disabled'}" id="calc-prime-label">
+                    <input type="checkbox" id="calc-prime-chk" onchange="onCalcPrimeChange(this.checked)"${hasPrime ? '' : ' disabled'}${isPrime ? ' checked' : ''}>
                     <span>프라임</span>
                 </label>
             </div>
@@ -103,12 +107,27 @@ function renderCalc() {
                 <div class="calc-stats-empty">워프레임을 선택하면<br>스탯이 표시됩니다</div>
             </div>
         </div>
+
+        <div class="calc-section calc-builds-section">
+            <div class="calc-section-title">내 빌드</div>
+            <div class="calc-save-row">
+                <input type="text" id="calc-build-name" class="calc-build-name-input"
+                    placeholder="빌드 이름..." maxlength="30"
+                    onkeydown="if(event.key==='Enter')saveCalcBuild()">
+                <button class="calc-save-btn" onclick="saveCalcBuild()">저장</button>
+            </div>
+            <div id="calc-builds-list"></div>
+        </div>
+
+        <button class="calc-share-btn" onclick="openCalcShareModal()">💬 채팅방 공유</button>
     </div>
 </div>`;
 
     renderModGrid();
     renderArcaneRow();
     renderShardRow();
+    renderCalcBuildsPanel();
+    _updateWfStats();
 }
 
 // ── 모드 슬롯 그리드 ──
@@ -515,4 +534,230 @@ function renderStatRow(label, baseVal, finalVal, unit) {
             <span class="calc-stat-final ${cls}">${fv}${unit}</span>
         </div>
     </div>`;
+}
+
+// ══════════════════════════════════════════════════════════
+// ── 빌드 저장 / 불러오기 (localStorage) ──────────────────
+// ══════════════════════════════════════════════════════════
+
+const CALC_BUILDS_KEY = 'wf_calc_builds';
+
+function _getCalcBuilds() {
+    try { return JSON.parse(localStorage.getItem(CALC_BUILDS_KEY) || '[]'); }
+    catch { return []; }
+}
+
+function saveCalcBuild() {
+    if (!calcState.warframe) { alert('워프레임을 먼저 선택해주세요.'); return; }
+    const nameInput = document.getElementById('calc-build-name');
+    const buildName = (nameInput?.value || '').trim();
+    if (!buildName) { alert('빌드 이름을 입력해주세요.'); return; }
+
+    const builds = _getCalcBuilds();
+    const existing = builds.findIndex(b => b.name === buildName);
+
+    if (existing >= 0 && !confirm(`"${buildName}" 빌드를 덮어쓸까요?`)) return;
+
+    const newBuild = {
+        id:            existing >= 0 ? builds[existing].id : Date.now(),
+        name:          buildName,
+        warframeName:  calcState.warframeItem?.name || '',
+        isPrime:       calcState.isPrime,
+        mods:          calcState.mods.map(m => m ? { ...m } : null),
+        shards:        calcState.shards.map(s => s ? { ...s } : null),
+        arcanes:       calcState.arcanes.map(a => a ? { ...a } : null),
+        savedAt:       new Date().toLocaleString('ko-KR'),
+    };
+
+    if (existing >= 0) builds[existing] = newBuild;
+    else builds.unshift(newBuild);
+
+    localStorage.setItem(CALC_BUILDS_KEY, JSON.stringify(builds.slice(0, 20)));
+    if (nameInput) nameInput.value = '';
+    renderCalcBuildsPanel();
+}
+
+function loadCalcBuild(buildId) {
+    const build = _getCalcBuilds().find(b => b.id === buildId);
+    if (!build) return;
+
+    const wfItem = calcState.warframeList.find(w => w.name === build.warframeName);
+    calcState.warframeItem = wfItem || null;
+    calcState.isPrime = !!(build.isPrime && wfItem?.has_prime);
+
+    if (wfItem) {
+        const stats = calcState.isPrime ? wfItem.prime : wfItem.base;
+        const displayName = calcState.isPrime ? wfItem.name + ' Prime' : wfItem.name;
+        calcState.warframe = stats ? { name: displayName, ...stats } : null;
+    } else {
+        calcState.warframe = null;
+    }
+
+    const pad = (arr, len) => {
+        const r = (arr || []).map(x => x ? { ...x } : null);
+        while (r.length < len) r.push(null);
+        return r.slice(0, len);
+    };
+    calcState.mods    = pad(build.mods,    10);
+    calcState.shards  = pad(build.shards,   5);
+    calcState.arcanes = pad(build.arcanes,  2);
+
+    renderCalc();          // renderCalc이 드롭다운·프라임·빌드목록·스탯까지 복원
+    computeAndRender();
+}
+
+function deleteCalcBuild(buildId) {
+    if (!confirm('이 빌드를 삭제하시겠습니까?')) return;
+    const builds = _getCalcBuilds().filter(b => b.id !== buildId);
+    localStorage.setItem(CALC_BUILDS_KEY, JSON.stringify(builds));
+    renderCalcBuildsPanel();
+}
+
+function renderCalcBuildsPanel() {
+    const listEl = document.getElementById('calc-builds-list');
+    if (!listEl) return;
+
+    const builds = _getCalcBuilds();
+    if (!builds.length) {
+        listEl.innerHTML = '<div class="calc-builds-empty">저장된 빌드 없음</div>';
+        return;
+    }
+
+    listEl.innerHTML = builds.map(b => {
+        const wfKo = calcState.warframeList.find(w => w.name === b.warframeName)?.ko_name || b.warframeName || '';
+        const label = b.isPrime ? wfKo + ' 프라임' : wfKo;
+        return `<div class="calc-build-item">
+            <div class="calc-build-item-info" onclick="loadCalcBuild(${b.id})">
+                <div class="calc-build-item-name">${escapeHtml(b.name)}</div>
+                <div class="calc-build-item-meta">${escapeHtml(label)} · ${escapeHtml(b.savedAt || '')}</div>
+            </div>
+            <button class="calc-build-delete-btn" onclick="event.stopPropagation();deleteCalcBuild(${b.id})" title="삭제">×</button>
+        </div>`;
+    }).join('');
+}
+
+// ══════════════════════════════════════════════════════════
+// ── 채팅방 공유 ───────────────────────────────────────────
+// ══════════════════════════════════════════════════════════
+
+function _buildMemoText() {
+    const item   = calcState.warframeItem;
+    const wfKo   = item ? (item.ko_name || item.name) : '?';
+    const header = calcState.isPrime ? `${wfKo} 프라임` : wfKo;
+    const lines  = [`◆ ${header} 빌드`, ''];
+
+    const filledMods = calcState.mods.filter(Boolean);
+    if (filledMods.length) {
+        lines.push('[모드]');
+        filledMods.forEach(m => {
+            const fx = formatEffects(m.effects);
+            lines.push(`• ${m.name} R${m.rank}${fx ? '  (' + fx + ')' : ''}`);
+        });
+        lines.push('');
+    }
+
+    const filledShards = calcState.shards.filter(Boolean);
+    if (filledShards.length) {
+        lines.push('[아케인 샤드]');
+        filledShards.forEach(s => {
+            const def       = calcState.shardsData[s.color];
+            const colorName = def?.name || s.color;
+            const opt       = def?.options?.find(o => o.key === s.option_key);
+            const optLabel  = opt?.label || s.option_key;
+            const tauStr    = s.tauforged ? ' (타우)' : '';
+            lines.push(`• ${colorName}: ${optLabel}${tauStr}`);
+        });
+        lines.push('');
+    }
+
+    const filledArcanes = calcState.arcanes.filter(Boolean);
+    if (filledArcanes.length) {
+        lines.push('[아케인]');
+        filledArcanes.forEach(a => lines.push(`• ${a.name}`));
+    }
+
+    return lines.join('\n').trim();
+}
+
+function openCalcShareModal() {
+    if (!calcState.warframe) { alert('워프레임을 먼저 선택해주세요.'); return; }
+
+    const item       = calcState.warframeItem;
+    const wfKo       = item ? (item.ko_name || item.name) : (calcState.warframe?.name || '');
+    const itemName   = calcState.isPrime ? wfKo + ' 프라임' : wfKo;
+    const savedAuthor = localStorage.getItem('tradeName') || '';
+    const memo       = _buildMemoText();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'calc-share-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:3000;display:flex;align-items:center;justify-content:center;padding:12px;';
+    overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+
+    overlay.innerHTML = `<div class="calc-share-popup">
+        <div class="calc-share-popup-header">
+            <span>💬 채팅방 공유</span>
+            <button onclick="document.getElementById('calc-share-overlay').remove()">×</button>
+        </div>
+        <div class="calc-share-popup-body">
+            <div class="calc-share-field">
+                <label>아이템</label>
+                <input type="text" id="csp-item" value="${escapeHtml(itemName)}" maxlength="50" placeholder="워프레임 이름">
+            </div>
+            <div class="calc-share-field">
+                <label>작성자</label>
+                <input type="text" id="csp-author" value="${escapeHtml(savedAuthor)}" maxlength="20" placeholder="닉네임">
+            </div>
+            <div class="calc-share-field">
+                <label>빌드 설명 (자동 입력 · 수정 가능)</label>
+                <textarea id="csp-memo" rows="7" maxlength="1000">${escapeHtml(memo)}</textarea>
+            </div>
+            <div class="calc-share-btns">
+                <button class="calc-share-cancel" onclick="document.getElementById('calc-share-overlay').remove()">취소</button>
+                <button class="calc-share-submit" id="csp-submit-btn" onclick="submitCalcShare()">공유하기</button>
+            </div>
+        </div>
+    </div>`;
+
+    document.body.appendChild(overlay);
+    setTimeout(() => overlay.querySelector('#csp-author')?.focus(), 50);
+}
+
+async function submitCalcShare() {
+    const overlay   = document.getElementById('calc-share-overlay');
+    const itemName  = (overlay?.querySelector('#csp-item')?.value   || '').trim();
+    const author    = (overlay?.querySelector('#csp-author')?.value || '').trim();
+    const memo      = (overlay?.querySelector('#csp-memo')?.value   || '').trim();
+
+    if (!author)   { alert('작성자 이름을 입력해주세요.'); return; }
+    if (!itemName) { alert('아이템 이름을 입력해주세요.'); return; }
+
+    const btn = overlay?.querySelector('#csp-submit-btn');
+    if (btn) { btn.disabled = true; btn.textContent = '공유 중...'; }
+
+    try {
+        const res = await fetch('/api/modding/shares', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({
+                category:        'warframe',
+                item_name:       itemName,
+                author:          author,
+                memo:            memo,
+                sub_type:        '',
+                image_filenames: [],
+            }),
+        });
+        const d = await res.json();
+        if (d.ok) {
+            localStorage.setItem('tradeName', author);
+            overlay?.remove();
+            alert('채팅방에 공유됐습니다!\n모딩 공유 탭 → 워프레임에서 확인할 수 있어요.');
+        } else {
+            alert('공유 실패: ' + (d.msg || '오류'));
+            if (btn) { btn.disabled = false; btn.textContent = '공유하기'; }
+        }
+    } catch (e) {
+        alert('네트워크 오류가 발생했습니다.');
+        if (btn) { btn.disabled = false; btn.textContent = '공유하기'; }
+    }
 }
