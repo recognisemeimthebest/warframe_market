@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from src.wiki.calc import (
     ARCHON_SHARDS,
     calc_warframe_stats,
+    get_warframe_grouped_list,
     search_arcanes,
     search_mods,
     search_warframes,
@@ -51,13 +52,17 @@ class ComputeRequest(BaseModel):
 async def api_search_warframes(q: str = Query(default="", alias="q")):
     """워프레임 이름 검색.
 
+    쿼리 없음 → 드롭다운용 그룹화 목록 (한글명 + 프라임 여부 포함)
+    쿼리 있음 → 일반 검색 결과 (상위 10개)
+
     ``GET /api/calc/warframes?q=라이노``
     """
     try:
-        # q 없으면 드롭다운용 전체 목록 (200개), 검색어 있으면 상위 10개
-        limit = 200 if not q.strip() else 10
-        items = await search_warframes(q.strip(), limit=limit)
-        return {"ok": True, "items": items}
+        if not q.strip():
+            items = await get_warframe_grouped_list()
+            return {"ok": True, "items": items, "grouped": True}
+        items = await search_warframes(q.strip(), limit=10)
+        return {"ok": True, "items": items, "grouped": False}
     except Exception as exc:
         logger.error("워프레임 검색 오류: %s", exc, exc_info=True)
         return {"ok": False, "msg": f"검색 중 오류가 발생했습니다: {exc}"}

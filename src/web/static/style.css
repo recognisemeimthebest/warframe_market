@@ -829,8 +829,13 @@ main::-webkit-scrollbar-thumb, #messages::-webkit-scrollbar-thumb, #surge-list::
 .calc-capacity-badge { background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:1px 8px; font-size:10px; font-weight:600; color:var(--text-muted); }
 
 /* 워프레임 드롭다운 */
-.calc-wf-select { width:100%; padding:8px 10px; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:13px; cursor:pointer; }
+.calc-wf-row { display:flex; align-items:center; gap:8px; }
+.calc-wf-select { flex:1; padding:8px 10px; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:13px; cursor:pointer; min-width:0; }
 .calc-wf-select:focus { outline:none; border-color:var(--primary,#4db8ff); }
+.calc-prime-label { display:flex; align-items:center; gap:4px; white-space:nowrap; font-size:13px; font-weight:600; color:#c8a84b; cursor:pointer; user-select:none; flex-shrink:0; }
+.calc-prime-label input[type=checkbox] { accent-color:#c8a84b; width:15px; height:15px; cursor:pointer; flex-shrink:0; }
+.calc-prime-label.calc-prime-disabled { color:var(--text-muted); opacity:.45; cursor:default; }
+.calc-prime-label.calc-prime-disabled input[type=checkbox] { cursor:not-allowed; }
 .calc-wf-stats { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
 .calc-wf-stats span { font-size:11px; color:var(--text-muted); background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:2px 8px; }
 

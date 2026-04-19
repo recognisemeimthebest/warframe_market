@@ -1,8 +1,10 @@
 // ── 가상 모딩 계산기 ──
 
 const calcState = {
-    warframe: null,         // {name, health, shield, armor, power, sprintSpeed}
-    warframeList: [],       // 전체 워프레임 목록 (드롭다운용)
+    warframe: null,         // {name, health, shield, armor, power, sprintSpeed} — 현재 선택된 스탯
+    warframeItem: null,     // 그룹 항목 {name, ko_name, has_prime, base, prime}
+    isPrime: false,         // 프라임 체크박스 상태
+    warframeList: [],       // 전체 워프레임 목록 (드롭다운용, 그룹화)
     mods: Array(10).fill(null),   // {name, effects, rank, fusionLimit} | null
     shards: Array(5).fill(null),  // {color, option_key, tauforged} | null
     arcanes: Array(2).fill(null), // {name, effects, effectText} | null
@@ -63,12 +65,18 @@ function renderCalc() {
     <div class="calc-left">
         <div class="calc-section">
             <div class="calc-section-title">워프레임</div>
-            <select id="calc-wf-select" class="calc-wf-select" onchange="onCalcWfSelect(this.value)">
-                <option value="">-- 워프레임 선택 --</option>
-                ${calcState.warframeList.map(wf =>
-                    `<option value="${escapeHtml(wf.name)}">${escapeHtml(wf.name)}</option>`
-                ).join('')}
-            </select>
+            <div class="calc-wf-row">
+                <select id="calc-wf-select" class="calc-wf-select" onchange="onCalcWfSelect(this.value)">
+                    <option value="">-- 워프레임 선택 --</option>
+                    ${calcState.warframeList.map(wf =>
+                        `<option value="${escapeHtml(wf.name)}">${escapeHtml(wf.ko_name || wf.name)}</option>`
+                    ).join('')}
+                </select>
+                <label class="calc-prime-label" id="calc-prime-label">
+                    <input type="checkbox" id="calc-prime-chk" onchange="onCalcPrimeChange(this.checked)" disabled>
+                    <span>프라임</span>
+                </label>
+            </div>
             <div id="calc-wf-stats" class="calc-wf-stats"></div>
         </div>
 
@@ -199,18 +207,59 @@ function renderShardRow() {
 
 // ── 워프레임 드롭다운 선택 ──
 function onCalcWfSelect(name) {
-    const wf = calcState.warframeList.find(w => w.name === name);
-    calcState.warframe = wf || null;
-    // 기본 스탯 미리보기 표시
+    const item = calcState.warframeList.find(w => w.name === name);
+    calcState.warframeItem = item || null;
+    calcState.isPrime = false;
+
+    // 프라임 체크박스 상태 갱신
+    const primeChk = document.getElementById('calc-prime-chk');
+    const primeLabel = document.getElementById('calc-prime-label');
+    if (primeChk) {
+        primeChk.checked = false;
+        primeChk.disabled = !item || !item.has_prime;
+    }
+    if (primeLabel) {
+        primeLabel.classList.toggle('calc-prime-disabled', !item || !item.has_prime);
+    }
+
+    // 현재 스탯 = 베이스 스탯
+    if (item) {
+        calcState.warframe = { name: item.name, ...item.base };
+    } else {
+        calcState.warframe = null;
+    }
+
+    _updateWfStats();
+    computeAndRender();
+}
+
+// ── 프라임 체크박스 변경 ──
+function onCalcPrimeChange(checked) {
+    calcState.isPrime = checked;
+    const item = calcState.warframeItem;
+    if (!item) return;
+
+    if (checked && item.prime) {
+        calcState.warframe = { name: item.name + ' Prime', ...item.prime };
+    } else {
+        calcState.warframe = { name: item.name, ...item.base };
+    }
+    _updateWfStats();
+    computeAndRender();
+}
+
+// ── 워프레임 스탯 미리보기 ──
+function _updateWfStats() {
     const statsEl = document.getElementById('calc-wf-stats');
-    if (statsEl && wf) {
+    if (!statsEl) return;
+    const wf = calcState.warframe;
+    if (wf) {
         statsEl.innerHTML =
             `<span>체력 ${wf.health}</span><span>실드 ${wf.shield}</span>` +
             `<span>방어도 ${wf.armor}</span><span>에너지 ${wf.power}</span>`;
-    } else if (statsEl) {
+    } else {
         statsEl.innerHTML = '';
     }
-    computeAndRender();
 }
 
 // ── 모드 검색 모달 열기 ──

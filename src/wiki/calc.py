@@ -245,6 +245,91 @@ def _parse_mod_effects(mod: dict, rank: int | None = None) -> dict[str, float]:
 
 # ── 검색 API ────────────────────────────────────────────────────────────────
 
+def _get_ko_warframe_name(base_name: str, has_prime: bool) -> str:
+    """워프레임 영문 기본명을 한글명으로 조회한다.
+
+    warframe.market에는 기본 워프레임이 없고 프라임 세트만 있으므로
+    "{name} Prime Set" → 한글명 → " 프라임 세트" 제거 순으로 시도한다.
+    """
+    try:
+        from src.market.items import _en_name_to_slug, _slug_to_ko, _load_items_cache  # noqa: PLC0415
+        if not _en_name_to_slug:
+            _load_items_cache()
+
+        # 직접 기본명 조회 (거래 가능한 일부 워프레임)
+        slug = _en_name_to_slug.get(base_name.lower(), "")
+        if slug:
+            ko = _slug_to_ko.get(slug, "")
+            if ko:
+                return ko
+
+        # 프라임 세트를 통한 조회 → 접미사 제거
+        if has_prime:
+            slug = _en_name_to_slug.get((base_name + " prime set").lower(), "")
+            if slug:
+                ko = _slug_to_ko.get(slug, "")
+                if ko:
+                    return ko.replace(" 프라임 세트", "").replace(" 프라임", "").replace(" 세트", "")
+    except Exception:
+        pass
+    return ""
+
+
+async def get_warframe_grouped_list() -> list[dict]:
+    """기본명으로 그룹화된 워프레임 목록을 반환한다.
+
+    Returns:
+        ``[{"name", "ko_name", "has_prime", "base": {...stats}, "prime": {...stats}|None}, ...]``
+    """
+    await _ensure_data()
+
+    wf_by_name: dict[str, dict] = {
+        wf.get("name", ""): wf for wf in _warframes_cache if wf.get("name")
+    }
+
+    def get_stats(wf: dict) -> dict:
+        return {
+            "health":      wf.get("health", 100),
+            "shield":      wf.get("shield", 100),
+            "armor":       wf.get("armor", 0),
+            "power":       wf.get("power", 150),
+            "sprintSpeed": wf.get("sprintSpeed", 1.0),
+        }
+
+    results: list[dict] = []
+    seen: set[str] = set()
+
+    for wf in _warframes_cache:
+        name: str = wf.get("name", "")
+        # 프라임·엄브라는 베이스 항목에서 처리
+        if wf.get("isPrime", False) or name.endswith(" Umbra"):
+            continue
+        if name in seen:
+            continue
+        seen.add(name)
+
+        prime_name = name + " Prime"
+        has_prime = prime_name in wf_by_name
+        umbra_name = name + " Umbra"
+
+        ko_name = _get_ko_warframe_name(name, has_prime)
+
+        entry: dict = {
+            "name":      name,
+            "ko_name":   ko_name or name,   # 한글 없으면 영문 그대로
+            "has_prime": has_prime,
+            "base":      get_stats(wf),
+            "prime":     get_stats(wf_by_name[prime_name]) if has_prime else None,
+        }
+        if umbra_name in wf_by_name:
+            entry["umbra"] = get_stats(wf_by_name[umbra_name])
+
+        results.append(entry)
+
+    results.sort(key=lambda x: x["ko_name"])
+    return results
+
+
 async def search_warframes(query: str, limit: int = 8) -> list[dict]:
     """이름으로 워프레임을 검색한다.
 
