@@ -422,6 +422,8 @@ async def search_mods(
 
     results: list[dict] = []
 
+    compat_upper = compat.upper()
+
     for mod in _mods_cache:
         name: str = mod.get("name", "")
         name_lower = name.lower()
@@ -431,15 +433,26 @@ async def search_mods(
             if not match:
                 continue
 
-        compat_name: str = mod.get("compatName", "") or ""
-        # 워프레임 호환: WARFRAME, ANY, AURA
-        if compat == "WARFRAME":
-            allowed = {"WARFRAME", "ANY", "AURA"}
-        else:
-            allowed = {compat.upper(), "ANY"}
+        compat_name: str = (mod.get("compatName", "") or "").upper()
+        is_exilus: bool   = bool(mod.get("isExilus", False))
 
-        if compat_name.upper() not in allowed:
-            continue
+        # 슬롯 유형별 필터
+        if compat_upper == "AURA":
+            # 오라 슬롯: AURA 전용
+            if compat_name != "AURA":
+                continue
+        elif compat_upper == "EXILUS":
+            # 엑실러스 슬롯: WARFRAME/ANY이면서 isExilus=True 인 모드만
+            if compat_name not in {"WARFRAME", "ANY"}:
+                continue
+            if not is_exilus:
+                continue
+        else:
+            # 일반 슬롯: WARFRAME/ANY 호환, 엑실러스 전용 모드 제외
+            if compat_name not in {"WARFRAME", "ANY"}:
+                continue
+            if is_exilus:
+                continue  # 엑실러스 모드는 엑실러스 슬롯에서만
 
         fusion_limit: int = mod.get("fusionLimit", 5)
         results.append({
@@ -448,6 +461,7 @@ async def search_mods(
             "baseDrain":   mod.get("baseDrain", 0),
             "fusionLimit": fusion_limit,
             "maxRank":     fusion_limit,
+            "isExilus":    is_exilus,
             "effects":     _parse_mod_effects(mod),
         })
 

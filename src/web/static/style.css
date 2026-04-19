@@ -852,6 +852,17 @@ main::-webkit-scrollbar-thumb, #messages::-webkit-scrollbar-thumb, #surge-list::
 .calc-slot-remove { position:absolute; top:2px; right:3px; background:none; border:none; color:var(--text-muted); font-size:14px; cursor:pointer; line-height:1; padding:0; }
 .calc-slot-remove:hover { color:var(--text); }
 
+/* 오라·엑실러스 전용 슬롯 */
+.calc-slot-aura   { border-color:#ff9800 !important; }
+.calc-slot-exilus { border-color:#9c27b0 !important; }
+.calc-slot-aura.calc-slot-filled   { background:rgba(255,152,0,.08); }
+.calc-slot-exilus.calc-slot-filled { background:rgba(156,39,176,.08); }
+.calc-slot-type-tag { font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.4px; margin-bottom:1px; }
+.aura-tag   { color:#ff9800; }
+.exilus-tag { color:#9c27b0; }
+.aura-label   { color:#ff9800 !important; }
+.exilus-label { color:#9c27b0 !important; }
+
 /* 아케인 슬롯 */
 .calc-arcane-row { display:flex; gap:8px; }
 .calc-arcane-slot { flex:1; }

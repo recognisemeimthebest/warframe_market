@@ -130,6 +130,12 @@ function renderCalc() {
     _updateWfStats();
 }
 
+// 슬롯 8 = 오라, 슬롯 9 = 엑실러스
+const _SLOT_META = {
+    8: { cls: 'calc-slot-aura',   tag: '오라',    tagCls: 'aura-tag',   labelCls: 'aura-label'   },
+    9: { cls: 'calc-slot-exilus', tag: '엑실러스', tagCls: 'exilus-tag', labelCls: 'exilus-label' },
+};
+
 // ── 모드 슬롯 그리드 ──
 function renderModGrid() {
     const grid = document.getElementById('calc-mod-grid');
@@ -138,18 +144,27 @@ function renderModGrid() {
     let totalCost = 0;
     let html = '';
     for (let i = 0; i < 10; i++) {
-        const mod = calcState.mods[i];
+        const mod  = calcState.mods[i];
+        const meta = _SLOT_META[i];
+        const extraCls  = meta ? ` ${meta.cls}` : '';
+        const slotLabel = meta ? meta.tag : `모드 ${i + 1}`;
+
         if (mod) {
             totalCost += (mod.rank || 0);
-            html += `<div class="calc-slot calc-slot-filled" onclick="openModSearch(${i})">
+            const tagHtml = meta
+                ? `<span class="calc-slot-type-tag ${meta.tagCls}">${meta.tag}</span>`
+                : '';
+            html += `<div class="calc-slot calc-slot-filled${extraCls}" onclick="openModSearch(${i})">
                 <button class="calc-slot-remove" onclick="event.stopPropagation();clearCalcSlot('mod',${i})">×</button>
+                ${tagHtml}
                 <span class="calc-slot-name">${escapeHtml(mod.name)}</span>
                 <span class="calc-slot-rank">R${mod.rank}</span>
             </div>`;
         } else {
-            html += `<div class="calc-slot calc-slot-empty" onclick="openModSearch(${i})">
+            const lblCls = meta ? ` ${meta.labelCls}` : '';
+            html += `<div class="calc-slot calc-slot-empty${extraCls}" onclick="openModSearch(${i})">
                 <span class="calc-slot-plus">+</span>
-                <span class="calc-slot-label">모드 ${i + 1}</span>
+                <span class="calc-slot-label${lblCls}">${slotLabel}</span>
             </div>`;
         }
     }
@@ -285,7 +300,18 @@ function _updateWfStats() {
 function openModSearch(idx) {
     calcState.activeSlotType = 'mod';
     calcState.activeSlotIdx = idx;
-    openCalcSearchModal('모드 이름...', '/api/calc/mods');
+    let apiUrl, placeholder;
+    if (idx === 8) {
+        apiUrl      = '/api/calc/mods?compat=AURA';
+        placeholder = '오라 모드 이름...';
+    } else if (idx === 9) {
+        apiUrl      = '/api/calc/mods?compat=EXILUS';
+        placeholder = '엑실러스 모드 이름...';
+    } else {
+        apiUrl      = '/api/calc/mods?compat=WARFRAME';
+        placeholder = '모드 이름...';
+    }
+    openCalcSearchModal(placeholder, apiUrl);
 }
 
 function openArcaneSearch(idx) {
@@ -355,7 +381,8 @@ function onCalcSearchInput() {
         }
 
         try {
-            const r = await fetch(`${_calcSearchApiUrl}?q=${encodeURIComponent(q)}`);
+            const sep = _calcSearchApiUrl.includes('?') ? '&' : '?';
+            const r = await fetch(`${_calcSearchApiUrl}${sep}q=${encodeURIComponent(q)}`);
             const d = await r.json();
             const items = d.items || [];
             if (!items.length) {
@@ -389,11 +416,35 @@ function onCalcSearchInput() {
     }, 300);
 }
 
+// ── 중복 모드 감지 헬퍼 ──
+function _modBaseName(name) {
+    // 움브라/프라임/아말감 접두사 제거해서 기본 이름 비교
+    return name.replace(/^(Umbral|Primed|Amalgam|Sacrificial)\s+/i, '').trim().toLowerCase();
+}
+
+function _findConflictingMod(newName, excludeIdx) {
+    const newBase = _modBaseName(newName);
+    for (let i = 0; i < calcState.mods.length; i++) {
+        if (i === excludeIdx) continue;
+        const m = calcState.mods[i];
+        if (!m) continue;
+        if (m.name === newName) return m.name;                          // 동일 모드
+        if (_modBaseName(m.name) === newBase) return m.name;            // 변형(움브라·프라임) 충돌
+    }
+    return null;
+}
+
 function selectCalcItem(item) {
     const { activeSlotType, activeSlotIdx } = calcState;
     if (activeSlotIdx < 0) return;
 
     if (activeSlotType === 'mod') {
+        // 중복·변형 충돌 검사
+        const conflict = _findConflictingMod(item.name, activeSlotIdx);
+        if (conflict) {
+            alert(`"${conflict}"이(가) 이미 장착되어 있어\n"${item.name}"을(를) 추가할 수 없습니다.`);
+            return;
+        }
         const rank = item.fusionLimit !== undefined ? item.fusionLimit : (item.maxRank || 0);
         calcState.mods[activeSlotIdx] = { ...item, rank };
     } else if (activeSlotType === 'arcane') {
