@@ -2274,19 +2274,25 @@ function openBuildModal(buildId, title, buildUrl) {
                     <span class="bm-stat-val">${escapeHtml(s.value)}</span>
                 </div>`
             ).join("");
-            const costParts = [
-                d.formas != null ? `Forma ${d.formas}` : "",
-                d.pt_cost ? `${d.pt_cost}p` : "",
-                d.endo_cost ? `엔도 ${d.endo_cost.toLocaleString()}` : "",
-                d.guide_len > 0 ? `📖 가이드 ${d.guide_len}단어` : "",
-            ].filter(Boolean).join("  ·  ");
+            const metaChips = [
+                d.formas != null ? `<span class="bm-meta-chip">◆ Forma ${d.formas}</span>` : "",
+                d.pt_cost   ? `<span class="bm-meta-chip">💰 ${d.pt_cost}p</span>` : "",
+                d.endo_cost ? `<span class="bm-meta-chip">⚙ 엔도 ${d.endo_cost.toLocaleString()}</span>` : "",
+                d.guide_len > 0 ? `<span class="bm-meta-chip">📖 ${d.guide_len}단어</span>` : "",
+            ].filter(Boolean).join("");
+            const modsHtml = (d.mods && d.mods.length)
+                ? d.mods.map(m =>
+                    `<div class="bm-mod-row">
+                        <span class="bm-mod-name">${escapeHtml(m.name)}</span>
+                        ${m.rank > 0 ? `<span class="bm-mod-rank">${m.rank}</span>` : ""}
+                    </div>`).join("")
+                : "";
             body.innerHTML = `
-                ${d.author ? `<div class="bm-author">by ${escapeHtml(d.author)}</div>` : ""}
-                ${costParts ? `<div class="bm-cost">${escapeHtml(costParts)}</div>` : ""}
+                ${(d.author || metaChips) ? `<div class="bm-meta">${d.author ? `<span class="bm-meta-author">✏ ${escapeHtml(d.author)}</span>` : ""}${metaChips}</div>` : ""}
                 ${statsHtml ? `<div class="bm-section-label">빌드 스탯</div><div class="bm-stats">${statsHtml}</div>` : ""}
-                ${(d.mods && d.mods.length) ? `<div class="bm-section-label">사용 모드</div><div class="bm-mods">${(d.mods).map(m => `<div class="bm-mod-row"><span class="bm-mod-name">${escapeHtml(m.name)}</span>${m.rank > 0 ? `<span class="bm-mod-rank">Lv.${m.rank}</span>` : ""}</div>`).join("")}</div>` : ""}
+                ${modsHtml ? `<div class="bm-section-label">사용 모드</div><div class="bm-mods">${modsHtml}</div>` : ""}
                 ${d.desc ? `<div class="bm-section-label">빌드 설명</div><div class="bm-desc">${escapeHtml(d.desc)}</div>` : ""}
-                ${!statsHtml && !(d.mods && d.mods.length) && !d.desc ? '<div class="build-modal-loading">상세 정보 없음</div>' : ""}
+                ${!statsHtml && !modsHtml && !d.desc ? '<div class="build-modal-loading">상세 정보 없음</div>' : ""}
             `;
         })
         .catch(() => {
