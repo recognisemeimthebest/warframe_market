@@ -274,10 +274,27 @@ async def search_warframes(query: str, limit: int = 8) -> list[dict]:
     return results[:limit]
 
 
+def _try_ko_to_en_mod(q: str) -> str:
+    """한글 모드 쿼리를 영문명으로 변환 시도 (items.py 역방향 매핑 활용)."""
+    try:
+        from src.market.items import _ko_to_slug, _slug_to_en_name, _load_items_cache, _en_name_to_slug
+        if not _en_name_to_slug:
+            _load_items_cache()
+        key_no_space = q.replace(" ", "").lower()
+        slug = _ko_to_slug.get(key_no_space) or _ko_to_slug.get(q.lower())
+        if slug:
+            return _slug_to_en_name.get(slug, "")
+    except Exception:
+        pass
+    return ""
+
+
 async def search_mods(
     query: str, compat: str = "WARFRAME", limit: int = 12
 ) -> list[dict]:
     """이름과 호환 대상으로 모드를 검색한다.
+
+    한글 쿼리는 items.py의 한글→슬러그→영문명 체인으로 변환 후 검색.
 
     Returns:
         ``[{"name", "polarity", "baseDrain", "fusionLimit", "effects", "maxRank"}, ...]``
@@ -285,12 +302,22 @@ async def search_mods(
     await _ensure_data()
 
     q = query.lower().strip()
+
+    # 한글 입력이면 영문명으로 변환 시도
+    en_q = ""
+    if q and any("\uAC00" <= c <= "\uD7A3" for c in q):
+        en_q = _try_ko_to_en_mod(q).lower()
+
     results: list[dict] = []
 
     for mod in _mods_cache:
         name: str = mod.get("name", "")
-        if q and q not in name.lower():
-            continue
+        name_lower = name.lower()
+
+        if q:
+            match = (q in name_lower) or (en_q and en_q in name_lower)
+            if not match:
+                continue
 
         compat_name: str = mod.get("compatName", "") or ""
         # 워프레임 호환: WARFRAME, ANY, AURA

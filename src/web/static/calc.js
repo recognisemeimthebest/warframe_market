@@ -2,7 +2,7 @@
 
 const calcState = {
     warframe: null,       // {name, health, shield, armor, power, sprintSpeed}
-    mods: Array(12).fill(null),   // {name, effects, rank, fusionLimit} | null
+    mods: Array(10).fill(null),   // {name, effects, rank, fusionLimit} | null
     shards: Array(5).fill(null),  // {color, option_key, tauforged} | null
     arcanes: Array(2).fill(null), // {name, effects, effectText} | null
     shardsData: {},        // /api/calc/shards 응답 캐시
@@ -103,7 +103,7 @@ function renderModGrid() {
 
     let totalCost = 0;
     let html = '';
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 10; i++) {
         const mod = calcState.mods[i];
         if (mod) {
             totalCost += (mod.rank || 0);
@@ -122,7 +122,7 @@ function renderModGrid() {
     grid.innerHTML = html;
 
     const badge = document.getElementById('calc-capacity');
-    if (badge) badge.textContent = `${totalCost}/72`;
+    if (badge) badge.textContent = `소모 ${totalCost}`;
 }
 
 // ── 아케인 슬롯 ──
@@ -167,9 +167,9 @@ function renderShardRow() {
 
         let optOptions = '<option value="">효과 선택</option>';
         if (selectedColor && calcState.shardsData[selectedColor]) {
-            const opts = calcState.shardsData[selectedColor].options || {};
-            optOptions += Object.entries(opts)
-                .map(([k, v]) => `<option value="${escapeHtml(k)}" ${k === selectedOpt ? 'selected' : ''}>${escapeHtml(v.name || k)}</option>`)
+            const opts = calcState.shardsData[selectedColor].options || [];
+            optOptions += opts
+                .map(opt => `<option value="${escapeHtml(opt.key)}" ${opt.key === selectedOpt ? 'selected' : ''}>${escapeHtml(opt.label)}</option>`)
                 .join('');
         }
 
@@ -312,7 +312,7 @@ function onCalcSearchInput() {
         try {
             const r = await fetch(`${_calcSearchApiUrl}?q=${encodeURIComponent(q)}`);
             const d = await r.json();
-            const items = d.mods || d.arcanes || [];
+            const items = d.items || [];
             if (!items.length) {
                 results.innerHTML = '<div class="calc-search-empty">검색 결과 없음</div>';
                 return;
@@ -377,11 +377,9 @@ function onShardColorChange(idx, color) {
     if (optSel) {
         optSel.disabled = false;
         const shardDef = calcState.shardsData[color];
-        const opts = shardDef ? (shardDef.options || {}) : {};
+        const opts = shardDef ? (shardDef.options || []) : [];
         optSel.innerHTML = '<option value="">효과 선택</option>' +
-            Object.entries(opts)
-                .map(([k, v]) => `<option value="${escapeHtml(k)}">${escapeHtml(v.name || k)}</option>`)
-                .join('');
+            opts.map(opt => `<option value="${escapeHtml(opt.key)}">${escapeHtml(opt.label)}</option>`).join('');
     }
 
     if (tauChk) { tauChk.disabled = true; tauChk.checked = false; }
