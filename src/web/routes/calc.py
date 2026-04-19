@@ -54,7 +54,9 @@ async def api_search_warframes(q: str = Query(default="", alias="q")):
     ``GET /api/calc/warframes?q=라이노``
     """
     try:
-        items = await search_warframes(q.strip())
+        # q 없으면 드롭다운용 전체 목록 (200개), 검색어 있으면 상위 10개
+        limit = 200 if not q.strip() else 10
+        items = await search_warframes(q.strip(), limit=limit)
         return {"ok": True, "items": items}
     except Exception as exc:
         logger.error("워프레임 검색 오류: %s", exc, exc_info=True)
