@@ -828,15 +828,11 @@ main::-webkit-scrollbar-thumb, #messages::-webkit-scrollbar-thumb, #surge-list::
 .calc-section-title { font-size:11px; font-weight:800; color:var(--text-muted); text-transform:uppercase; letter-spacing:.5px; margin-bottom:10px; display:flex; align-items:center; gap:8px; }
 .calc-capacity-badge { background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:1px 8px; font-size:10px; font-weight:600; color:var(--text-muted); }
 
-/* 워프레임 검색 */
-.calc-wf-search-row { display:flex; gap:6px; }
-.calc-wf-search-row input { flex:1; padding:7px 10px; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:13px; }
-.calc-wf-search-row button { padding:7px 12px; background:var(--primary,#4db8ff); color:#000; border:none; border-radius:8px; font-weight:700; font-size:12px; cursor:pointer; }
-.calc-suggest { background:var(--surface); border:1px solid var(--border); border-radius:8px; overflow:hidden; margin-top:4px; }
-.calc-suggest-item { padding:8px 12px; font-size:13px; cursor:pointer; border-bottom:1px solid var(--border); }
-.calc-suggest-item:last-child { border-bottom:none; }
-.calc-suggest-item:hover { background:var(--bg); }
-.calc-wf-selected { margin-top:6px; font-size:13px; font-weight:700; color:var(--primary,#4db8ff); }
+/* 워프레임 드롭다운 */
+.calc-wf-select { width:100%; padding:8px 10px; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:13px; cursor:pointer; }
+.calc-wf-select:focus { outline:none; border-color:var(--primary,#4db8ff); }
+.calc-wf-stats { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.calc-wf-stats span { font-size:11px; color:var(--text-muted); background:var(--bg); border:1px solid var(--border); border-radius:10px; padding:2px 8px; }
 
 /* 모드 슬롯 그리드 */
 .calc-mod-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }

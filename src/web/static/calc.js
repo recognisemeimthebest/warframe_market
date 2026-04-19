@@ -1,12 +1,13 @@
 // ── 가상 모딩 계산기 ──
 
 const calcState = {
-    warframe: null,       // {name, health, shield, armor, power, sprintSpeed}
+    warframe: null,         // {name, health, shield, armor, power, sprintSpeed}
+    warframeList: [],       // 전체 워프레임 목록 (드롭다운용)
     mods: Array(10).fill(null),   // {name, effects, rank, fusionLimit} | null
     shards: Array(5).fill(null),  // {color, option_key, tauforged} | null
     arcanes: Array(2).fill(null), // {name, effects, effectText} | null
-    shardsData: {},        // /api/calc/shards 응답 캐시
-    activeSlotType: null,  // "mod" | "arcane" | null
+    shardsData: {},         // /api/calc/shards 응답 캐시
+    activeSlotType: null,   // "mod" | "arcane" | null
     activeSlotIdx: -1,
     initialized: false,
 };
@@ -35,12 +36,17 @@ function formatEffects(effects) {
 // ── 초기화 ──
 async function initCalc() {
     if (calcState.initialized) return;
+    // 샤드 정적 데이터 + 워프레임 전체 목록 병렬 로드
     try {
-        const r = await fetch('/api/calc/shards');
-        const d = await r.json();
-        if (d.ok) calcState.shardsData = d.shards;
+        const [shardsRes, wfRes] = await Promise.all([
+            fetch('/api/calc/shards'),
+            fetch('/api/calc/warframes'),
+        ]);
+        const [shardsD, wfD] = await Promise.all([shardsRes.json(), wfRes.json()]);
+        if (shardsD.ok) calcState.shardsData = shardsD.shards;
+        if (wfD.ok) calcState.warframeList = wfD.items || [];
     } catch (e) {
-        console.error('[calc] shards 로드 실패:', e);
+        console.error('[calc] 초기 데이터 로드 실패:', e);
     }
     calcState.initialized = true;
     renderCalc();
@@ -57,12 +63,13 @@ function renderCalc() {
     <div class="calc-left">
         <div class="calc-section">
             <div class="calc-section-title">워프레임</div>
-            <div class="calc-wf-search-row">
-                <input type="text" id="calc-wf-input" placeholder="워프레임 이름 검색..." autocomplete="off" oninput="onCalcWfInput()">
-                <button onclick="searchCalcWf()">선택</button>
-            </div>
-            <div id="calc-wf-suggest" class="calc-suggest" style="display:none;"></div>
-            <div id="calc-wf-selected" class="calc-wf-selected"></div>
+            <select id="calc-wf-select" class="calc-wf-select" onchange="onCalcWfSelect(this.value)">
+                <option value="">-- 워프레임 선택 --</option>
+                ${calcState.warframeList.map(wf =>
+                    `<option value="${escapeHtml(wf.name)}">${escapeHtml(wf.name)}</option>`
+                ).join('')}
+            </select>
+            <div id="calc-wf-stats" class="calc-wf-stats"></div>
         </div>
 
         <div class="calc-section">
@@ -190,49 +197,19 @@ function renderShardRow() {
     row.innerHTML = html;
 }
 
-// ── 워프레임 실시간 검색 (oninput) ──
-let _wfInputTimer = null;
-function onCalcWfInput() {
-    clearTimeout(_wfInputTimer);
-    _wfInputTimer = setTimeout(() => searchCalcWf(), 300);
-}
-
-async function searchCalcWf() {
-    const input = document.getElementById('calc-wf-input');
-    if (!input) return;
-    const q = input.value.trim();
-    if (!q) {
-        const sug = document.getElementById('calc-wf-suggest');
-        if (sug) { sug.innerHTML = ''; sug.style.display = 'none'; }
-        return;
+// ── 워프레임 드롭다운 선택 ──
+function onCalcWfSelect(name) {
+    const wf = calcState.warframeList.find(w => w.name === name);
+    calcState.warframe = wf || null;
+    // 기본 스탯 미리보기 표시
+    const statsEl = document.getElementById('calc-wf-stats');
+    if (statsEl && wf) {
+        statsEl.innerHTML =
+            `<span>체력 ${wf.health}</span><span>실드 ${wf.shield}</span>` +
+            `<span>방어도 ${wf.armor}</span><span>에너지 ${wf.power}</span>`;
+    } else if (statsEl) {
+        statsEl.innerHTML = '';
     }
-    try {
-        const r = await fetch(`/api/calc/warframes?q=${encodeURIComponent(q)}`);
-        const d = await r.json();
-        const sug = document.getElementById('calc-wf-suggest');
-        if (!sug) return;
-        if (!d.ok || !d.warframes || d.warframes.length === 0) {
-            sug.innerHTML = '<div class="calc-suggest-item" style="color:var(--text-muted);">결과 없음</div>';
-            sug.style.display = '';
-            return;
-        }
-        sug.innerHTML = d.warframes
-            .map(item => `<div class="calc-suggest-item" onclick="selectCalcWarframe(${JSON.stringify(item).replace(/"/g, '&quot;')})">${escapeHtml(item.name)}</div>`)
-            .join('');
-        sug.style.display = '';
-    } catch (e) {
-        console.error('[calc] warframe 검색 실패:', e);
-    }
-}
-
-function selectCalcWarframe(item) {
-    calcState.warframe = item;
-    const sug = document.getElementById('calc-wf-suggest');
-    if (sug) { sug.innerHTML = ''; sug.style.display = 'none'; }
-    const sel = document.getElementById('calc-wf-selected');
-    if (sel) sel.textContent = item.name;
-    const inp = document.getElementById('calc-wf-input');
-    if (inp) inp.value = item.name;
     computeAndRender();
 }
 
