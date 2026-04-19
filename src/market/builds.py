@@ -294,7 +294,8 @@ async def _resolve_mod_names(mod_ids: list[int]) -> dict[int, str]:
 
 
 async def get_build_detail(build_id: int) -> dict | None:
-    """빌드 상세 조회 (스탯 + 모드 목록 포함)."""
+    """빌드 상세 조회 (스탯 + 모드 + 아케인 포함)."""
+    from src.market.items import get_ko_by_en_name
     try:
         client = get_client()
         r = await client.get(
@@ -309,17 +310,33 @@ async def get_build_detail(build_id: int) -> dict | None:
 
         result = _build_summary(raw, item_type)
 
-        # 모드 목록 — slots 필드에서 mod ID 추출 후 이름 조회
+        # slots: drain==0 → 아케인, drain!=0 → 일반 모드
         slots = raw.get("slots") or []
         if slots:
             mod_ids = [s["mod"] for s in slots if s.get("mod")]
             names_map = await _resolve_mod_names(mod_ids)
-            result["mods"] = [
-                {"name": names_map.get(s["mod"], ""), "rank": s.get("rank", 0)}
-                for s in slots if s.get("mod") and names_map.get(s["mod"])
-            ]
+
+            mods: list[dict] = []
+            arcanes: list[dict] = []
+            for s in slots:
+                mid = s.get("mod")
+                if not mid:
+                    continue
+                en_name = names_map.get(mid, "")
+                if not en_name:
+                    continue
+                ko_name = get_ko_by_en_name(en_name)
+                entry = {"name": en_name, "ko": ko_name, "rank": s.get("rank", 0)}
+                if s.get("drain", 1) == 0:
+                    arcanes.append(entry)
+                else:
+                    mods.append(entry)
+
+            result["mods"] = mods
+            result["arcanes"] = arcanes
         else:
             result["mods"] = []
+            result["arcanes"] = []
 
         return result
     except Exception as e:

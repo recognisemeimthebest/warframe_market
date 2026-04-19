@@ -378,6 +378,16 @@ def resolve_item(query: str) -> tuple[str, str] | None:
     return None
 
 
+def get_ko_by_en_name(en_name: str) -> str:
+    """영문 아이템명 → 한글명 (없으면 빈 문자열). 아이템 캐시 lazy 로드."""
+    if not _en_name_to_slug:
+        _load_items_cache()
+    slug = _en_name_to_slug.get(en_name.lower(), "")
+    if not slug:
+        return ""
+    return _slug_to_ko.get(slug, "")
+
+
 def search_items(query: str, limit: int = 5) -> list[SearchResult]:
     """
     검색어에 대해 상위 후보 아이템을 반환한다.

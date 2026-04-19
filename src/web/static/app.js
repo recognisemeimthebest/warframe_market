@@ -2280,19 +2280,21 @@ function openBuildModal(buildId, title, buildUrl) {
                 d.endo_cost ? `<span class="bm-meta-chip">⚙ 엔도 ${d.endo_cost.toLocaleString()}</span>` : "",
                 d.guide_len > 0 ? `<span class="bm-meta-chip">📖 ${d.guide_len}단어</span>` : "",
             ].filter(Boolean).join("");
-            const modsHtml = (d.mods && d.mods.length)
-                ? d.mods.map(m =>
-                    `<div class="bm-mod-row">
-                        <span class="bm-mod-name">${escapeHtml(m.name)}</span>
-                        ${m.rank > 0 ? `<span class="bm-mod-rank">${m.rank}</span>` : ""}
-                    </div>`).join("")
-                : "";
+            const renderModPills = (list) => (list || []).map(m => {
+                const displayName = m.ko || escapeHtml(m.name);
+                const subName = m.ko ? `<span class="bm-mod-en">${escapeHtml(m.name)}</span>` : "";
+                const rankBadge = m.rank > 0 ? `<span class="bm-mod-rank">${m.rank}</span>` : "";
+                return `<div class="bm-mod-row"><span class="bm-mod-name">${displayName}</span>${subName}${rankBadge}</div>`;
+            }).join("");
+            const modsHtml    = renderModPills(d.mods);
+            const arcaneHtml  = renderModPills(d.arcanes);
             body.innerHTML = `
                 ${(d.author || metaChips) ? `<div class="bm-meta">${d.author ? `<span class="bm-meta-author">✏ ${escapeHtml(d.author)}</span>` : ""}${metaChips}</div>` : ""}
-                ${statsHtml ? `<div class="bm-section-label">빌드 스탯</div><div class="bm-stats">${statsHtml}</div>` : ""}
-                ${modsHtml ? `<div class="bm-section-label">사용 모드</div><div class="bm-mods">${modsHtml}</div>` : ""}
-                ${d.desc ? `<div class="bm-section-label">빌드 설명</div><div class="bm-desc">${escapeHtml(d.desc)}</div>` : ""}
-                ${!statsHtml && !modsHtml && !d.desc ? '<div class="build-modal-loading">상세 정보 없음</div>' : ""}
+                ${statsHtml   ? `<div class="bm-section-label">빌드 스탯</div><div class="bm-stats">${statsHtml}</div>` : ""}
+                ${modsHtml    ? `<div class="bm-section-label">사용 모드</div><div class="bm-mods">${modsHtml}</div>` : ""}
+                ${arcaneHtml  ? `<div class="bm-section-label">아케인</div><div class="bm-mods bm-arcanes">${arcaneHtml}</div>` : ""}
+                ${d.desc      ? `<div class="bm-section-label">빌드 설명</div><div class="bm-desc">${escapeHtml(d.desc)}</div>` : ""}
+                ${!statsHtml && !modsHtml && !arcaneHtml && !d.desc ? '<div class="build-modal-loading">상세 정보 없음</div>' : ""}
             `;
         })
         .catch(() => {

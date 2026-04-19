@@ -463,10 +463,14 @@ footer { padding: 12px 16px; background: var(--surface); border-top: 1px solid v
 .bm-mods { display:flex; flex-wrap:wrap; gap:6px; }
 .bm-mod-row { display:inline-flex; align-items:center; gap:5px;
     background:var(--bg); border:1px solid color-mix(in srgb, var(--primary, #4db8ff) 35%, var(--border));
-    border-radius:20px; padding:5px 11px; }
-.bm-mod-name { font-size:12px; color:var(--text); font-weight:500; }
+    border-radius:20px; padding:5px 11px; max-width:100%; }
+.bm-mod-name { font-size:12px; color:var(--text); font-weight:600; }
+.bm-mod-en   { font-size:10px; color:var(--text-muted); margin-left:1px; }
 .bm-mod-rank { background:var(--primary, #4db8ff); color:#000; font-size:10px;
-    font-weight:800; border-radius:10px; padding:1px 7px; line-height:1.4; }
+    font-weight:800; border-radius:10px; padding:1px 7px; line-height:1.4; flex-shrink:0; }
+/* 아케인은 골드 계열 테두리 */
+.bm-arcanes .bm-mod-row { border-color:color-mix(in srgb, #e8c96a 50%, var(--border)); }
+.bm-arcanes .bm-mod-rank { background:#e8c96a; color:#000; }
 
 /* 빌드 설명 */
 .bm-desc { font-size:12px; color:var(--text-muted); line-height:1.7;
