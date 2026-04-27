@@ -85,6 +85,7 @@ async def api_create_room(body: CreateRoomRequest):
         "created_at":  time.time(),
         "empty_since": time.time(),
         "connections": {},
+        "messages":    [],   # 인메모리 채팅 기록 (방 삭제 시 소멸)
     }
     logger.info("음성채팅방 생성: %s (%s) by %s", room_id, name, creator)
     return {"ok": True, "room_id": room_id, "name": name}
@@ -118,8 +119,12 @@ async def voice_ws(ws: WebSocket, room_id: str, user_name: str):
         "members": list(room["connections"].keys()),
     }, exclude=user_name)
 
-    # 신규 입장자에게 현재 방 상태 전송
-    await ws.send_json({"type": "room_state", "members": existing})
+    # 신규 입장자에게 현재 방 상태 + 기존 채팅 기록 전송
+    await ws.send_json({
+        "type":     "room_state",
+        "members":  existing,
+        "messages": room["messages"][-100:],  # 최근 100개
+    })
 
     try:
         while True:
@@ -135,6 +140,16 @@ async def voice_ws(ws: WebSocket, room_id: str, user_name: str):
                         await target.send_json({**data, "from": user_name})
                     except Exception:
                         pass
+
+            # 채팅 메시지 브로드캐스트
+            elif msg_type == "chat":
+                text = (data.get("text") or "").strip()[:500]
+                if text:
+                    entry = {"from": user_name, "text": text, "ts": time.time()}
+                    room["messages"].append(entry)
+                    if len(room["messages"]) > 500:
+                        room["messages"] = room["messages"][-500:]
+                    await _broadcast(room, {"type": "chat", **entry})
 
     except (WebSocketDisconnect, Exception):
         pass

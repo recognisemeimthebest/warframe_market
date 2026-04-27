@@ -10,6 +10,7 @@ const voiceState = {
     isMuted:       false,
     isDeafened:    false,
     volumes:       {},   // {userName: 0~100}
+    messages:      [],   // 채팅 기록 (인메모리)
     inRoom:        false,
     rooms:         [],
     speakingMap:   {},   // {userName: bool}
@@ -263,6 +264,8 @@ async function joinVoiceRoom(roomId, roomName) {
 async function _handleSignal(msg) {
     switch (msg.type) {
         case 'room_state':
+            // 기존 채팅 기록 로드
+            voiceState.messages = msg.messages || [];
             // 이미 있던 멤버들에게 오퍼 전송 (내가 새로 들어온 사람)
             for (const member of msg.members) {
                 await _createOffer(member);
@@ -290,6 +293,11 @@ async function _handleSignal(msg) {
 
         case 'ice':
             await _handleIce(msg.from, msg.candidate);
+            break;
+
+        case 'chat':
+            voiceState.messages.push(msg);
+            _appendChatMessage(msg);
             break;
     }
 }
@@ -466,7 +474,27 @@ function _renderInRoom(container, otherMembers) {
             ${voiceState.isDeafened ? '🔈 스피커 켜기' : '🔊 스피커 끄기'}
         </button>
     </div>
+
+    <div class="voice-chat-panel">
+        <div class="voice-chat-log" id="voice-chat-log">
+            ${voiceState.messages.map(m => _chatMsgHtml(m)).join('')}
+        </div>
+        <form class="voice-chat-form" onsubmit="sendVoiceChat(event)">
+            <input type="text" id="voice-chat-input"
+                class="voice-chat-input"
+                placeholder="채팅 입력... (Enter)"
+                maxlength="500"
+                autocomplete="off">
+            <button type="submit" class="voice-chat-send">전송</button>
+        </form>
+    </div>
 </div>`;
+
+    // 채팅 로그 맨 아래로 스크롤
+    requestAnimationFrame(() => {
+        const log = document.getElementById('voice-chat-log');
+        if (log) log.scrollTop = log.scrollHeight;
+    });
 }
 
 function _memberCardHtml(userName) {
@@ -532,6 +560,34 @@ function toggleVoiceDeafen() {
     }
 }
 
+// ── 채팅 ────────────────────────────────────────────────────────────────────
+
+function _chatMsgHtml(msg) {
+    const isMe = msg.from === voiceState.userName;
+    const time = new Date(msg.ts * 1000).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+    return `<div class="voice-chat-msg${isMe ? ' me' : ''}">
+        <span class="voice-chat-name">${escapeHtml(msg.from)}</span>
+        <span class="voice-chat-text">${escapeHtml(msg.text)}</span>
+        <span class="voice-chat-time">${time}</span>
+    </div>`;
+}
+
+function _appendChatMessage(msg) {
+    const log = document.getElementById('voice-chat-log');
+    if (!log) return;
+    log.insertAdjacentHTML('beforeend', _chatMsgHtml(msg));
+    log.scrollTop = log.scrollHeight;
+}
+
+function sendVoiceChat(e) {
+    e.preventDefault();
+    const input = document.getElementById('voice-chat-input');
+    const text = (input?.value || '').trim();
+    if (!text || !voiceState.ws || voiceState.ws.readyState !== WebSocket.OPEN) return;
+    voiceState.ws.send(JSON.stringify({ type: 'chat', text }));
+    input.value = '';
+}
+
 function leaveVoiceRoom() {
     // 피어 연결 모두 닫기
     for (const [, peer] of Object.entries(voiceState.peers)) {
@@ -559,9 +615,18 @@ function leaveVoiceRoom() {
     voiceState.roomName    = null;
     voiceState.speakingMap = {};
     voiceState.volumes     = {};
+    voiceState.messages    = [];
     voiceState.isMuted     = false;
     voiceState.isDeafened  = false;
 
     _startRoomPoll();
     renderVoiceTab();
 }
+
+// ── 페이지 로드 후 voice 탭 활성화 보정 ──────────────────────────────────────
+// app.js IIFE가 실행될 때 voice.js가 아직 로드되지 않아 initVoiceTab()이 미호출되는 문제 방어
+window.addEventListener('load', () => {
+    if (document.getElementById('tab-voice')?.classList.contains('active')) {
+        initVoiceTab();
+    }
+});

@@ -936,7 +936,7 @@ main::-webkit-scrollbar-thumb, #messages::-webkit-scrollbar-thumb, #surge-list::
 .calc-share-submit:hover { opacity:.85; }
 
 /* ── 음성채팅 탭 ───────────────────────────────────────────────────────────── */
-#tab-voice { display:none; flex-direction:column; padding:0; overflow-y:auto; }
+#tab-voice { display:none; flex-direction:column; padding:0; overflow-y:auto; overscroll-behavior-y: contain; }
 #tab-voice.active { display:flex; }
 
 .voice-lobby { display:flex; flex-direction:column; gap:12px; padding:14px 12px; }
@@ -1011,6 +1011,20 @@ main::-webkit-scrollbar-thumb, #messages::-webkit-scrollbar-thumb, #surge-list::
 .voice-mute-btn.muted:hover { opacity:.85; }
 .voice-deafen-btn.deafened { background:#7b1fa2; border-color:#7b1fa2; color:#fff; }
 .voice-deafen-btn.deafened:hover { opacity:.85; }
+
+/* 채팅 패널 */
+.voice-chat-panel { display:flex; flex-direction:column; border:1px solid var(--border); border-radius:12px; overflow:hidden; flex-shrink:0; max-height:220px; }
+.voice-chat-log { flex:1; overflow-y:auto; padding:10px 12px; display:flex; flex-direction:column; gap:4px; min-height:120px; }
+.voice-chat-msg { display:flex; align-items:baseline; gap:6px; font-size:13px; flex-wrap:wrap; }
+.voice-chat-msg.me .voice-chat-name { color:var(--primary,#4db8ff); }
+.voice-chat-name { font-weight:700; color:#aaa; flex-shrink:0; font-size:12px; }
+.voice-chat-text { color:var(--text); word-break:break-word; flex:1; }
+.voice-chat-time { font-size:10px; color:var(--text-muted); flex-shrink:0; }
+.voice-chat-form { display:flex; border-top:1px solid var(--border); }
+.voice-chat-input { flex:1; padding:10px 12px; background:transparent; border:none; color:var(--text); font-size:13px; outline:none; }
+.voice-chat-input::placeholder { color:var(--text-muted); }
+.voice-chat-send { padding:10px 14px; background:var(--primary,#4db8ff); border:none; color:#0a1628; font-size:13px; font-weight:700; cursor:pointer; }
+.voice-chat-send:hover { opacity:.85; }
 
 /* 볼륨 슬라이더 */
 .voice-vol-row { display:flex; align-items:center; gap:5px; margin-top:6px; width:100%; }
