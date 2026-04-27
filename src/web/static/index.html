@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>워프봇</title>
-    <link rel="stylesheet" href="/static/style.css?v=20260419m">
+    <link rel="stylesheet" href="/static/style.css?v=20260419n">
     <link rel="manifest" href="/static/manifest.json">
     <meta name="theme-color" content="#4db8ff">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -98,6 +98,7 @@
             <button class="tab" data-tab="farming">파밍</button>
             <button class="tab" data-tab="modding">모딩 공유</button>
             <button class="tab" data-tab="board">거래소</button>
+            <button class="tab" data-tab="voice">음성채팅</button>
         </nav>
 
         <!-- 시세 조회 탭 -->
@@ -247,6 +248,11 @@
             <div class="board-modal-body" id="board-modal-body"></div>
         </div>
 
+        <!-- 음성채팅 탭 -->
+        <main id="tab-voice" class="tab-content">
+            <div id="voice-container"></div>
+        </main>
+
         <footer id="farming-footer" style="display:none;">
             <form id="farming-form" onsubmit="return false;">
                 <input type="text" id="farming-input" placeholder="아이템/모드/워프레임 이름 검색..." autocomplete="off">
@@ -263,9 +269,10 @@
 
     </div>
 
-    <script src="/static/app.js?v=20260419m"></script>
-    <script src="/static/board.js?v=20260419m"></script>
-    <script src="/static/calc.js?v=20260419m"></script>
+    <script src="/static/app.js?v=20260419n"></script>
+    <script src="/static/board.js?v=20260419n"></script>
+    <script src="/static/calc.js?v=20260419n"></script>
+    <script src="/static/voice.js?v=20260419n"></script>
     <script>
         if ("serviceWorker" in navigator) {
             navigator.serviceWorker.register("/static/sw.js").catch(() => {});

@@ -55,6 +55,7 @@ from src.web.routes.admin import router as admin_router
 from src.web.routes.push import router as push_router
 from src.web.routes.board import router as board_router
 from src.web.routes.calc import router as calc_router
+from src.web.routes.voice import router as voice_router, cleanup_empty_rooms
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +128,8 @@ async def lifespan(app: FastAPI):
     logger.info("라이브 캐시 백그라운드 태스크 시작")
     watchlist_task = asyncio.create_task(run_watchlist_monitor(broadcast_fn=broadcast))
     logger.info("워치리스트 모니터 백그라운드 태스크 시작")
+    asyncio.create_task(cleanup_empty_rooms())
+    logger.info("음성채팅방 청소 태스크 시작")
 
     yield  # 앱 실행 중
 
@@ -150,6 +153,7 @@ app.include_router(admin_router)
 app.include_router(push_router)
 app.include_router(board_router)
 app.include_router(calc_router)
+app.include_router(voice_router)
 
 
 # ── 페이지 서빙 ──

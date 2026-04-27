@@ -368,6 +368,8 @@ function _activateTab(tab, pushHistory = true) {
     if (tab === "world") fetchWorldState();
     if (tab === "modding") renderModdingTab();
     if (tab === "board" && typeof loadBoardList === "function") loadBoardList();
+    if (tab === "voice" && typeof initVoiceTab === "function") initVoiceTab();
+    if (tab !== "voice" && activeTab === "voice" && typeof destroyVoiceTab === "function") destroyVoiceTab();
 
     if (pushHistory) {
         history.pushState({ tab }, "", "?tab=" + tab);

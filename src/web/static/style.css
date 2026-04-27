@@ -934,4 +934,79 @@ main::-webkit-scrollbar-thumb, #messages::-webkit-scrollbar-thumb, #surge-list::
 .calc-share-cancel { padding:8px 18px; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:var(--text-muted); font-size:13px; cursor:pointer; }
 .calc-share-submit { padding:8px 18px; background:var(--primary,#4db8ff); border:none; border-radius:8px; color:#0a1628; font-size:13px; font-weight:700; cursor:pointer; }
 .calc-share-submit:hover { opacity:.85; }
+
+/* ── 음성채팅 탭 ───────────────────────────────────────────────────────────── */
+#tab-voice { display:none; flex-direction:column; padding:0; overflow-y:auto; }
+#tab-voice.active { display:flex; }
+
+.voice-lobby { display:flex; flex-direction:column; gap:12px; padding:14px 12px; }
+
+/* 닉네임 + 방 만들기 */
+.voice-name-bar { display:flex; gap:8px; align-items:center; }
+.voice-username-input { flex:1; padding:10px 12px; background:var(--surface); border:1px solid var(--border); border-radius:10px; color:var(--text); font-size:14px; outline:none; }
+.voice-username-input:focus { border-color:var(--primary,#4db8ff); }
+.voice-create-btn { padding:10px 14px; background:var(--primary,#4db8ff); border:none; border-radius:10px; color:#0a1628; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap; }
+.voice-create-btn:hover { opacity:.85; }
+
+/* 방 목록 헤더 */
+.voice-rooms-header { display:flex; justify-content:space-between; align-items:center; margin-top:4px; }
+.voice-section-label { font-size:13px; font-weight:700; color:var(--text-muted); letter-spacing:.3px; }
+.voice-rooms-count { font-size:12px; color:var(--text-muted); }
+
+/* 방 목록 */
+.voice-room-list { display:flex; flex-direction:column; gap:8px; }
+.voice-loading, .voice-empty { text-align:center; color:var(--text-muted); font-size:13px; padding:32px 16px; line-height:1.7; }
+
+/* 방 카드 */
+.voice-room-card { display:flex; align-items:center; gap:10px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:12px 14px; }
+.voice-room-card.voice-room-empty { opacity:.7; }
+.voice-room-info { flex:1; min-width:0; }
+.voice-room-name { font-size:14px; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.voice-room-meta { display:flex; flex-wrap:wrap; gap:6px 12px; margin-top:4px; font-size:11px; color:var(--text-muted); }
+.voice-countdown { color:#ff9800; font-size:11px; }
+.voice-join-btn { padding:8px 14px; background:var(--primary,#4db8ff); border:none; border-radius:8px; color:#0a1628; font-size:13px; font-weight:700; cursor:pointer; white-space:nowrap; }
+.voice-join-btn:hover { opacity:.85; }
+
+/* 방 만들기 모달 */
+.voice-modal { position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:1001; background:var(--surface); border:1px solid var(--border); border-radius:16px; width:92%; max-width:380px; display:flex; flex-direction:column; box-shadow:0 8px 32px rgba(0,0,0,.4); }
+#voice-create-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1000; }
+.voice-modal-header { display:flex; justify-content:space-between; align-items:center; padding:14px 16px; border-bottom:1px solid var(--border); font-size:15px; font-weight:700; }
+.voice-modal-header button { background:none; border:none; font-size:22px; color:var(--text-muted); cursor:pointer; line-height:1; }
+.voice-modal-body { padding:16px; display:flex; flex-direction:column; gap:12px; }
+.voice-modal-field { display:flex; flex-direction:column; gap:6px; }
+.voice-modal-field label { font-size:12px; font-weight:700; color:var(--text-muted); }
+.voice-modal-field input { padding:10px 12px; background:var(--bg); border:1px solid var(--border); border-radius:10px; color:var(--text); font-size:14px; outline:none; }
+.voice-modal-field input:focus { border-color:var(--primary,#4db8ff); }
+.voice-modal-hint { font-size:11px; color:var(--text-muted); line-height:1.5; }
+.voice-modal-btns { display:flex; gap:8px; justify-content:flex-end; margin-top:4px; }
+.voice-btn-cancel { padding:9px 18px; background:var(--bg); border:1px solid var(--border); border-radius:8px; color:var(--text-muted); font-size:13px; cursor:pointer; }
+.voice-btn-submit { padding:9px 18px; background:var(--primary,#4db8ff); border:none; border-radius:8px; color:#0a1628; font-size:13px; font-weight:700; cursor:pointer; }
+.voice-btn-submit:hover { opacity:.85; }
+
+/* 방 내부 뷰 */
+.voice-room-view { display:flex; flex-direction:column; height:100%; min-height:0; padding:12px; gap:14px; }
+.voice-room-topbar { display:flex; align-items:center; justify-content:space-between; padding:10px 14px; background:var(--surface); border:1px solid var(--border); border-radius:12px; }
+.voice-room-title { font-size:15px; font-weight:700; color:var(--text); }
+.voice-leave-btn { padding:8px 14px; background:#e53935; border:none; border-radius:8px; color:#fff; font-size:13px; font-weight:700; cursor:pointer; }
+.voice-leave-btn:hover { opacity:.85; }
+
+/* 멤버 그리드 */
+.voice-members-grid { display:flex; flex-wrap:wrap; gap:12px; justify-content:center; padding:8px 0; flex:1; align-content:flex-start; }
+.voice-member-card { display:flex; flex-direction:column; align-items:center; gap:8px; padding:16px 12px; background:var(--surface); border:2px solid var(--border); border-radius:14px; min-width:90px; transition:border-color .2s, box-shadow .2s; cursor:default; }
+.voice-member-card.speaking { border-color:#4caf50; box-shadow:0 0 12px rgba(76,175,80,.4); }
+.voice-avatar { width:48px; height:48px; background:var(--primary,#4db8ff); border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:700; color:#0a1628; text-transform:uppercase; }
+.voice-member-card.speaking .voice-avatar { background:#4caf50; animation:voice-pulse 1s ease-in-out infinite; }
+.voice-member-name { font-size:12px; color:var(--text); font-weight:600; text-align:center; word-break:break-all; }
+
+@keyframes voice-pulse {
+    0%, 100% { box-shadow:0 0 0 0 rgba(76,175,80,.5); }
+    50%       { box-shadow:0 0 0 8px rgba(76,175,80,0); }
+}
+
+/* 컨트롤 바 */
+.voice-controls { display:flex; justify-content:center; padding:8px 0 4px; }
+.voice-mute-btn { padding:12px 28px; background:var(--surface); border:2px solid var(--primary,#4db8ff); border-radius:12px; color:var(--primary,#4db8ff); font-size:14px; font-weight:700; cursor:pointer; transition:all .2s; }
+.voice-mute-btn:hover { background:rgba(77,184,255,.1); }
+.voice-mute-btn.muted { background:#e53935; border-color:#e53935; color:#fff; }
+.voice-mute-btn.muted:hover { opacity:.85; }
 .calc-share-submit:disabled { opacity:.5; cursor:not-allowed; }
