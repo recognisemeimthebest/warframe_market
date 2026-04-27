@@ -1011,4 +1011,12 @@ main::-webkit-scrollbar-thumb, #messages::-webkit-scrollbar-thumb, #surge-list::
 .voice-mute-btn.muted:hover { opacity:.85; }
 .voice-deafen-btn.deafened { background:#7b1fa2; border-color:#7b1fa2; color:#fff; }
 .voice-deafen-btn.deafened:hover { opacity:.85; }
+
+/* 볼륨 슬라이더 */
+.voice-vol-row { display:flex; align-items:center; gap:5px; margin-top:6px; width:100%; }
+.voice-vol-icon { font-size:11px; }
+.voice-vol-slider { flex:1; -webkit-appearance:none; height:4px; border-radius:2px; background:var(--border); outline:none; cursor:pointer; min-width:0; }
+.voice-vol-slider::-webkit-slider-thumb { -webkit-appearance:none; width:14px; height:14px; border-radius:50%; background:var(--primary,#4db8ff); cursor:pointer; }
+.voice-vol-slider::-moz-range-thumb { width:14px; height:14px; border-radius:50%; background:var(--primary,#4db8ff); cursor:pointer; border:none; }
+.voice-vol-val { font-size:10px; color:var(--text-muted); min-width:32px; text-align:right; }
 .calc-share-submit:disabled { opacity:.5; cursor:not-allowed; }

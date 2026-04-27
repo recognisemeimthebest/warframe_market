@@ -9,6 +9,7 @@ const voiceState = {
     localStream:   null,
     isMuted:       false,
     isDeafened:    false,
+    volumes:       {},   // {userName: 0~100}
     inRoom:        false,
     rooms:         [],
     speakingMap:   {},   // {userName: bool}
@@ -382,6 +383,10 @@ function _setRemoteAudio(userName, stream) {
         document.body.appendChild(el);
     }
     el.srcObject = stream;
+    // 저장된 볼륨 적용
+    const vol = voiceState.volumes[userName] ?? 100;
+    el.volume = Math.min(vol / 100, 1.0);
+    el.muted  = voiceState.isDeafened;
 }
 
 // ── 말하기 감지 (AudioContext) ───────────────────────────────────────────────
@@ -468,10 +473,32 @@ function _memberCardHtml(userName) {
     const isMe  = userName === voiceState.userName;
     const spk   = voiceState.speakingMap[userName] || false;
     const label = isMe ? `${escapeHtml(userName)} (나)` : escapeHtml(userName);
+    const vol   = voiceState.volumes[userName] ?? 100;
+    const volSlider = isMe ? '' : `
+        <div class="voice-vol-row">
+            <span class="voice-vol-icon">🔊</span>
+            <input type="range" class="voice-vol-slider"
+                min="0" max="200" value="${vol}"
+                oninput="setUserVolume('${escapeHtml(userName)}', this.value)"
+                title="${vol}%">
+            <span class="voice-vol-val" id="voice-vol-val-${escapeHtml(userName)}">${vol}%</span>
+        </div>`;
     return `<div class="voice-member-card${spk ? ' speaking' : ''}" data-user="${escapeHtml(userName)}">
         <div class="voice-avatar">${escapeHtml(userName.slice(0, 2))}</div>
         <div class="voice-member-name">${label}</div>
+        ${volSlider}
     </div>`;
+}
+
+function setUserVolume(userName, value) {
+    const vol = parseInt(value, 10);
+    voiceState.volumes[userName] = vol;
+    // audio 엘리먼트 볼륨 적용 (0~1 범위, 최대 2.0배)
+    const audio = document.getElementById(`voice-audio-${userName}`);
+    if (audio) audio.volume = Math.min(vol / 100, 1.0);
+    // 표시값 업데이트
+    const valEl = document.getElementById(`voice-vol-val-${userName}`);
+    if (valEl) valEl.textContent = `${vol}%`;
 }
 
 // ── 컨트롤 ──────────────────────────────────────────────────────────────────
@@ -531,6 +558,7 @@ function leaveVoiceRoom() {
     voiceState.roomId      = null;
     voiceState.roomName    = null;
     voiceState.speakingMap = {};
+    voiceState.volumes     = {};
     voiceState.isMuted     = false;
     voiceState.isDeafened  = false;
 
