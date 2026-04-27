@@ -8,6 +8,7 @@ const voiceState = {
     peers:         {},   // {userName: {pc: RTCPeerConnection, pendingIce: []}}
     localStream:   null,
     isMuted:       false,
+    isDeafened:    false,
     inRoom:        false,
     rooms:         [],
     speakingMap:   {},   // {userName: bool}
@@ -453,7 +454,11 @@ function _renderInRoom(container, otherMembers) {
     <div class="voice-controls">
         <button class="voice-mute-btn ${voiceState.isMuted ? 'muted' : ''}" id="voice-mute-btn"
             onclick="toggleVoiceMute()">
-            ${voiceState.isMuted ? '🔇 음소거 해제' : '🎤 음소거'}
+            ${voiceState.isMuted ? '🔇 마이크 켜기' : '🎤 마이크 끄기'}
+        </button>
+        <button class="voice-deafen-btn ${voiceState.isDeafened ? 'deafened' : ''}" id="voice-deafen-btn"
+            onclick="toggleVoiceDeafen()">
+            ${voiceState.isDeafened ? '🔈 스피커 켜기' : '🔊 스피커 끄기'}
         </button>
     </div>
 </div>`;
@@ -478,12 +483,25 @@ function toggleVoiceMute() {
     });
     const btn = document.getElementById('voice-mute-btn');
     if (btn) {
-        btn.textContent = voiceState.isMuted ? '🔇 음소거 해제' : '🎤 음소거';
+        btn.textContent = voiceState.isMuted ? '🔇 마이크 켜기' : '🎤 마이크 끄기';
         btn.classList.toggle('muted', voiceState.isMuted);
     }
     if (voiceState.isMuted) {
         voiceState.speakingMap[voiceState.userName] = false;
         _updateSpeakingUI(voiceState.userName);
+    }
+}
+
+function toggleVoiceDeafen() {
+    voiceState.isDeafened = !voiceState.isDeafened;
+    // 모든 원격 오디오 엘리먼트 음소거/해제
+    document.querySelectorAll('[id^="voice-audio-"]').forEach(el => {
+        el.muted = voiceState.isDeafened;
+    });
+    const btn = document.getElementById('voice-deafen-btn');
+    if (btn) {
+        btn.textContent = voiceState.isDeafened ? '🔈 스피커 켜기' : '🔊 스피커 끄기';
+        btn.classList.toggle('deafened', voiceState.isDeafened);
     }
 }
 
@@ -509,11 +527,12 @@ function leaveVoiceRoom() {
     voiceState._speakTimers.forEach(id => cancelAnimationFrame(id));
     voiceState._speakTimers = [];
 
-    voiceState.inRoom    = false;
-    voiceState.roomId    = null;
-    voiceState.roomName  = null;
+    voiceState.inRoom      = false;
+    voiceState.roomId      = null;
+    voiceState.roomName    = null;
     voiceState.speakingMap = {};
-    voiceState.isMuted   = false;
+    voiceState.isMuted     = false;
+    voiceState.isDeafened  = false;
 
     _startRoomPoll();
     renderVoiceTab();

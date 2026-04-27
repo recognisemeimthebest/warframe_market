@@ -1004,9 +1004,11 @@ main::-webkit-scrollbar-thumb, #messages::-webkit-scrollbar-thumb, #surge-list::
 }
 
 /* 컨트롤 바 */
-.voice-controls { display:flex; justify-content:center; padding:8px 0 4px; }
-.voice-mute-btn { padding:12px 28px; background:var(--surface); border:2px solid var(--primary,#4db8ff); border-radius:12px; color:var(--primary,#4db8ff); font-size:14px; font-weight:700; cursor:pointer; transition:all .2s; }
-.voice-mute-btn:hover { background:rgba(77,184,255,.1); }
+.voice-controls { display:flex; justify-content:center; gap:10px; padding:8px 0 4px; }
+.voice-mute-btn, .voice-deafen-btn { padding:12px 22px; background:var(--surface); border:2px solid var(--primary,#4db8ff); border-radius:12px; color:var(--primary,#4db8ff); font-size:14px; font-weight:700; cursor:pointer; transition:all .2s; }
+.voice-mute-btn:hover, .voice-deafen-btn:hover { background:rgba(77,184,255,.1); }
 .voice-mute-btn.muted { background:#e53935; border-color:#e53935; color:#fff; }
 .voice-mute-btn.muted:hover { opacity:.85; }
+.voice-deafen-btn.deafened { background:#7b1fa2; border-color:#7b1fa2; color:#fff; }
+.voice-deafen-btn.deafened:hover { opacity:.85; }
 .calc-share-submit:disabled { opacity:.5; cursor:not-allowed; }
