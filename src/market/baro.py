@@ -260,29 +260,46 @@ async def sync_current_visit() -> dict:
 
 # ── 피처 매트릭스 (ML 학습용) ──────────────────────────────────────────────────
 
-def _item_visit_nums() -> dict[int, list[int]]:
-    """item_id → 방문번호 정렬 리스트."""
+def _item_visit_nums(type_filter: str | None = None) -> dict[int, list[int]]:
+    """item_id → 방문번호 정렬 리스트. type_filter: item_type LIKE 패턴."""
     with sqlite3.connect(DB_PATH) as conn:
-        rows = conn.execute(
-            "SELECT item_id, visit_num FROM baro_appearances ORDER BY item_id, visit_num"
-        ).fetchall()
+        if type_filter:
+            rows = conn.execute(
+                "SELECT a.item_id, a.visit_num FROM baro_appearances a "
+                "JOIN baro_items i ON a.item_id = i.id "
+                "WHERE i.item_type LIKE ? ORDER BY a.item_id, a.visit_num",
+                (f"%{type_filter}%",),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT item_id, visit_num FROM baro_appearances ORDER BY item_id, visit_num"
+            ).fetchall()
     result: dict[int, list[int]] = {}
     for item_id, vn in rows:
         result.setdefault(item_id, []).append(vn)
     return result
 
 
-def _all_items() -> dict[int, dict]:
-    """item_id → {item_name, ducat_cost, item_type}."""
+def _all_items(type_filter: str | None = None) -> dict[int, dict]:
+    """item_id → {item_name, ducat_cost, item_type}. type_filter: LIKE 패턴."""
     with sqlite3.connect(DB_PATH) as conn:
-        rows = conn.execute(
-            "SELECT id, item_name, ducat_cost, item_type FROM baro_items"
-        ).fetchall()
+        if type_filter:
+            rows = conn.execute(
+                "SELECT id, item_name, ducat_cost, item_type FROM baro_items "
+                "WHERE item_type LIKE ?",
+                (f"%{type_filter}%",),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT id, item_name, ducat_cost, item_type FROM baro_items"
+            ).fetchall()
     return {r[0]: {"item_name": r[1], "ducat": r[2], "item_type": r[3]} for r in rows}
 
 
-def build_feature_matrix():
-    """(X, y, item_names) 반환 — 시간 순 정렬 보장."""
+def build_feature_matrix(type_filter: str | None = None):
+    """(X, y, item_names) 반환 — 시간 순 정렬 보장.
+    type_filter: 'Primed' 등 item_type LIKE 필터 (None=전체)
+    """
     with sqlite3.connect(DB_PATH) as conn:
         total_visits = conn.execute(
             "SELECT MAX(visit_num) FROM baro_visits"
@@ -291,8 +308,8 @@ def build_feature_matrix():
     if total_visits < 15:
         return [], [], []
 
-    visit_map  = _item_visit_nums()   # item_id → sorted visit_nums
-    items_meta = _all_items()
+    visit_map  = _item_visit_nums(type_filter)
+    items_meta = _all_items(type_filter)
 
     # 타입 인코딩 (일관성 유지용)
     all_types  = sorted({m["item_type"] for m in items_meta.values()})
@@ -330,8 +347,10 @@ def build_feature_matrix():
     return X, y, names
 
 
-def get_item_features_for_prediction() -> list[dict]:
-    """예측용 현재 시점 피처 (각 아이템의 최신 상태)."""
+def get_item_features_for_prediction(type_filter: str | None = None) -> list[dict]:
+    """예측용 현재 시점 피처 (각 아이템의 최신 상태).
+    type_filter: 'Primed' 등 item_type LIKE 필터 (None=전체)
+    """
     with sqlite3.connect(DB_PATH) as conn:
         total_visits = conn.execute(
             "SELECT MAX(visit_num) FROM baro_visits"
@@ -340,8 +359,8 @@ def get_item_features_for_prediction() -> list[dict]:
     if total_visits == 0:
         return []
 
-    visit_map  = _item_visit_nums()
-    items_meta = _all_items()
+    visit_map  = _item_visit_nums(type_filter)
+    items_meta = _all_items(type_filter)
     all_types  = sorted({m["item_type"] for m in items_meta.values()})
     type_enc   = {t: i for i, t in enumerate(all_types)}
 

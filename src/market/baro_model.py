@@ -15,13 +15,24 @@ from src.market.baro import (
 
 logger = logging.getLogger(__name__)
 
-MODEL_PATH = DATA_DIR / "baro_model.pkl"
+MODEL_PATH        = DATA_DIR / "baro_model.pkl"
+MODEL_PATH_PRIMED = DATA_DIR / "baro_model_primed.pkl"
+
+
+def _model_path(mode: str) -> "Path":
+    return MODEL_PATH_PRIMED if mode == "primed" else MODEL_PATH
+
+
+def _type_filter(mode: str) -> str | None:
+    return "Primed" if mode == "primed" else None
 
 
 # ── 학습 ──────────────────────────────────────────────────────────────────────
 
-def train_model(n_trials: int = 200, n_jobs: int = 4) -> dict:
-    """Optuna 하이퍼파라미터 탐색 → LightGBM 최종 학습."""
+def train_model(n_trials: int = 200, n_jobs: int = 4, mode: str = "all") -> dict:
+    """Optuna 하이퍼파라미터 탐색 → LightGBM 최종 학습.
+    mode: 'all' | 'primed'  (primed = Mod (Primed) 전용 모델)
+    """
     try:
         import lightgbm as lgb
         import numpy as np
@@ -29,7 +40,7 @@ def train_model(n_trials: int = 200, n_jobs: int = 4) -> dict:
     except ImportError as e:
         return {"ok": False, "error": f"의존성 없음: {e}"}
 
-    X_list, y_list, _ = build_feature_matrix()
+    X_list, y_list, _ = build_feature_matrix(type_filter=_type_filter(mode))
     if not X_list:
         return {"ok": False, "error": "학습 데이터 없음 (DB 스크래핑 먼저 실행)"}
 
@@ -142,29 +153,41 @@ def train_model(n_trials: int = 200, n_jobs: int = 4) -> dict:
         "pos_weight":    pos_weight,
         "train_samples": len(X_tr),
         "val_samples":   len(X_va),
+        "mode":          mode,
         "trained_at":    __import__("datetime").datetime.now().isoformat(),
     }
-    with open(MODEL_PATH, "wb") as f:
+    out_path = _model_path(mode)
+    with open(out_path, "wb") as f:
         pickle.dump(bundle, f)
+    logger.info("바로 모델 저장: %s", out_path)
 
     logger.info("바로 모델 저장 완료: %s", MODEL_PATH)
     return {
         "ok":           True,
+        "mode":         mode,
         "best_auc":     round(best_auc, 4),
         "best_params":  best_params,
         "importance":   importance,
         "train_samples": len(X_tr),
         "val_samples":  len(X_va),
-        "model_path":   str(MODEL_PATH),
+        "model_path":   str(out_path),
     }
 
 
 # ── 예측 ──────────────────────────────────────────────────────────────────────
 
-def predict_next_visit(top_n: int = 30) -> list[dict]:
-    """다음 방문 등장 확률 예측 (모델 없으면 빈 리스트)."""
-    if not MODEL_PATH.exists():
-        return []
+def predict_next_visit(top_n: int = 30, mode: str = "primed") -> list[dict]:
+    """다음 방문 등장 확률 예측.
+    mode: 'all' | 'primed'  (기본값 primed — 가장 유용한 예측)
+    """
+    path = _model_path(mode)
+    if not path.exists():
+        # fallback: 다른 모드 모델로 시도
+        fallback = MODEL_PATH if mode == "primed" else MODEL_PATH_PRIMED
+        if fallback.exists():
+            path = fallback
+        else:
+            return []
 
     try:
         import numpy as np
@@ -172,11 +195,12 @@ def predict_next_visit(top_n: int = 30) -> list[dict]:
     except ImportError:
         return []
 
-    with open(MODEL_PATH, "rb") as f:
+    with open(path, "rb") as f:
         bundle: dict = pickle.load(f)
     model: lgb.Booster = bundle["model"]
+    actual_mode = bundle.get("mode", mode)
 
-    item_feats = get_item_features_for_prediction()
+    item_feats = get_item_features_for_prediction(type_filter=_type_filter(actual_mode))
     if not item_feats:
         return []
 
@@ -201,14 +225,16 @@ def predict_next_visit(top_n: int = 30) -> list[dict]:
     return results[:top_n]
 
 
-def get_model_info() -> dict:
-    if not MODEL_PATH.exists():
-        return {"trained": False}
+def get_model_info(mode: str = "primed") -> dict:
+    path = _model_path(mode)
+    if not path.exists():
+        return {"trained": False, "mode": mode}
     try:
-        with open(MODEL_PATH, "rb") as f:
+        with open(path, "rb") as f:
             b = pickle.load(f)
         return {
             "trained":    True,
+            "mode":       b.get("mode", mode),
             "best_auc":   b.get("best_auc"),
             "trained_at": b.get("trained_at"),
             "best_params": b.get("best_params"),

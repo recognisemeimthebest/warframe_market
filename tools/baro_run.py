@@ -82,16 +82,18 @@ async def cmd_scrape():
     print()
 
 
-def cmd_train(fast: bool = False):
+def cmd_train(fast: bool = False, mode: str = "all"):
     trials  = 20  if fast else 200
     workers = 2   if fast else 4
     label   = "빠른 테스트" if fast else "전체 학습"
+    mode_label = "프라임드 모드 전용" if mode == "primed" else "전체 아이템"
 
-    print(f"\n🤖 LightGBM + Optuna {label} (trials={trials}, workers={workers})")
-    print("  (Pi 5에서 전체 학습 ~10-20분 소요)")
+    print(f"\n🤖 LightGBM + Optuna {label} [{mode_label}] (trials={trials}, workers={workers})")
+    if not fast:
+        print("  (9700X 기준 ~5-10분 소요)")
     print()
 
-    result = train_model(n_trials=trials, n_jobs=workers)
+    result = train_model(n_trials=trials, n_jobs=workers, mode=mode)
     if result["ok"]:
         print(f"\n  ✅ 학습 완료!")
         print(f"  AUC:            {result['best_auc']:.4f}")
@@ -123,17 +125,18 @@ def cmd_train(fast: bool = False):
     print()
 
 
-def cmd_predict(top: int = 30):
-    print(f"\n🔮 다음 바로 방문 예측 (상위 {top}개)")
-    m = get_model_info()
+def cmd_predict(top: int = 30, mode: str = "primed"):
+    mode_label = "프라임드 모드 전용" if mode == "primed" else "전체 아이템"
+    print(f"\n🔮 다음 바로 방문 예측 [{mode_label}] (상위 {top}개)")
+    m = get_model_info(mode=mode)
     if not m.get("trained"):
-        print("  ⚠️  학습된 모델 없음. `python tools/baro_run.py train` 먼저 실행하세요.")
+        print(f"  ⚠️  학습된 모델 없음. `python tools/baro_run.py train --primed` 먼저 실행하세요.")
         return
 
     s = get_db_stats()
     print(f"  (총 {s['total_visits']}회 방문 데이터, 모델 AUC={m['best_auc']:.4f})\n")
 
-    preds = predict_next_visit(top_n=top)
+    preds = predict_next_visit(top_n=top, mode=mode)
     if not preds:
         print("  예측 결과 없음.")
         return
@@ -160,9 +163,12 @@ def cmd_predict(top: int = 30):
 async def main():
     parser = argparse.ArgumentParser(description="바로 키티어 파이프라인")
     parser.add_argument("cmd", choices=["scrape", "train", "predict", "stats", "all"])
-    parser.add_argument("--fast", action="store_true", help="빠른 테스트 (20 trials)")
-    parser.add_argument("--top",  type=int, default=30, help="예측 결과 상위 N개")
+    parser.add_argument("--fast",   action="store_true", help="빠른 테스트 (20 trials)")
+    parser.add_argument("--primed", action="store_true", help="Primed 모드만 학습/예측")
+    parser.add_argument("--top",    type=int, default=30, help="예측 결과 상위 N개")
     args = parser.parse_args()
+
+    mode = "primed" if args.primed else "all"
 
     if args.cmd == "stats":
         cmd_stats()
@@ -171,13 +177,13 @@ async def main():
         cmd_stats()
     elif args.cmd == "train":
         cmd_stats()
-        cmd_train(fast=args.fast)
+        cmd_train(fast=args.fast, mode=mode)
     elif args.cmd == "predict":
-        cmd_predict(top=args.top)
+        cmd_predict(top=args.top, mode=mode)
     elif args.cmd == "all":
         await cmd_scrape()
-        cmd_train(fast=args.fast)
-        cmd_predict(top=args.top)
+        cmd_train(fast=args.fast, mode=mode)
+        cmd_predict(top=args.top, mode=mode)
 
 
 if __name__ == "__main__":

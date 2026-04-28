@@ -25,5 +25,5 @@ async def close_client() -> None:
     """앱 종료 시 호출하여 커넥션 풀을 정리한다."""
     global _client
     if _client and not _client.is_closed:
-        await _client.close()
+        await _client.aclose()
     _client = None
