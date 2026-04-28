@@ -12,7 +12,13 @@
 import argparse
 import asyncio
 import sys
+import io
 from pathlib import Path
+
+# Windows 콘솔 UTF-8 강제
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 

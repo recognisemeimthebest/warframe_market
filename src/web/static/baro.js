@@ -17,8 +17,7 @@
         if (!bar) return;
         bar.innerHTML = `
             <button class="baro-sub active" data-bsub="current">현재 방문</button>
-            <button class="baro-sub" data-bsub="predict">예측</button>
-            <button class="baro-sub" data-bsub="db">DB / 학습</button>
+            <button class="baro-sub" data-bsub="predict">다음 방문 예측</button>
         `;
         bar.querySelectorAll('.baro-sub').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -37,7 +36,6 @@
         });
         if (sub === 'current') loadBaroCurrent();
         if (sub === 'predict') loadBaroPredict();
-        if (sub === 'db')      loadBaroDb();
     }
 
     // ── 현재 방문 ──────────────────────────────────────────────────────────────
