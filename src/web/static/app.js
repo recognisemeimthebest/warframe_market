@@ -3232,9 +3232,14 @@ function _renderBaroCard(container, baro) {
             <div class="vendor-status offline">부재 중</div>
             <div class="vendor-eta"><span class="vendor-eta-label">도착까지</span> ${escapeHtml(baro.eta || "")}</div>
             <div class="vendor-hint">키티어는 격주로 릴레이에 방문합니다.</div>
+            <div class="baro-pred-section">
+                <div class="baro-pred-title">다음 방문 예상 프라임드 모드</div>
+                <div class="baro-pred-list" id="baro-inline-preds"><span class="vendor-hint">불러오는 중...</span></div>
+            </div>
         `;
         sec.appendChild(card);
         container.appendChild(sec);
+        _loadInlineBaroPreds(card.querySelector('#baro-inline-preds'));
         return;
     }
 
@@ -3261,6 +3266,29 @@ function _renderBaroCard(container, baro) {
     `;
     sec.appendChild(card);
     container.appendChild(sec);
+}
+
+async function _loadInlineBaroPreds(el) {
+    try {
+        const r = await fetch('/api/baro/predict?top=5');
+        const d = await r.json();
+        const preds = d.predictions || [];
+        if (!preds.length || !d.model?.trained) {
+            el.innerHTML = '<span class="vendor-hint">예측 데이터 없음</span>';
+            return;
+        }
+        el.innerHTML = preds.map((p, i) => {
+            const pct = p.probability_pct;
+            const barColor = pct >= 70 ? 'var(--red, #e57373)' : pct >= 40 ? 'var(--orange, #ffb74d)' : 'var(--accent, #4fc3f7)';
+            return `<div class="baro-pred-item">
+                <span class="baro-pred-rank">${i + 1}</span>
+                <span class="baro-pred-name">${escapeHtml(p.item_name)}</span>
+                <span class="baro-pred-pct" style="color:${barColor}">${pct}%</span>
+            </div>`;
+        }).join('');
+    } catch {
+        el.innerHTML = '<span class="vendor-hint">예측 불러오기 실패</span>';
+    }
 }
 
 function _renderSteelPathCard(container, sp) {
