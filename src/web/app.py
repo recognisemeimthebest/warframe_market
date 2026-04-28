@@ -25,6 +25,7 @@ from src.market.items import (
     search_items,
 )
 from src.market.board import init_board_db
+from src.market.baro import init_baro_db, sync_current_visit
 from src.market.learned_aliases import init_aliases_db, save_alias
 from src.market.live_cache import run_live_cache_loop
 from src.market.monitor import backfill_statistics, get_popular_slugs, run_monitor
@@ -56,6 +57,7 @@ from src.web.routes.push import router as push_router
 from src.web.routes.board import router as board_router
 from src.web.routes.calc import router as calc_router
 from src.web.routes.voice import router as voice_router, cleanup_empty_rooms
+from src.web.routes.baro import router as baro_router
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +117,7 @@ async def lifespan(app: FastAPI):
     init_board_db()
     init_aliases_db()
     init_analytics_db()
+    init_baro_db()
 
     # overframe.gg 빌드 캐시 미리 로드 (첫 번째 참고빌드 검색 응답 속도 개선)
     asyncio.create_task(_warm_builds_cache())
@@ -130,6 +133,8 @@ async def lifespan(app: FastAPI):
     logger.info("워치리스트 모니터 백그라운드 태스크 시작")
     asyncio.create_task(cleanup_empty_rooms())
     logger.info("음성채팅방 청소 태스크 시작")
+    asyncio.create_task(_run_baro_watcher())
+    logger.info("바로 키티어 감시 태스크 시작")
 
     yield  # 앱 실행 중
 
@@ -154,6 +159,7 @@ app.include_router(push_router)
 app.include_router(board_router)
 app.include_router(calc_router)
 app.include_router(voice_router)
+app.include_router(baro_router)
 
 
 # ── 페이지 서빙 ──
@@ -355,3 +361,36 @@ async def broadcast(message: dict) -> None:
             body=f"{name} 목표가 도달: {price}p",
             url="/",
         ))
+
+
+# ── 바로 키티어 감시 (2주마다 자동 동기화 + 재학습) ──
+
+_baro_last_activation: str | None = None
+
+
+async def _run_baro_watcher() -> None:
+    """1시간마다 바로 방문 여부 확인 → 새 방문 감지 시 DB 저장 + 모델 재학습."""
+    global _baro_last_activation
+    from src.http_client import get_client
+    from src.market.baro_model import train_model
+
+    while True:
+        try:
+            client = get_client()
+            r = await client.get("https://api.warframestat.us/pc/voidTrader", timeout=15.0)
+            r.raise_for_status()
+            d = r.json()
+            activation = d.get("activation", "")
+            active = d.get("active", False)
+
+            if active and activation and activation != _baro_last_activation:
+                logger.info("새 바로 방문 감지: %s — 동기화 + 재학습 시작", activation)
+                _baro_last_activation = activation
+                await sync_current_visit()
+                asyncio.create_task(
+                    asyncio.to_thread(train_model, 200, 4)
+                )
+        except Exception:
+            logger.debug("바로 감시 오류", exc_info=True)
+
+        await asyncio.sleep(3600)  # 1시간마다 체크

@@ -99,6 +99,7 @@
             <button class="tab" data-tab="modding">모딩 공유</button>
             <button class="tab" data-tab="board">거래소</button>
             <button class="tab" data-tab="voice">음성채팅</button>
+            <button class="tab" data-tab="baro">바로</button>
         </nav>
 
         <!-- 시세 조회 탭 -->
@@ -248,6 +249,20 @@
             <div class="board-modal-body" id="board-modal-body"></div>
         </div>
 
+        <!-- 바로 키티어 탭 -->
+        <main id="tab-baro" class="tab-content">
+            <div id="baro-sub-bar"></div>
+            <div id="baro-sub-current">
+                <div id="baro-current-content"></div>
+            </div>
+            <div id="baro-sub-predict" style="display:none;">
+                <div id="baro-predict-content"></div>
+            </div>
+            <div id="baro-sub-db" style="display:none;">
+                <div id="baro-db-content"></div>
+            </div>
+        </main>
+
         <!-- 음성채팅 탭 -->
         <main id="tab-voice" class="tab-content">
             <div id="voice-container"></div>
@@ -273,6 +288,7 @@
     <script src="/static/board.js?v=20260419n"></script>
     <script src="/static/calc.js?v=20260419n"></script>
     <script src="/static/voice.js?v=20260419n"></script>
+    <script src="/static/baro.js?v=20260428a"></script>
     <script>
         if ("serviceWorker" in navigator) {
             navigator.serviceWorker.register("/static/sw.js").catch(() => {});

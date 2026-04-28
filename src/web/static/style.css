@@ -1034,3 +1034,69 @@ main::-webkit-scrollbar-thumb, #messages::-webkit-scrollbar-thumb, #surge-list::
 .voice-vol-slider::-moz-range-thumb { width:14px; height:14px; border-radius:50%; background:var(--primary,#4db8ff); cursor:pointer; border:none; }
 .voice-vol-val { font-size:10px; color:var(--text-muted); min-width:32px; text-align:right; }
 .calc-share-submit:disabled { opacity:.5; cursor:not-allowed; }
+
+/* ── 바로 키티어 탭 ────────────────────────────────────────────────── */
+#baro-sub-bar { display:flex; background:var(--surface); border-bottom:1px solid var(--border); overflow-x:auto; scrollbar-width:none; }
+#baro-sub-bar::-webkit-scrollbar { display:none; }
+.baro-sub { flex:0 0 auto; padding:10px 16px; background:none; border:none; border-bottom:2px solid transparent; color:var(--text-muted); font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; }
+.baro-sub.active { color:var(--primary); border-bottom-color:var(--primary); }
+#tab-baro main, #tab-baro { flex:1; overflow-y:auto; }
+.baro-loading, .baro-empty, .baro-hint { text-align:center; color:var(--text-muted); padding:20px 16px; font-size:13px; }
+.baro-inactive { text-align:center; padding:40px 16px; }
+.baro-icon { font-size:48px; margin-bottom:12px; }
+.baro-eta, .baro-eta-active { font-size:13px; color:var(--text-muted); margin:4px 0; }
+.baro-eta-active strong { color:var(--primary); }
+.baro-location { font-size:14px; font-weight:600; color:var(--text); margin-bottom:4px; }
+.baro-item-count { font-size:12px; color:var(--text-muted); }
+.baro-current-header { padding:12px 16px; background:var(--surface); border-bottom:1px solid var(--border); }
+.baro-item-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:8px; padding:12px 16px; }
+.baro-item-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:10px 12px; }
+.baro-item-name { font-size:13px; font-weight:600; color:var(--text); margin-bottom:6px; line-height:1.3; }
+.baro-item-cost { display:flex; gap:8px; font-size:12px; margin-bottom:4px; }
+.baro-ducat { color:var(--orange); }
+.baro-credit { color:var(--text-muted); }
+.baro-item-market { display:flex; gap:6px; flex-wrap:wrap; font-size:11px; margin-top:4px; }
+.baro-price-sell { color:var(--green); }
+.baro-price-buy  { color:var(--primary); }
+.baro-mkt-link   { color:var(--text-muted); text-decoration:none; }
+.baro-mkt-link:hover { color:var(--primary); }
+
+/* 예측 */
+.baro-no-model { text-align:center; padding:40px 16px; }
+.baro-predict-header { display:flex; align-items:center; gap:10px; padding:10px 16px; background:var(--surface); border-bottom:1px solid var(--border); font-size:12px; color:var(--text-muted); flex-wrap:wrap; }
+.baro-auc-badge { background:rgba(77,184,255,.15); color:var(--primary); padding:2px 8px; border-radius:10px; font-size:12px; font-weight:600; }
+.baro-train-date { font-size:11px; color:var(--text-muted); }
+.baro-predict-table-wrap { overflow-x:auto; padding:0 8px 16px; }
+.baro-predict-table { width:100%; border-collapse:collapse; font-size:13px; }
+.baro-predict-table th { padding:8px 10px; text-align:left; color:var(--text-muted); font-size:11px; font-weight:600; border-bottom:1px solid var(--border); white-space:nowrap; }
+.baro-pred-row td { padding:8px 10px; border-bottom:1px solid rgba(255,255,255,.04); vertical-align:middle; }
+.baro-pred-row.high-prob td { background:rgba(255,107,107,.04); }
+.baro-pred-rank { color:var(--text-muted); font-size:11px; width:28px; }
+.baro-pred-name a { color:var(--text); text-decoration:none; }
+.baro-pred-name a:hover { color:var(--primary); }
+.baro-pred-type { display:block; font-size:10px; color:var(--text-muted); }
+.baro-pred-prob { min-width:120px; }
+.baro-prob-bar-wrap { height:4px; background:var(--border); border-radius:2px; margin-bottom:3px; }
+.baro-prob-bar { height:4px; border-radius:2px; transition:width .3s; }
+.baro-prob-pct { font-size:12px; font-weight:700; }
+.baro-pred-stat { font-size:12px; color:var(--text-muted); text-align:right; white-space:nowrap; }
+.baro-ducat-col { color:var(--orange) !important; }
+
+/* DB / 학습 */
+.baro-db-section { padding:14px 16px; border-bottom:1px solid var(--border); }
+.baro-section-title { font-size:13px; font-weight:700; color:var(--primary); margin-bottom:10px; }
+.baro-stat-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:12px; }
+.baro-stat { background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:8px; text-align:center; }
+.baro-stat-val { display:block; font-size:18px; font-weight:700; color:var(--text); }
+.baro-stat-lbl { font-size:10px; color:var(--text-muted); }
+.baro-btn-row { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; }
+.baro-btn { padding:8px 14px; background:var(--primary); color:#000; border:none; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; }
+.baro-btn:disabled { opacity:.5; cursor:not-allowed; }
+.baro-btn-sec { background:var(--surface); color:var(--text); border:1px solid var(--border); }
+.baro-model-info { margin-bottom:8px; }
+.baro-importance { margin-top:10px; }
+.baro-imp-row { display:flex; align-items:center; gap:8px; margin:4px 0; font-size:11px; }
+.baro-imp-name { width:90px; color:var(--text-muted); flex-shrink:0; }
+.baro-imp-bar-wrap { flex:1; height:6px; background:var(--border); border-radius:3px; }
+.baro-imp-bar { height:6px; border-radius:3px; background:var(--primary); }
+.baro-imp-val { width:45px; text-align:right; color:var(--text-muted); }

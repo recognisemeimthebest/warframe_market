@@ -370,6 +370,7 @@ function _activateTab(tab, pushHistory = true) {
     if (tab === "board" && typeof loadBoardList === "function") loadBoardList();
     if (tab === "voice" && typeof initVoiceTab === "function") initVoiceTab();
     if (tab !== "voice" && activeTab === "voice" && typeof destroyVoiceTab === "function") destroyVoiceTab();
+    if (tab === "baro" && typeof initBaroTab === "function") initBaroTab();
 
     if (pushHistory) {
         history.pushState({ tab }, "", "?tab=" + tab);
