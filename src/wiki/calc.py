@@ -777,6 +777,34 @@ def _get_weapon_base_stats(w: dict, weapon_type: str = "primary") -> dict:
     }
 
 
+_WEAPON_SUFFIX_RE = re.compile(
+    r'\s+(set|blueprint|receiver|barrel|stock|handle|guard|blade|grip|hilt|'
+    r'string|limb|upper receiver|lower receiver|link|neuroptics|systems|chassis)\s*$',
+    re.IGNORECASE,
+)
+
+
+def _try_ko_to_en_weapon(q: str) -> str:
+    """한글 무기 쿼리를 영문명으로 변환 시도.
+
+    warframe.market 아이템 캐시의 한글→슬러그→영문명 체인을 사용하고,
+    " Set" 같은 접미사를 제거해 WFCD 이름과 맞춘다.
+    """
+    try:
+        from src.market.items import _ko_to_slug, _slug_to_en_name, _load_items_cache, _en_name_to_slug  # noqa: PLC0415
+        if not _en_name_to_slug:
+            _load_items_cache()
+        key_no_space = q.replace(" ", "").lower()
+        slug = _ko_to_slug.get(key_no_space) or _ko_to_slug.get(q.lower())
+        if slug:
+            en_name = _slug_to_en_name.get(slug, "")
+            if en_name:
+                return _WEAPON_SUFFIX_RE.sub("", en_name).strip()
+    except Exception:
+        pass
+    return ""
+
+
 async def search_weapons(query: str, weapon_type: str = "primary", limit: int = 12) -> list[dict]:
     await _ensure_weapons_data()
 
@@ -788,6 +816,12 @@ async def search_weapons(query: str, weapon_type: str = "primary", limit: int = 
         cache, default_compat = _primary_cache, "RIFLE"
 
     q = query.lower().strip()
+
+    # 한글 입력이면 영문명으로 변환 시도
+    en_q = ""
+    if q and any("가" <= c <= "힣" for c in q):
+        en_q = _try_ko_to_en_weapon(q).lower()
+
     results: list[dict] = []
 
     for w in cache:
@@ -799,8 +833,10 @@ async def search_weapons(query: str, weapon_type: str = "primary", limit: int = 
             continue
         if "skin" in name.lower() and "skin" not in q:
             continue
-        if q and q not in name.lower():
-            continue
+        if q:
+            name_lower = name.lower()
+            if not ((q in name_lower) or (en_q and en_q in name_lower)):
+                continue
 
         wtype = w.get("type", "")
         compat = _WEAPON_TYPE_TO_COMPAT.get(wtype, default_compat)
