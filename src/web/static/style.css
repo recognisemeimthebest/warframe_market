@@ -1042,6 +1042,35 @@ main::-webkit-scrollbar-thumb, #messages::-webkit-scrollbar-thumb, #surge-list::
 .voice-vol-val { font-size:10px; color:var(--text-muted); min-width:32px; text-align:right; }
 .calc-share-submit:disabled { opacity:.5; cursor:not-allowed; }
 
+/* ── 가상모딩 모드 전환 바 ── */
+.calc-mode-bar { display:flex; gap:4px; margin-bottom:10px; border-bottom:1px solid var(--border); padding-bottom:8px; }
+.calc-mode-btn { padding:6px 16px; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--text-muted); font-size:13px; font-weight:600; cursor:pointer; transition:all .15s; }
+.calc-mode-btn.active { background:var(--primary,#4db8ff); color:#0a1628; border-color:var(--primary,#4db8ff); }
+.calc-mode-btn:hover:not(.active) { background:var(--surface2,#1e2a3a); color:var(--text); }
+
+/* ── 무기 유형 버튼 ── */
+.calc-weapon-type-bar { display:flex; gap:6px; }
+.calc-weapon-type-btn { flex:1; padding:7px 4px; border-radius:8px; border:1px solid var(--border); background:transparent; color:var(--text-muted); font-size:12px; font-weight:600; cursor:pointer; transition:all .15s; }
+.calc-weapon-type-btn.active { background:var(--surface2,#1e2a3a); color:var(--text); border-color:var(--primary,#4db8ff); }
+.calc-weapon-type-btn:hover:not(.active) { background:var(--surface2,#1e2a3a); }
+
+/* ── 무기 선택 표시 ── */
+.calc-weapon-search-row { display:flex; gap:8px; align-items:center; }
+.calc-weapon-display { flex:1; padding:8px 12px; border:1px dashed var(--border); border-radius:10px; cursor:pointer; min-height:38px; display:flex; align-items:center; gap:8px; transition:border-color .15s; }
+.calc-weapon-display:hover, .calc-weapon-selected { border-style:solid; border-color:color-mix(in srgb, var(--primary,#4db8ff) 40%, var(--border)); background:var(--bg); }
+.calc-weapon-placeholder { color:var(--text-muted); font-size:13px; }
+.calc-weapon-name { font-size:13px; font-weight:600; color:var(--text); }
+.calc-weapon-type-tag { font-size:11px; color:var(--text-muted); background:var(--surface2,#1e2a3a); padding:2px 7px; border-radius:5px; }
+.calc-weapon-clear { padding:4px 10px; border:1px solid var(--border); border-radius:8px; background:transparent; color:var(--text-muted); cursor:pointer; font-size:15px; line-height:1; }
+.calc-weapon-clear:hover { background:var(--surface2,#1e2a3a); color:var(--text); }
+
+/* ── 무기 검색 모달 ── */
+#wp-search-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:3000; }
+#wp-search-modal   { display:none; position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); width:min(400px,90vw); max-height:70vh; background:var(--surface); border:1px solid var(--border); border-radius:14px; z-index:3001; flex-direction:column; overflow:hidden; box-shadow:0 20px 50px rgba(0,0,0,.4); }
+
+/* ── DPS 행 ── */
+.calc-stat-dps-row { border-top:1px solid var(--border); padding-top:8px; margin-top:4px; }
+
 /* ── 바로 키티어 탭 ────────────────────────────────────────────────── */
 #baro-sub-bar { display:flex; background:var(--surface); border-bottom:1px solid var(--border); overflow-x:auto; scrollbar-width:none; }
 #baro-sub-bar::-webkit-scrollbar { display:none; }

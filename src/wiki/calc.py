@@ -95,6 +95,36 @@ for _stat_key, _keywords in _MOD_STAT_MAP.items():
     for _kw in _keywords:
         _KEYWORD_TO_STAT[_kw.lower()] = _stat_key
 
+# ── 무기 모드 스탯 키 → 텍스트 매핑 ─────────────────────────────────────────
+
+_WEAPON_MOD_STAT_MAP: dict[str, list[str]] = {
+    "damage":          ["Damage", "Base Damage"],
+    "multishot":       ["Multishot"],
+    "crit_chance":     ["Critical Chance"],
+    "crit_multiplier": ["Critical Damage"],
+    "status_chance":   ["Status Chance"],
+    "fire_rate":       ["Fire Rate", "Attack Speed"],
+    "reload_speed":    ["Reload Speed"],
+    "impact":          ["Impact"],
+    "puncture":        ["Puncture"],
+    "slash":           ["Slash"],
+    "heat":            ["Heat"],
+    "cold":            ["Cold"],
+    "electricity":     ["Electricity"],
+    "toxin":           ["Toxin"],
+    "magnetic":        ["Magnetic"],
+    "radiation":       ["Radiation"],
+    "viral":           ["Viral"],
+    "corrosive":       ["Corrosive"],
+    "blast":           ["Blast"],
+    "gas":             ["Gas"],
+}
+
+_WEAPON_KEYWORD_TO_STAT: dict[str, str] = {}
+for _stat_key, _keywords in _WEAPON_MOD_STAT_MAP.items():
+    for _kw in _keywords:
+        _WEAPON_KEYWORD_TO_STAT[_kw.lower()] = _stat_key
+
 # ── WFCD 캐시 경로 및 전역 ──────────────────────────────────────────────────
 
 _WFCD_BASE = "https://raw.githubusercontent.com/WFCD/warframe-items/master/data/json"
@@ -617,4 +647,273 @@ def calc_warframe_stats(
         "duration":   round(duration, 1),
         "range":      round(ability_range, 1),
         "efficiency": round(efficiency, 1),
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ── 무기 모딩 ─────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+
+_PRIMARY_PATH   = Path(DATA_DIR) / "wf_primary.json"
+_SECONDARY_PATH = Path(DATA_DIR) / "wf_secondary.json"
+_MELEE_PATH     = Path(DATA_DIR) / "wf_melee.json"
+
+_primary_cache:   list[dict] = []
+_secondary_cache: list[dict] = []
+_melee_cache:     list[dict] = []
+_weapons_loaded = False
+
+_WEAPON_TYPE_TO_COMPAT: dict[str, str] = {
+    "Assault Rifle": "RIFLE",  "Rifle": "RIFLE",    "Beam Rifle": "RIFLE",
+    "Launcher":      "RIFLE",  "Archgun": "RIFLE",
+    "Shotgun":       "SHOTGUN",
+    "Sniper Rifle":  "SNIPER",
+    "Bow":           "BOW",    "Crossbow": "BOW",
+    "Pistol":        "PISTOL", "Thrown":   "PISTOL", "Pistol Shotgun": "PISTOL",
+    "Speargun":      "PISTOL",
+}
+
+
+async def _ensure_weapons_data() -> None:
+    global _weapons_loaded, _primary_cache, _secondary_cache, _melee_cache
+    if _weapons_loaded:
+        return
+    async with _get_lock():
+        if _weapons_loaded:
+            return
+        all_local = _PRIMARY_PATH.exists() and _SECONDARY_PATH.exists() and _MELEE_PATH.exists()
+        if all_local:
+            try:
+                _primary_cache   = _json.loads(_PRIMARY_PATH.read_text(encoding="utf-8"))
+                _secondary_cache = _json.loads(_SECONDARY_PATH.read_text(encoding="utf-8"))
+                _melee_cache     = _json.loads(_MELEE_PATH.read_text(encoding="utf-8"))
+                logger.info(
+                    "무기 로컬 캐시 로드: 주무기 %d개, 보조 %d개, 근접 %d개",
+                    len(_primary_cache), len(_secondary_cache), len(_melee_cache),
+                )
+                _weapons_loaded = True
+                return
+            except Exception:
+                logger.warning("무기 로컬 캐시 파싱 실패 — 재다운로드", exc_info=True)
+        try:
+            results = await asyncio.gather(
+                _download_and_save(f"{_WFCD_BASE}/Primary.json",   _PRIMARY_PATH),
+                _download_and_save(f"{_WFCD_BASE}/Secondary.json", _SECONDARY_PATH),
+                _download_and_save(f"{_WFCD_BASE}/Melee.json",     _MELEE_PATH),
+                return_exceptions=True,
+            )
+            pri_res, sec_res, mel_res = results
+            _primary_cache   = pri_res if not isinstance(pri_res, BaseException) else []
+            _secondary_cache = sec_res if not isinstance(sec_res, BaseException) else []
+            _melee_cache     = mel_res if not isinstance(mel_res, BaseException) else []
+            for label, res in [("주무기", pri_res), ("보조", sec_res), ("근접", mel_res)]:
+                if isinstance(res, BaseException):
+                    logger.error("%s 데이터 다운로드 실패: %s", label, res)
+            _weapons_loaded = True
+        except Exception:
+            logger.error("무기 데이터 초기화 실패", exc_info=True)
+            _weapons_loaded = True
+
+
+def _parse_weapon_mod_effects(mod: dict, rank: int | None = None) -> dict[str, float]:
+    level_stats: list[dict] = mod.get("levelStats", [])
+    if not level_stats:
+        return {}
+    idx = -1 if rank is None else min(rank, len(level_stats) - 1)
+    try:
+        stats_at_rank: list[dict] = level_stats[idx].get("stats", [])
+    except (IndexError, TypeError):
+        return {}
+
+    effects: dict[str, float] = {}
+    _pattern = re.compile(r"([+\-][\d.]+)%?\s+(.*)", re.IGNORECASE)
+    for stat_entry in stats_at_rank:
+        text: str = stat_entry if isinstance(stat_entry, str) else str(stat_entry)
+        m = _pattern.match(text.strip())
+        if not m:
+            continue
+        value_str, label_raw = m.group(1), m.group(2).strip()
+        try:
+            value = float(value_str)
+        except ValueError:
+            continue
+        label_lower = label_raw.lower()
+        matched_key: str | None = None
+        if label_lower in _WEAPON_KEYWORD_TO_STAT:
+            matched_key = _WEAPON_KEYWORD_TO_STAT[label_lower]
+        else:
+            for kw, stat_key in _WEAPON_KEYWORD_TO_STAT.items():
+                if kw in label_lower or label_lower in kw:
+                    matched_key = stat_key
+                    break
+        if matched_key:
+            effects[matched_key] = effects.get(matched_key, 0.0) + value
+    return effects
+
+
+def _get_weapon_base_stats(w: dict, weapon_type: str = "primary") -> dict:
+    damage_obj = w.get("damage", {})
+    if isinstance(damage_obj, dict):
+        impact   = damage_obj.get("Impact",   damage_obj.get("impact",   0.0))
+        puncture = damage_obj.get("Puncture", damage_obj.get("puncture", 0.0))
+        slash    = damage_obj.get("Slash",    damage_obj.get("slash",    0.0))
+        total    = sum(v for v in damage_obj.values() if isinstance(v, (int, float)))
+    else:
+        impact = puncture = slash = 0.0
+        total = float(damage_obj or 0)
+    fire_rate = w.get("fireRate") or w.get("attackSpeed") or 1.0
+    return {
+        "totalDamage":    round(total, 2),
+        "impact":         round(impact, 2),
+        "puncture":       round(puncture, 2),
+        "slash":          round(slash, 2),
+        "critChance":     round(w.get("criticalChance", 0.0), 4),
+        "critMultiplier": round(w.get("criticalMultiplier", 1.5), 2),
+        "statusChance":   round(w.get("statusChance", 0.0), 4),
+        "fireRate":       round(fire_rate, 3),
+        "magazineSize":   w.get("magazineSize", 0),
+        "reloadTime":     round(w.get("reloadTime", 0.0), 2),
+        "isMelee":        weapon_type == "melee",
+    }
+
+
+async def search_weapons(query: str, weapon_type: str = "primary", limit: int = 12) -> list[dict]:
+    await _ensure_weapons_data()
+
+    if weapon_type == "secondary":
+        cache, default_compat = _secondary_cache, "PISTOL"
+    elif weapon_type == "melee":
+        cache, default_compat = _melee_cache, "MELEE"
+    else:
+        cache, default_compat = _primary_cache, "RIFLE"
+
+    q = query.lower().strip()
+    results: list[dict] = []
+
+    for w in cache:
+        name: str = w.get("name", "")
+        if not name:
+            continue
+        # 스킨/코스메틱 제외
+        if w.get("productCategory") in {"SkinSet", "Appearance"}:
+            continue
+        if "skin" in name.lower() and "skin" not in q:
+            continue
+        if q and q not in name.lower():
+            continue
+
+        wtype = w.get("type", "")
+        compat = _WEAPON_TYPE_TO_COMPAT.get(wtype, default_compat)
+
+        results.append({
+            "name":   name,
+            "type":   wtype,
+            "compat": compat,
+            **_get_weapon_base_stats(w, weapon_type),
+        })
+
+    results.sort(key=lambda x: (x["name"].lower() != q, len(x["name"]), x["name"]))
+    return results[:limit]
+
+
+async def search_weapon_mods(query: str, compat: str = "RIFLE", limit: int = 12) -> list[dict]:
+    await _ensure_data()  # _mods_cache 사용
+
+    q = query.lower().strip()
+    en_q = ""
+    if q and any("가" <= c <= "힣" for c in q):
+        en_q = _try_ko_to_en_mod(q).lower()
+
+    compat_upper = compat.upper()
+    compat_allowed = {compat_upper, "ANY"}
+    if compat_upper in {"SHOTGUN", "SNIPER", "BOW"}:
+        compat_allowed.add("RIFLE")
+
+    results: list[dict] = []
+    for mod in _mods_cache:
+        name: str = mod.get("name", "")
+        name_lower = name.lower()
+        if q:
+            if not ((q in name_lower) or (en_q and en_q in name_lower)):
+                continue
+        mod_compat: str = (mod.get("compatName", "") or "").upper()
+        if mod_compat not in compat_allowed:
+            continue
+        fusion_limit: int = mod.get("fusionLimit", 5)
+        results.append({
+            "name":        name,
+            "polarity":    mod.get("polarity", ""),
+            "baseDrain":   mod.get("baseDrain", 0),
+            "fusionLimit": fusion_limit,
+            "maxRank":     fusion_limit,
+            "isExilus":    bool(mod.get("isExilus", False)),
+            "effects":     _parse_weapon_mod_effects(mod),
+        })
+
+    results.sort(key=lambda x: x["name"])
+    return results[:limit]
+
+
+def calc_weapon_stats(base: dict, mods: list[dict]) -> dict:
+    bonuses: dict[str, float] = {k: 0.0 for k in _WEAPON_MOD_STAT_MAP}
+    for m in mods:
+        effects = m.get("effects", {})
+        fusion_limit = max(m.get("fusionLimit", 5), 1)
+        rank = m.get("rank", fusion_limit)
+        ratio = rank / fusion_limit
+        for k, v in effects.items():
+            bonuses[k] = bonuses.get(k, 0.0) + v * ratio
+
+    base_total    = base.get("totalDamage", 50.0)
+    base_impact   = base.get("impact", 0.0)
+    base_puncture = base.get("puncture", 0.0)
+    base_slash    = base.get("slash", 0.0)
+    base_fr       = base.get("fireRate", 1.0)
+    base_cc       = base.get("critChance", 0.0)
+    base_cm       = base.get("critMultiplier", 1.5)
+    base_sc       = base.get("statusChance", 0.0)
+
+    # 물리 데미지
+    dmg_mult   = 1 + bonuses["damage"] / 100
+    imp_mult   = 1 + bonuses["impact"] / 100
+    pun_mult   = 1 + bonuses["puncture"] / 100
+    sla_mult   = 1 + bonuses["slash"] / 100
+    final_imp  = base_impact   * imp_mult * dmg_mult
+    final_pun  = base_puncture * pun_mult * dmg_mult
+    final_sla  = base_slash    * sla_mult * dmg_mult
+    final_phy  = final_imp + final_pun + final_sla
+
+    # 원소 데미지 (기본 총 데미지의 %)
+    elemental: dict[str, float] = {}
+    for elem in ("heat", "cold", "electricity", "toxin",
+                 "magnetic", "radiation", "viral", "corrosive", "blast", "gas"):
+        val = bonuses.get(elem, 0.0)
+        if val:
+            elemental[elem] = round(base_total * val / 100, 1)
+    total_elemental = sum(elemental.values())
+    final_total = final_phy + total_elemental
+
+    final_cc = min(1.0, base_cc * (1 + bonuses["crit_chance"] / 100))
+    final_cm = base_cm * (1 + bonuses["crit_multiplier"] / 100)
+    final_sc = min(1.0, base_sc * (1 + bonuses["status_chance"] / 100))
+    final_fr = base_fr * (1 + bonuses["fire_rate"] / 100)
+    multishot = 1 + bonuses["multishot"] / 100
+
+    # 예상 DPS (단순 추정)
+    avg_crit = 1 + final_cc * (final_cm - 1)
+    dps = final_total * final_fr * multishot * avg_crit
+
+    return {
+        "totalDamage":    round(final_total, 1),
+        "physicalDamage": round(final_phy, 1),
+        "impact":         round(final_imp, 1),
+        "puncture":       round(final_pun, 1),
+        "slash":          round(final_sla, 1),
+        "elemental":      elemental,
+        "critChance":     round(final_cc * 100, 1),
+        "critMultiplier": round(final_cm, 2),
+        "statusChance":   round(final_sc * 100, 1),
+        "fireRate":       round(final_fr, 3),
+        "multishot":      round(multishot, 2),
+        "dps":            round(dps, 0),
     }

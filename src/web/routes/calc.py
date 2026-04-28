@@ -8,10 +8,13 @@ from pydantic import BaseModel
 from src.wiki.calc import (
     ARCHON_SHARDS,
     calc_warframe_stats,
+    calc_weapon_stats,
     get_warframe_grouped_list,
     search_arcanes,
     search_mods,
     search_warframes,
+    search_weapon_mods,
+    search_weapons,
 )
 
 logger = logging.getLogger(__name__)
@@ -44,6 +47,11 @@ class ComputeRequest(BaseModel):
     mods: list[ModSlot] = []
     shards: list[ShardSlot] = []
     arcanes: list[ArcaneSlot] = []
+
+
+class WeaponComputeRequest(BaseModel):
+    base: dict  # weapon base stats
+    mods: list[ModSlot] = []
 
 
 # ── 엔드포인트 ────────────────────────────────────────────────────────────────
@@ -142,4 +150,46 @@ async def api_compute(req: ComputeRequest):
         return {"ok": False, "msg": f"필수 필드가 없습니다: {exc}"}
     except Exception as exc:
         logger.error("스탯 계산 오류: %s", exc, exc_info=True)
+        return {"ok": False, "msg": f"계산 중 오류가 발생했습니다: {exc}"}
+
+
+@router.get("/weapons")
+async def api_search_weapons(
+    q: str = Query(default="", alias="q"),
+    type: str = Query(default="primary"),
+):
+    """무기 이름 검색. ``GET /api/calc/weapons?type=primary&q=브라톤``"""
+    try:
+        items = await search_weapons(q.strip(), weapon_type=type.lower())
+        return {"ok": True, "items": items}
+    except Exception as exc:
+        logger.error("무기 검색 오류: %s", exc, exc_info=True)
+        return {"ok": False, "msg": str(exc)}
+
+
+@router.get("/weapon-mods")
+async def api_search_weapon_mods(
+    q: str = Query(default="", alias="q"),
+    compat: str = Query(default="RIFLE"),
+):
+    """무기 모드 검색. ``GET /api/calc/weapon-mods?compat=RIFLE&q=세레이션``"""
+    try:
+        items = await search_weapon_mods(q.strip(), compat=compat.upper())
+        return {"ok": True, "items": items}
+    except Exception as exc:
+        logger.error("무기 모드 검색 오류: %s", exc, exc_info=True)
+        return {"ok": False, "msg": str(exc)}
+
+
+@router.post("/compute-weapon")
+async def api_compute_weapon(req: WeaponComputeRequest):
+    """무기 스탯 계산. ``POST /api/calc/compute-weapon``"""
+    try:
+        result = calc_weapon_stats(
+            base=req.base,
+            mods=[m.dict() for m in req.mods],
+        )
+        return {"ok": True, "stats": result}
+    except Exception as exc:
+        logger.error("무기 스탯 계산 오류: %s", exc, exc_info=True)
         return {"ok": False, "msg": f"계산 중 오류가 발생했습니다: {exc}"}

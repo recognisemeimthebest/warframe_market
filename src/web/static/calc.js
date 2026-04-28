@@ -1,22 +1,40 @@
-// ── 가상 모딩 계산기 ──
+// ── 가상 모딩 계산기 (워프레임 + 무기) ──
 
+// ── 모드 전환 상태 ─────────────────────────────────────────────────────────
+let calcRootMode = 'warframe'; // 'warframe' | 'weapon'
+let _calcSearchMode = 'warframe'; // 모드 검색 시 어느 쪽 선택인지 구분
+
+// ── 워프레임 상태 ──────────────────────────────────────────────────────────
 const calcState = {
-    warframe: null,         // {name, health, shield, armor, power, sprintSpeed} — 현재 선택된 스탯
-    warframeItem: null,     // 그룹 항목 {name, ko_name, has_prime, base, prime}
-    isPrime: false,         // 프라임 체크박스 상태
-    warframeList: [],       // 전체 워프레임 목록 (드롭다운용, 그룹화)
-    mods: Array(10).fill(null),   // {name, effects, rank, fusionLimit} | null
-    shards: Array(5).fill(null),  // {color, option_key, tauforged} | null
-    arcanes: Array(2).fill(null), // {name, effects, effectText} | null
-    shardsData: {},         // /api/calc/shards 응답 캐시
-    activeSlotType: null,   // "mod" | "arcane" | null
+    warframe: null,
+    warframeItem: null,
+    isPrime: false,
+    warframeList: [],
+    mods: Array(10).fill(null),
+    shards: Array(5).fill(null),
+    arcanes: Array(2).fill(null),
+    shardsData: {},
+    activeSlotType: null,
+    activeSlotIdx: -1,
+    initialized: false,
+};
+
+// ── 무기 상태 ──────────────────────────────────────────────────────────────
+const weaponCalcState = {
+    weaponType: 'primary',  // 'primary' | 'secondary' | 'melee'
+    weapon: null,           // 선택된 무기 기본 스탯 객체
+    weaponName: '',
+    mods: Array(8).fill(null),
+    compat: 'RIFLE',        // 무기의 모드 호환 코드
     activeSlotIdx: -1,
     initialized: false,
 };
 
 let _calcSearchDebounceTimer = null;
+let _weaponSearchDebounce = null;
+let _weaponSearchApiUrl = '';
 
-// ── 한국어 스탯 이름 매핑 ──
+// ── 한국어 스탯 이름 매핑 ──────────────────────────────────────────────────
 const STAT_KO = {
     ability_strength: '위력',
     ability_duration: '지속',
@@ -29,40 +47,82 @@ const STAT_KO = {
     sprint_speed: '속도',
 };
 
+const ELEM_KO = {
+    heat: '화염', cold: '냉기', electricity: '전기', toxin: '독',
+    magnetic: '자기', radiation: '방사능', viral: '바이러스',
+    corrosive: '부식', blast: '폭발', gas: '가스',
+};
+
 function formatEffects(effects) {
     return Object.entries(effects || {})
-        .map(([k, v]) => `${v > 0 ? '+' : ''}${v}% ${STAT_KO[k] || k}`)
+        .map(([k, v]) => `${v > 0 ? '+' : ''}${v}% ${STAT_KO[k] || ELEM_KO[k] || k}`)
         .join(', ');
 }
 
-// ── 초기화 ──
+// ══════════════════════════════════════════════════════════════════════════
+// ── 루트 초기화 & 모드 전환 ────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+
 async function initCalc() {
-    if (calcState.initialized) return;
-    // 샤드 정적 데이터 + 워프레임 전체 목록 병렬 로드
-    try {
-        const [shardsRes, wfRes] = await Promise.all([
-            fetch('/api/calc/shards'),
-            fetch('/api/calc/warframes'),
-        ]);
-        const [shardsD, wfD] = await Promise.all([shardsRes.json(), wfRes.json()]);
-        if (shardsD.ok) calcState.shardsData = shardsD.shards;
-        if (wfD.ok) calcState.warframeList = wfD.items || [];
-    } catch (e) {
-        console.error('[calc] 초기 데이터 로드 실패:', e);
+    if (!calcState.initialized) {
+        try {
+            const [shardsRes, wfRes] = await Promise.all([
+                fetch('/api/calc/shards'),
+                fetch('/api/calc/warframes'),
+            ]);
+            const [shardsD, wfD] = await Promise.all([shardsRes.json(), wfRes.json()]);
+            if (shardsD.ok) calcState.shardsData = shardsD.shards;
+            if (wfD.ok) calcState.warframeList = wfD.items || [];
+        } catch (e) {
+            console.error('[calc] 초기 데이터 로드 실패:', e);
+        }
+        calcState.initialized = true;
     }
-    calcState.initialized = true;
-    renderCalc();
+    renderCalcRoot();
     ensureCalcSearchModal();
+    ensureWeaponSearchModal();
 }
 
-// ── 전체 레이아웃 렌더 ──
-function renderCalc() {
+function renderCalcRoot() {
     const container = document.getElementById('calc-container');
     if (!container) return;
+    container.innerHTML = `
+        <div class="calc-mode-bar">
+            <button class="calc-mode-btn${calcRootMode === 'warframe' ? ' active' : ''}" onclick="switchCalcMode('warframe')">워프레임 모딩</button>
+            <button class="calc-mode-btn${calcRootMode === 'weapon' ? ' active' : ''}" onclick="switchCalcMode('weapon')">무기 모딩</button>
+        </div>
+        <div id="calc-wf-inner"${calcRootMode !== 'warframe' ? ' style="display:none;"' : ''}></div>
+        <div id="calc-wp-inner"${calcRootMode !== 'weapon' ? ' style="display:none;"' : ''}></div>`;
 
-    const selName   = calcState.warframeItem?.name || '';
-    const hasPrime  = calcState.warframeItem?.has_prime || false;
-    const isPrime   = calcState.isPrime;
+    if (calcRootMode === 'warframe') {
+        renderWfCalc();
+    } else {
+        if (!weaponCalcState.initialized) {
+            weaponCalcState.initialized = true;
+        }
+        renderWeaponCalc();
+    }
+}
+
+function switchCalcMode(mode) {
+    if (mode === calcRootMode) return;
+    calcRootMode = mode;
+    renderCalcRoot();
+    ensureCalcSearchModal();
+    ensureWeaponSearchModal();
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// ── 워프레임 모딩 ───────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+
+function renderWfCalc() {
+    const container = document.getElementById('calc-wf-inner');
+    if (!container) return;
+
+    const selName  = calcState.warframeItem?.name || '';
+    const hasPrime = calcState.warframeItem?.has_prime || false;
+    const isPrime  = calcState.isPrime;
 
     container.innerHTML = `
 <div class="calc-layout">
@@ -136,7 +196,6 @@ const _SLOT_META = {
     1: { cls: 'calc-slot-exilus', tag: '엑실러스', tagCls: 'exilus-tag', labelCls: 'exilus-label' },
 };
 
-// ── 모드 슬롯 그리드 ──
 function renderModGrid() {
     const grid = document.getElementById('calc-mod-grid');
     if (!grid) return;
@@ -174,7 +233,6 @@ function renderModGrid() {
     if (badge) badge.textContent = `소모 ${totalCost}`;
 }
 
-// ── 아케인 슬롯 ──
 function renderArcaneRow() {
     const row = document.getElementById('calc-arcane-row');
     if (!row) return;
@@ -198,7 +256,6 @@ function renderArcaneRow() {
     row.innerHTML = html;
 }
 
-// ── 샤드 슬롯 ──
 function renderShardRow() {
     const row = document.getElementById('calc-shard-row');
     if (!row) return;
@@ -239,13 +296,11 @@ function renderShardRow() {
     row.innerHTML = html;
 }
 
-// ── 워프레임 드롭다운 선택 ──
 function onCalcWfSelect(name) {
     const item = calcState.warframeList.find(w => w.name === name);
     calcState.warframeItem = item || null;
     calcState.isPrime = false;
 
-    // 프라임 체크박스 상태 갱신
     const primeChk = document.getElementById('calc-prime-chk');
     const primeLabel = document.getElementById('calc-prime-label');
     if (primeChk) {
@@ -256,7 +311,6 @@ function onCalcWfSelect(name) {
         primeLabel.classList.toggle('calc-prime-disabled', !item || !item.has_prime);
     }
 
-    // 현재 스탯 = 베이스 스탯
     if (item) {
         calcState.warframe = { name: item.name, ...item.base };
     } else {
@@ -267,7 +321,6 @@ function onCalcWfSelect(name) {
     computeAndRender();
 }
 
-// ── 프라임 체크박스 변경 ──
 function onCalcPrimeChange(checked) {
     calcState.isPrime = checked;
     const item = calcState.warframeItem;
@@ -282,7 +335,6 @@ function onCalcPrimeChange(checked) {
     computeAndRender();
 }
 
-// ── 워프레임 스탯 미리보기 ──
 function _updateWfStats() {
     const statsEl = document.getElementById('calc-wf-stats');
     if (!statsEl) return;
@@ -296,8 +348,8 @@ function _updateWfStats() {
     }
 }
 
-// ── 모드 검색 모달 열기 ──
 function openModSearch(idx) {
+    _calcSearchMode = 'warframe';
     calcState.activeSlotType = 'mod';
     calcState.activeSlotIdx = idx;
     let apiUrl, placeholder;
@@ -315,6 +367,7 @@ function openModSearch(idx) {
 }
 
 function openArcaneSearch(idx) {
+    _calcSearchMode = 'warframe';
     calcState.activeSlotType = 'arcane';
     calcState.activeSlotIdx = idx;
     openCalcSearchModal('아케인 이름...', '/api/calc/arcanes');
@@ -390,9 +443,16 @@ function onCalcSearchInput() {
                 return;
             }
 
-            if (calcState.activeSlotType === 'mod') {
+            if (_calcSearchMode === 'weapon') {
                 results.innerHTML = items.map(item => {
-                    const safeItem = JSON.stringify(item).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+                    return `<div class="calc-search-item" onclick='selectCalcItem(${JSON.stringify(item)})'>
+                        <span class="calc-search-name">${escapeHtml(item.name)}</span>
+                        <span class="calc-search-meta">R${item.maxRank || item.fusionLimit || 0} | ${escapeHtml(item.polarity || '-')}</span>
+                        <span class="calc-search-effects">${escapeHtml(formatEffects(item.effects))}</span>
+                    </div>`;
+                }).join('');
+            } else if (calcState.activeSlotType === 'mod') {
+                results.innerHTML = items.map(item => {
                     return `<div class="calc-search-item" onclick='selectCalcItem(${JSON.stringify(item)})'>
                         <span class="calc-search-name">${escapeHtml(item.name)}</span>
                         <span class="calc-search-meta">R${item.maxRank || item.fusionLimit || 0} | ${escapeHtml(item.polarity || '-')}</span>
@@ -416,9 +476,7 @@ function onCalcSearchInput() {
     }, 300);
 }
 
-// ── 중복 모드 감지 헬퍼 ──
 function _modBaseName(name) {
-    // 움브라/프라임/아말감 접두사 제거해서 기본 이름 비교
     return name.replace(/^(Umbral|Primed|Amalgam|Sacrificial)\s+/i, '').trim().toLowerCase();
 }
 
@@ -428,18 +486,30 @@ function _findConflictingMod(newName, excludeIdx) {
         if (i === excludeIdx) continue;
         const m = calcState.mods[i];
         if (!m) continue;
-        if (m.name === newName) return m.name;                          // 동일 모드
-        if (_modBaseName(m.name) === newBase) return m.name;            // 변형(움브라·프라임) 충돌
+        if (m.name === newName) return m.name;
+        if (_modBaseName(m.name) === newBase) return m.name;
     }
     return null;
 }
 
 function selectCalcItem(item) {
+    // 무기 모드 선택
+    if (_calcSearchMode === 'weapon') {
+        const idx = weaponCalcState.activeSlotIdx;
+        if (idx < 0) return;
+        const rank = item.fusionLimit !== undefined ? item.fusionLimit : (item.maxRank || 0);
+        weaponCalcState.mods[idx] = { ...item, rank };
+        closeCalcSearch();
+        renderWeaponModGrid();
+        computeWeaponAndRender();
+        return;
+    }
+
+    // 워프레임 모드/아케인 선택
     const { activeSlotType, activeSlotIdx } = calcState;
     if (activeSlotIdx < 0) return;
 
     if (activeSlotType === 'mod') {
-        // 중복·변형 충돌 검사
         const conflict = _findConflictingMod(item.name, activeSlotIdx);
         if (conflict) {
             alert(`"${conflict}"이(가) 이미 장착되어 있어\n"${item.name}"을(를) 추가할 수 없습니다.`);
@@ -457,7 +527,6 @@ function selectCalcItem(item) {
     computeAndRender();
 }
 
-// ── 샤드 이벤트 ──
 function onShardColorChange(idx, color) {
     const optSel = document.getElementById(`calc-shard-opt-${idx}`);
     const tauChk = document.getElementById(`calc-shard-tau-${idx}`);
@@ -506,7 +575,6 @@ function onShardTauChange(idx, checked) {
     }
 }
 
-// ── 슬롯 제거 ──
 function clearCalcSlot(type, idx) {
     if (type === 'mod') calcState.mods[idx] = null;
     else if (type === 'arcane') calcState.arcanes[idx] = null;
@@ -515,7 +583,6 @@ function clearCalcSlot(type, idx) {
     computeAndRender();
 }
 
-// ── 스탯 계산 ──
 async function computeAndRender() {
     if (!calcState.warframe) return;
 
@@ -543,15 +610,12 @@ async function computeAndRender() {
         const d = await r.json();
         if (d.ok) {
             renderStatsPanel(d.stats, d.base);
-        } else {
-            console.error('[calc] compute 오류:', d);
         }
     } catch (e) {
         console.error('[calc] compute 요청 실패:', e);
     }
 }
 
-// ── 스탯 패널 렌더 ──
 function renderStatsPanel(stats, base) {
     const panel = document.getElementById('calc-stats-panel');
     if (!panel) return;
@@ -587,9 +651,7 @@ function renderStatRow(label, baseVal, finalVal, unit) {
     </div>`;
 }
 
-// ══════════════════════════════════════════════════════════
-// ── 빌드 저장 / 불러오기 (localStorage) ──────────────────
-// ══════════════════════════════════════════════════════════
+// ── 빌드 저장/불러오기 (localStorage) ─────────────────────────────────────
 
 const CALC_BUILDS_KEY = 'wf_calc_builds';
 
@@ -653,7 +715,12 @@ function loadCalcBuild(buildId) {
     calcState.shards  = pad(build.shards,   5);
     calcState.arcanes = pad(build.arcanes,  2);
 
-    renderCalc();          // renderCalc이 드롭다운·프라임·빌드목록·스탯까지 복원
+    if (calcRootMode !== 'warframe') {
+        calcRootMode = 'warframe';
+        renderCalcRoot();
+    } else {
+        renderWfCalc();
+    }
     computeAndRender();
 }
 
@@ -687,9 +754,7 @@ function renderCalcBuildsPanel() {
     }).join('');
 }
 
-// ══════════════════════════════════════════════════════════
-// ── 채팅방 공유 ───────────────────────────────────────────
-// ══════════════════════════════════════════════════════════
+// ── 채팅방 공유 (워프레임) ─────────────────────────────────────────────────
 
 function _buildMemoText() {
     const item   = calcState.warframeItem;
@@ -803,6 +868,501 @@ async function submitCalcShare() {
             localStorage.setItem('tradeName', author);
             overlay?.remove();
             alert('채팅방에 공유됐습니다!\n모딩 공유 탭 → 워프레임에서 확인할 수 있어요.');
+        } else {
+            alert('공유 실패: ' + (d.msg || '오류'));
+            if (btn) { btn.disabled = false; btn.textContent = '공유하기'; }
+        }
+    } catch (e) {
+        alert('네트워크 오류가 발생했습니다.');
+        if (btn) { btn.disabled = false; btn.textContent = '공유하기'; }
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// ── 무기 모딩 ─────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+
+function renderWeaponCalc() {
+    const container = document.getElementById('calc-wp-inner');
+    if (!container) return;
+
+    const wt = weaponCalcState.weaponType;
+    const w  = weaponCalcState.weapon;
+    const frLabel = wt === 'melee' ? '공격속도' : '연사속도';
+
+    container.innerHTML = `
+<div class="calc-layout">
+    <div class="calc-left">
+        <div class="calc-section">
+            <div class="calc-section-title">무기 유형</div>
+            <div class="calc-weapon-type-bar">
+                <button class="calc-weapon-type-btn${wt === 'primary' ? ' active' : ''}" onclick="onWeaponTypeChange('primary')">주무기</button>
+                <button class="calc-weapon-type-btn${wt === 'secondary' ? ' active' : ''}" onclick="onWeaponTypeChange('secondary')">보조무기</button>
+                <button class="calc-weapon-type-btn${wt === 'melee' ? ' active' : ''}" onclick="onWeaponTypeChange('melee')">근접</button>
+            </div>
+        </div>
+
+        <div class="calc-section">
+            <div class="calc-section-title">무기</div>
+            <div class="calc-weapon-search-row">
+                <div class="calc-weapon-display${w ? ' calc-weapon-selected' : ''}" onclick="openWeaponSearch()">
+                    ${w
+                        ? `<span class="calc-weapon-name">${escapeHtml(weaponCalcState.weaponName)}</span>
+                           <span class="calc-weapon-type-tag">${escapeHtml(w.type || '')}</span>`
+                        : `<span class="calc-weapon-placeholder">무기를 선택하세요...</span>`
+                    }
+                </div>
+                ${w ? `<button class="calc-weapon-clear" onclick="clearWeaponSelection()">×</button>` : ''}
+            </div>
+            ${w ? `<div class="calc-wf-stats">
+                <span>데미지 ${w.totalDamage}</span>
+                <span>CC ${(w.critChance * 100).toFixed(0)}%</span>
+                <span>CM ${w.critMultiplier}x</span>
+                <span>SC ${(w.statusChance * 100).toFixed(0)}%</span>
+                <span>${frLabel} ${w.fireRate}</span>
+            </div>` : ''}
+        </div>
+
+        <div class="calc-section">
+            <div class="calc-section-title">모드 슬롯 <span class="calc-capacity-badge" id="wpcalc-capacity">소모 0</span></div>
+            <div class="calc-mod-grid" id="wpcalc-mod-grid"></div>
+        </div>
+
+        <button class="calc-share-btn" onclick="openWeaponCalcShareModal()" style="margin-top:4px;">💬 채팅방 공유</button>
+    </div>
+
+    <div class="calc-right">
+        <div class="calc-section">
+            <div class="calc-section-title">빌드 스탯</div>
+            <div id="wpcalc-stats-panel" class="calc-stats-panel">
+                <div class="calc-stats-empty">무기를 선택하면<br>스탯이 표시됩니다</div>
+            </div>
+        </div>
+
+        <div class="calc-section calc-builds-section">
+            <div class="calc-section-title">내 빌드</div>
+            <div class="calc-save-row">
+                <input type="text" id="wpcalc-build-name" class="calc-build-name-input"
+                    placeholder="빌드 이름..." maxlength="30"
+                    onkeydown="if(event.key==='Enter')saveWeaponCalcBuild()">
+                <button class="calc-save-btn" onclick="saveWeaponCalcBuild()">저장</button>
+            </div>
+            <div id="wpcalc-builds-list"></div>
+        </div>
+    </div>
+</div>`;
+
+    renderWeaponModGrid();
+    renderWeaponCalcBuildsPanel();
+    if (w) computeWeaponAndRender();
+}
+
+function renderWeaponModGrid() {
+    const grid = document.getElementById('wpcalc-mod-grid');
+    if (!grid) return;
+
+    let totalCost = 0;
+    let html = '';
+    for (let i = 0; i < 8; i++) {
+        const mod = weaponCalcState.mods[i];
+        if (mod) {
+            totalCost += (mod.rank || 0);
+            html += `<div class="calc-slot calc-slot-filled" onclick="openWeaponModSearch(${i})">
+                <button class="calc-slot-remove" onclick="event.stopPropagation();clearWeaponCalcSlot(${i})">×</button>
+                <span class="calc-slot-name">${escapeHtml(mod.name)}</span>
+                <span class="calc-slot-rank">R${mod.rank}</span>
+            </div>`;
+        } else {
+            html += `<div class="calc-slot calc-slot-empty" onclick="openWeaponModSearch(${i})">
+                <span class="calc-slot-plus">+</span>
+                <span class="calc-slot-label">모드 ${i + 1}</span>
+            </div>`;
+        }
+    }
+    grid.innerHTML = html;
+
+    const badge = document.getElementById('wpcalc-capacity');
+    if (badge) badge.textContent = `소모 ${totalCost}`;
+}
+
+function onWeaponTypeChange(type) {
+    if (type === weaponCalcState.weaponType) return;
+    weaponCalcState.weaponType  = type;
+    weaponCalcState.weapon      = null;
+    weaponCalcState.weaponName  = '';
+    weaponCalcState.mods        = Array(8).fill(null);
+    weaponCalcState.compat      = type === 'secondary' ? 'PISTOL' : type === 'melee' ? 'MELEE' : 'RIFLE';
+    renderWeaponCalc();
+}
+
+function openWeaponSearch() {
+    openWeaponSearchModal(`/api/calc/weapons?type=${weaponCalcState.weaponType}`);
+}
+
+function clearWeaponSelection() {
+    weaponCalcState.weapon     = null;
+    weaponCalcState.weaponName = '';
+    weaponCalcState.mods       = Array(8).fill(null);
+    renderWeaponCalc();
+}
+
+function openWeaponModSearch(idx) {
+    _calcSearchMode = 'weapon';
+    weaponCalcState.activeSlotIdx = idx;
+    const compat = weaponCalcState.compat || 'RIFLE';
+    openCalcSearchModal('모드 이름...', `/api/calc/weapon-mods?compat=${compat}`);
+}
+
+function clearWeaponCalcSlot(idx) {
+    weaponCalcState.mods[idx] = null;
+    renderWeaponModGrid();
+    computeWeaponAndRender();
+}
+
+// ── 무기 검색 전용 모달 ──────────────────────────────────────────────────────
+
+function ensureWeaponSearchModal() {
+    if (document.getElementById('wp-search-overlay')) return;
+
+    const overlay = document.createElement('div');
+    overlay.id = 'wp-search-overlay';
+    overlay.onclick = closeWeaponSearch;
+
+    const modal = document.createElement('div');
+    modal.id = 'wp-search-modal';
+    modal.innerHTML = `
+<div class="calc-search-header">
+    <input type="text" id="wp-search-input" placeholder="무기 이름 검색..." oninput="onWeaponSearchInput()" autocomplete="off">
+    <button onclick="closeWeaponSearch()">×</button>
+</div>
+<div id="wp-search-results"></div>`;
+
+    document.body.appendChild(overlay);
+    document.body.appendChild(modal);
+}
+
+function openWeaponSearchModal(apiUrl) {
+    ensureWeaponSearchModal();
+    _weaponSearchApiUrl = apiUrl;
+
+    const inp = document.getElementById('wp-search-input');
+    if (inp) { inp.value = ''; inp.placeholder = '무기 이름 검색...'; }
+    const results = document.getElementById('wp-search-results');
+    if (results) results.innerHTML = '';
+
+    document.getElementById('wp-search-overlay').style.display = 'block';
+    document.getElementById('wp-search-modal').style.display = 'flex';
+    setTimeout(() => { if (inp) inp.focus(); }, 50);
+}
+
+function closeWeaponSearch() {
+    const overlay = document.getElementById('wp-search-overlay');
+    const modal   = document.getElementById('wp-search-modal');
+    if (overlay) overlay.style.display = 'none';
+    if (modal)   modal.style.display   = 'none';
+}
+
+function onWeaponSearchInput() {
+    clearTimeout(_weaponSearchDebounce);
+    _weaponSearchDebounce = setTimeout(async () => {
+        const inp = document.getElementById('wp-search-input');
+        if (!inp) return;
+        const q = inp.value.trim();
+        const results = document.getElementById('wp-search-results');
+        if (!results) return;
+        if (!q) { results.innerHTML = ''; return; }
+
+        try {
+            const sep = _weaponSearchApiUrl.includes('?') ? '&' : '?';
+            const r = await fetch(`${_weaponSearchApiUrl}${sep}q=${encodeURIComponent(q)}`);
+            const d = await r.json();
+            const items = d.items || [];
+            if (!items.length) {
+                results.innerHTML = '<div class="calc-search-empty">검색 결과 없음</div>';
+                return;
+            }
+            const wt = weaponCalcState.weaponType;
+            const frLabel = wt === 'melee' ? '공격속도' : '연사속도';
+            results.innerHTML = items.map(item => {
+                const cc = (item.critChance * 100).toFixed(0);
+                const sc = (item.statusChance * 100).toFixed(0);
+                return `<div class="calc-search-item" onclick='selectWeaponItem(${JSON.stringify(item)})'>
+                    <span class="calc-search-name">${escapeHtml(item.name)}</span>
+                    <span class="calc-search-meta">${escapeHtml(item.type || '')} | CC ${cc}% CM ${item.critMultiplier}x SC ${sc}%</span>
+                    <span class="calc-search-effects">데미지 ${item.totalDamage} | ${frLabel} ${item.fireRate}</span>
+                </div>`;
+            }).join('');
+        } catch (e) {
+            console.error('[weapon-calc] 검색 실패:', e);
+            const r2 = document.getElementById('wp-search-results');
+            if (r2) r2.innerHTML = '<div class="calc-search-empty">오류가 발생했습니다</div>';
+        }
+    }, 300);
+}
+
+function selectWeaponItem(item) {
+    weaponCalcState.weapon     = item;
+    weaponCalcState.weaponName = item.name;
+    weaponCalcState.compat     = item.compat || 'RIFLE';
+    weaponCalcState.mods       = Array(8).fill(null);
+    closeWeaponSearch();
+    renderWeaponCalc();
+}
+
+// ── 무기 스탯 계산 ─────────────────────────────────────────────────────────
+
+async function computeWeaponAndRender() {
+    if (!weaponCalcState.weapon) return;
+
+    const payload = {
+        base: weaponCalcState.weapon,
+        mods: weaponCalcState.mods.filter(Boolean).map(m => ({
+            name: m.name,
+            effects: m.effects,
+            rank: m.rank,
+            fusionLimit: m.fusionLimit,
+        })),
+    };
+
+    try {
+        const r = await fetch('/api/calc/compute-weapon', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        const d = await r.json();
+        if (d.ok) {
+            renderWeaponStatsPanel(d.stats, weaponCalcState.weapon);
+        }
+    } catch (e) {
+        console.error('[weapon-calc] compute 실패:', e);
+    }
+}
+
+function renderWeaponStatsPanel(stats, base) {
+    const panel = document.getElementById('wpcalc-stats-panel');
+    if (!panel) return;
+
+    const wt = weaponCalcState.weaponType;
+    const frLabel = wt === 'melee' ? '공격속도' : '연사속도';
+    const baseCC = parseFloat((base.critChance * 100).toFixed(1));
+    const baseSC = parseFloat((base.statusChance * 100).toFixed(1));
+
+    let elemRows = '';
+    if (stats.elemental && Object.keys(stats.elemental).length > 0) {
+        elemRows = Object.entries(stats.elemental).map(([k, v]) =>
+            `<div class="calc-stat-row">
+                <span class="calc-stat-label">${escapeHtml(ELEM_KO[k] || k)} 데미지</span>
+                <div class="calc-stat-values">
+                    <span class="calc-stat-base">0</span>
+                    <span class="calc-stat-arrow">→</span>
+                    <span class="calc-stat-final calc-stat-up">${v}</span>
+                </div>
+            </div>`
+        ).join('');
+    }
+
+    panel.innerHTML = `<div class="calc-stats-grid">
+        ${renderStatRow('총 데미지',   base.totalDamage,  stats.totalDamage,   '')}
+        ${renderStatRow('충격',        base.impact,       stats.impact,         '')}
+        ${renderStatRow('관통',        base.puncture,     stats.puncture,       '')}
+        ${renderStatRow('베기',        base.slash,        stats.slash,          '')}
+        ${elemRows}
+        ${renderStatRow('치명타 확률', baseCC,            stats.critChance,     '%')}
+        ${renderStatRow('치명타 배율', base.critMultiplier, stats.critMultiplier, 'x')}
+        ${renderStatRow('상태이상',    baseSC,            stats.statusChance,   '%')}
+        ${renderStatRow(frLabel,       base.fireRate,     stats.fireRate,       '')}
+        ${renderStatRow('멀티샷',      1.0,               stats.multishot,      'x')}
+        <div class="calc-stat-row calc-stat-dps-row">
+            <span class="calc-stat-label">예상 DPS</span>
+            <div class="calc-stat-values">
+                <span class="calc-stat-final calc-stat-up">${stats.dps}</span>
+            </div>
+        </div>
+    </div>`;
+}
+
+// ── 무기 빌드 저장/불러오기 ────────────────────────────────────────────────
+
+const WP_CALC_BUILDS_KEY = 'wf_wp_calc_builds';
+
+function _getWeaponCalcBuilds() {
+    try { return JSON.parse(localStorage.getItem(WP_CALC_BUILDS_KEY) || '[]'); }
+    catch { return []; }
+}
+
+function saveWeaponCalcBuild() {
+    if (!weaponCalcState.weapon) { alert('무기를 먼저 선택해주세요.'); return; }
+    const nameInput = document.getElementById('wpcalc-build-name');
+    const buildName = (nameInput?.value || '').trim();
+    if (!buildName) { alert('빌드 이름을 입력해주세요.'); return; }
+
+    const builds = _getWeaponCalcBuilds();
+    const existing = builds.findIndex(b => b.name === buildName);
+    if (existing >= 0 && !confirm(`"${buildName}" 빌드를 덮어쓸까요?`)) return;
+
+    const newBuild = {
+        id:         existing >= 0 ? builds[existing].id : Date.now(),
+        name:       buildName,
+        weaponType: weaponCalcState.weaponType,
+        weaponName: weaponCalcState.weaponName,
+        weapon:     weaponCalcState.weapon ? { ...weaponCalcState.weapon } : null,
+        compat:     weaponCalcState.compat,
+        mods:       weaponCalcState.mods.map(m => m ? { ...m } : null),
+        savedAt:    new Date().toLocaleString('ko-KR'),
+    };
+
+    if (existing >= 0) builds[existing] = newBuild;
+    else builds.unshift(newBuild);
+
+    localStorage.setItem(WP_CALC_BUILDS_KEY, JSON.stringify(builds.slice(0, 20)));
+    if (nameInput) nameInput.value = '';
+    renderWeaponCalcBuildsPanel();
+}
+
+function loadWeaponCalcBuild(buildId) {
+    const build = _getWeaponCalcBuilds().find(b => b.id === buildId);
+    if (!build) return;
+
+    weaponCalcState.weaponType  = build.weaponType || 'primary';
+    weaponCalcState.weaponName  = build.weaponName || '';
+    weaponCalcState.weapon      = build.weapon ? { ...build.weapon } : null;
+    weaponCalcState.compat      = build.compat || 'RIFLE';
+    const pad = (arr, len) => {
+        const r = (arr || []).map(x => x ? { ...x } : null);
+        while (r.length < len) r.push(null);
+        return r.slice(0, len);
+    };
+    weaponCalcState.mods = pad(build.mods, 8);
+
+    if (calcRootMode !== 'weapon') {
+        calcRootMode = 'weapon';
+        renderCalcRoot();
+    } else {
+        renderWeaponCalc();
+    }
+}
+
+function deleteWeaponCalcBuild(buildId) {
+    if (!confirm('이 빌드를 삭제하시겠습니까?')) return;
+    const builds = _getWeaponCalcBuilds().filter(b => b.id !== buildId);
+    localStorage.setItem(WP_CALC_BUILDS_KEY, JSON.stringify(builds));
+    renderWeaponCalcBuildsPanel();
+}
+
+function renderWeaponCalcBuildsPanel() {
+    const listEl = document.getElementById('wpcalc-builds-list');
+    if (!listEl) return;
+
+    const builds = _getWeaponCalcBuilds();
+    if (!builds.length) {
+        listEl.innerHTML = '<div class="calc-builds-empty">저장된 빌드 없음</div>';
+        return;
+    }
+
+    const typeLabel = t => t === 'primary' ? '주무기' : t === 'secondary' ? '보조무기' : '근접';
+    listEl.innerHTML = builds.map(b =>
+        `<div class="calc-build-item">
+            <div class="calc-build-item-info" onclick="loadWeaponCalcBuild(${b.id})">
+                <div class="calc-build-item-name">${escapeHtml(b.name)}</div>
+                <div class="calc-build-item-meta">${escapeHtml(b.weaponName || '')} (${typeLabel(b.weaponType)}) · ${escapeHtml(b.savedAt || '')}</div>
+            </div>
+            <button class="calc-build-delete-btn" onclick="event.stopPropagation();deleteWeaponCalcBuild(${b.id})" title="삭제">×</button>
+        </div>`
+    ).join('');
+}
+
+// ── 무기 채팅방 공유 ──────────────────────────────────────────────────────
+
+function _buildWeaponMemoText() {
+    const wt = weaponCalcState.weaponType;
+    const typeLabel = wt === 'primary' ? '주무기' : wt === 'secondary' ? '보조무기' : '근접';
+    const lines = [`◆ ${weaponCalcState.weaponName} 빌드 (${typeLabel})`, ''];
+
+    const filledMods = weaponCalcState.mods.filter(Boolean);
+    if (filledMods.length) {
+        lines.push('[모드]');
+        filledMods.forEach(m => {
+            const fx = formatEffects(m.effects);
+            lines.push(`• ${m.name} R${m.rank}${fx ? '  (' + fx + ')' : ''}`);
+        });
+    }
+
+    return lines.join('\n').trim();
+}
+
+function openWeaponCalcShareModal() {
+    if (!weaponCalcState.weapon) { alert('무기를 먼저 선택해주세요.'); return; }
+
+    const wt = weaponCalcState.weaponType;
+    const catKey = wt === 'primary' ? 'primary_weapon' : wt === 'secondary' ? 'secondary_weapon' : 'melee_weapon';
+    const memo = _buildWeaponMemoText();
+    const savedAuthor = localStorage.getItem('tradeName') || '';
+
+    const overlay = document.createElement('div');
+    overlay.id = 'calc-share-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:3000;display:flex;align-items:center;justify-content:center;padding:12px;';
+    overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+
+    overlay.innerHTML = `<div class="calc-share-popup">
+        <div class="calc-share-popup-header">
+            <span>💬 채팅방 공유</span>
+            <button onclick="document.getElementById('calc-share-overlay').remove()">×</button>
+        </div>
+        <div class="calc-share-popup-body">
+            <div class="calc-share-field">
+                <label>아이템</label>
+                <input type="text" id="csp-item" value="${escapeHtml(weaponCalcState.weaponName)}" maxlength="50" placeholder="무기 이름">
+            </div>
+            <div class="calc-share-field">
+                <label>작성자</label>
+                <input type="text" id="csp-author" value="${escapeHtml(savedAuthor)}" maxlength="20" placeholder="닉네임">
+            </div>
+            <div class="calc-share-field">
+                <label>빌드 설명 (자동 입력 · 수정 가능)</label>
+                <textarea id="csp-memo" rows="7" maxlength="1000">${escapeHtml(memo)}</textarea>
+            </div>
+            <div class="calc-share-btns">
+                <button class="calc-share-cancel" onclick="document.getElementById('calc-share-overlay').remove()">취소</button>
+                <button class="calc-share-submit" id="csp-submit-btn" onclick="submitWeaponCalcShare('${catKey}')">공유하기</button>
+            </div>
+        </div>
+    </div>`;
+
+    document.body.appendChild(overlay);
+    setTimeout(() => overlay.querySelector('#csp-author')?.focus(), 50);
+}
+
+async function submitWeaponCalcShare(catKey) {
+    const overlay  = document.getElementById('calc-share-overlay');
+    const itemName = (overlay?.querySelector('#csp-item')?.value   || '').trim();
+    const author   = (overlay?.querySelector('#csp-author')?.value || '').trim();
+    const memo     = (overlay?.querySelector('#csp-memo')?.value   || '').trim();
+
+    if (!author)   { alert('작성자 이름을 입력해주세요.'); return; }
+    if (!itemName) { alert('아이템 이름을 입력해주세요.'); return; }
+
+    const btn = overlay?.querySelector('#csp-submit-btn');
+    if (btn) { btn.disabled = true; btn.textContent = '공유 중...'; }
+
+    try {
+        const res = await fetch('/api/modding/shares', {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({
+                category:        catKey,
+                item_name:       itemName,
+                author:          author,
+                memo:            memo,
+                sub_type:        '',
+                image_filenames: [],
+            }),
+        });
+        const d = await res.json();
+        if (d.ok) {
+            localStorage.setItem('tradeName', author);
+            overlay?.remove();
+            alert('채팅방에 공유됐습니다!\n모딩 공유 탭에서 확인할 수 있어요.');
         } else {
             alert('공유 실패: ' + (d.msg || '오류'));
             if (btn) { btn.disabled = false; btn.textContent = '공유하기'; }
