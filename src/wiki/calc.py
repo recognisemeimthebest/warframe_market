@@ -464,7 +464,8 @@ async def search_mods(
                 continue
 
         compat_name: str = (mod.get("compatName", "") or "").upper()
-        is_exilus: bool   = bool(mod.get("isExilus", False))
+        is_exilus: bool  = bool(mod.get("isExilus",  False))
+        is_utility: bool = bool(mod.get("isUtility", False))
 
         # 슬롯 유형별 필터
         if compat_upper == "AURA":
@@ -472,14 +473,16 @@ async def search_mods(
             if compat_name != "AURA":
                 continue
         elif compat_upper == "EXILUS":
-            # 엑실러스 슬롯: WARFRAME/ANY이면서 isExilus=True 인 모드만
+            # 엑실러스 슬롯: WARFRAME/ANY 호환이면서
+            # isExilus=True 또는 isUtility=True인 모드
+            # (Preparation 등은 isUtility만 True이므로 두 조건 모두 체크해야 함)
             if compat_name not in {"WARFRAME", "ANY"}:
                 continue
-            if not is_exilus:
+            if not (is_exilus or is_utility):
                 continue
         else:
-            # 일반 슬롯: WARFRAME/ANY 호환
-            # isExilus=True 모드(Preparation, Rush 등)도 일반 슬롯 장착 가능 — 제외하지 않음
+            # 일반 슬롯: WARFRAME/ANY 호환 모드 전부 허용
+            # (엑실러스 호환 모드도 일반 슬롯 장착 가능)
             if compat_name not in {"WARFRAME", "ANY"}:
                 continue
 
