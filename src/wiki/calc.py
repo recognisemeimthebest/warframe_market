@@ -478,11 +478,10 @@ async def search_mods(
             if not is_exilus:
                 continue
         else:
-            # 일반 슬롯: WARFRAME/ANY 호환, 엑실러스 전용 모드 제외
+            # 일반 슬롯: WARFRAME/ANY 호환
+            # isExilus=True 모드(Preparation, Rush 등)도 일반 슬롯 장착 가능 — 제외하지 않음
             if compat_name not in {"WARFRAME", "ANY"}:
                 continue
-            if is_exilus:
-                continue  # 엑실러스 모드는 엑실러스 슬롯에서만
 
         fusion_limit: int = mod.get("fusionLimit", 5)
         results.append({
