@@ -162,7 +162,7 @@ async def _download_and_save(url: str, path: Path) -> list[dict]:
 
 async def _ensure_data() -> None:
     """WFCD 데이터가 로드되지 않았으면 로컬 캐시 또는 원격에서 로드한다."""
-    global _cache_loaded, _warframes_cache, _mods_cache, _arcanes_cache
+    global _cache_loaded, _warframes_cache, _mods_cache, _arcanes_cache, _ko_mod_name_cache
 
     if _cache_loaded:
         return
@@ -183,6 +183,7 @@ async def _ensure_data() -> None:
                 _warframes_cache = _json.loads(_WARFRAMES_PATH.read_text(encoding="utf-8"))
                 _mods_cache      = _json.loads(_MODS_PATH.read_text(encoding="utf-8"))
                 _arcanes_cache   = _json.loads(_ARCANES_PATH.read_text(encoding="utf-8"))
+                _ko_mod_name_cache = {}  # 모드 캐시 갱신 시 한글 캐시 초기화
                 logger.info(
                     "WFCD 로컬 캐시 로드: 워프레임 %d개, 모드 %d개, 아케인 %d개",
                     len(_warframes_cache), len(_mods_cache), len(_arcanes_cache),
@@ -202,9 +203,10 @@ async def _ensure_data() -> None:
             )
             wf_res, mod_res, arc_res = results
 
-            _warframes_cache = wf_res if not isinstance(wf_res, BaseException) else []
-            _mods_cache      = mod_res if not isinstance(mod_res, BaseException) else []
-            _arcanes_cache   = arc_res if not isinstance(arc_res, BaseException) else []
+            _warframes_cache   = wf_res if not isinstance(wf_res, BaseException) else []
+            _mods_cache        = mod_res if not isinstance(mod_res, BaseException) else []
+            _arcanes_cache     = arc_res if not isinstance(arc_res, BaseException) else []
+            _ko_mod_name_cache = {}  # 모드 캐시 갱신 시 한글 캐시 초기화
 
             if isinstance(wf_res, BaseException):
                 logger.error("워프레임 데이터 다운로드 실패: %s", wf_res)
@@ -416,19 +418,63 @@ async def search_warframes(query: str, limit: int = 8) -> list[dict]:
     return results[:limit]
 
 
-def _try_ko_to_en_mod(q: str) -> str:
-    """한글 모드 쿼리를 영문명으로 변환 시도 (items.py 역방향 매핑 활용)."""
+# 한글 → 영문 모드명 캐시 (ko_names.json + _mods_cache 기반, 최초 호출 시 구축)
+_ko_mod_name_cache: dict[str, str] = {}  # {한글소문자(공백제거): 영문모드명}
+
+
+def _build_ko_mod_name_cache() -> None:
+    """ko_names.json 기반으로 한글→영문 모드명 캐시를 구축한다.
+
+    items.py/_en_name_to_slug 에 의존하지 않고 ko_names.json 과 _mods_cache 를
+    직접 사용하므로 items.json 미로드 상태에서도 동작한다.
+    _mods_cache 가 채워진 뒤 호출해야 한다 (search_mods 에서 _ensure_data 이후 호출).
+    """
+    global _ko_mod_name_cache
+    if _ko_mod_name_cache:
+        return
     try:
-        from src.market.items import _ko_to_slug, _slug_to_en_name, _load_items_cache, _en_name_to_slug
-        if not _en_name_to_slug:
-            _load_items_cache()
-        key_no_space = q.replace(" ", "").lower()
-        slug = _ko_to_slug.get(key_no_space) or _ko_to_slug.get(q.lower())
-        if slug:
-            return _slug_to_en_name.get(slug, "")
+        ko_path = DATA_DIR / "ko_names.json"
+        if not ko_path.exists():
+            return
+        # ko_names.json 구조: {slug: ko_name}
+        ko_map: dict[str, str] = _json.loads(ko_path.read_text(encoding="utf-8"))
+
+        # slug → 실제 영문명 (WFCD _mods_cache 우선, 없으면 slug 타이틀케이스)
+        slug_to_en: dict[str, str] = {}
+        for mod in _mods_cache:
+            name: str = mod.get("name", "")
+            if not name:
+                continue
+            # slug 는 주로 name.lower().replace(" ", "_") 형태
+            slug_to_en[name.lower()] = name
+            slug_to_en[name.lower().replace(" ", "_")] = name
+
+        tmp: dict[str, str] = {}
+        for slug, ko_name in ko_map.items():
+            en_name = (
+                slug_to_en.get(slug)
+                or slug_to_en.get(slug.replace("_", " "))
+            )
+            if not en_name:
+                continue
+            ko_lower = ko_name.lower()
+            ko_no_sp = ko_name.replace(" ", "").lower()
+            tmp[ko_lower] = en_name
+            if ko_no_sp != ko_lower:
+                tmp[ko_no_sp] = en_name
+
+        _ko_mod_name_cache = tmp
+        logger.debug("한글 모드명 캐시 구축: %d개", len(tmp))
     except Exception:
-        pass
-    return ""
+        logger.exception("_build_ko_mod_name_cache 실패")
+
+
+def _try_ko_to_en_mod(q: str) -> str:
+    """한글 모드 쿼리를 영문명으로 변환 (ko_names.json + _mods_cache 기반)."""
+    if not _ko_mod_name_cache:
+        _build_ko_mod_name_cache()
+    key = q.replace(" ", "").lower()
+    return _ko_mod_name_cache.get(key) or _ko_mod_name_cache.get(q.lower()) or ""
 
 
 async def search_mods(
