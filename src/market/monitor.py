@@ -214,32 +214,34 @@ async def daily_scan(broadcast_fn=None) -> None:
 
 
 async def backfill_statistics(slugs: list[str]) -> None:
-    """서버 시작 시 warframe.market statistics로 히스토리 백필."""
-    from src.config import MARKET_API_BASE, MARKET_RATE_LIMIT
-    sem = asyncio.Semaphore(MARKET_RATE_LIMIT)
+    """서버 시작 시 warframe.market statistics로 히스토리 백필.
+
+    429 방지를 위해 순차 처리 + 요청 간 0.5초 간격 사용.
+    """
+    from src.config import MARKET_API_BASE
     total = 0
 
-    async def _fetch_one(slug: str) -> None:
-        nonlocal total
-        async with sem:
-            try:
-                url = f"{MARKET_API_BASE}/items/{slug}/statistics"
-                client = get_client()
+    for slug in slugs:
+        try:
+            url = f"{MARKET_API_BASE}/items/{slug}/statistics"
+            client = get_client()
+            r = await client.get(url, headers={"Platform": "pc", "Language": "en"})
+            if r.status_code == 429:
+                logger.warning("백필 429: %s — 10초 대기 후 재시도", slug)
+                await asyncio.sleep(10)
                 r = await client.get(url, headers={"Platform": "pc", "Language": "en"})
-                if r.status_code != 200:
-                    return
-                payload = r.json().get("payload", {}).get("statistics_closed", {})
-                h48 = payload.get("48hours", [])
-                d90 = payload.get("90days", [])
-                n = backfill_from_statistics(slug, h48, d90)
-                if n:
-                    total += n
-            except Exception:
-                pass
-            finally:
-                await asyncio.sleep(1 / MARKET_RATE_LIMIT)
-
-    await asyncio.gather(*[_fetch_one(s) for s in slugs])
+            if r.status_code != 200:
+                await asyncio.sleep(0.5)
+                continue
+            payload = r.json().get("payload", {}).get("statistics_closed", {})
+            h48 = payload.get("48hours", [])
+            d90 = payload.get("90days", [])
+            n = backfill_from_statistics(slug, h48, d90)
+            if n:
+                total += n
+        except Exception:
+            pass
+        await asyncio.sleep(0.5)  # 초당 2회 이하로 제한
     if total:
         logger.info("statistics 백필 완료: %d개 스냅샷 삽입", total)
 
