@@ -2350,7 +2350,7 @@ async function handleModdingShareLink() {
         // 모딩 탭으로 이동 후 해당 빌드 위치로 이동
         moddingCategory = s.category;
         moddingSelectedItem = s.item_name;
-        switchTab("modding");
+        _activateTab("modding");
         await renderModdingTab();
 
         // 해당 카드 하이라이트
