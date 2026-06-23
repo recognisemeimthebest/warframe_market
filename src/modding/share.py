@@ -301,6 +301,30 @@ def get_shares(category: str = "", item_name: str = "", limit: int = 50) -> list
     return shares
 
 
+def get_share_by_id(share_id: int) -> "ModdingShare | None":
+    """ID로 모딩 공유 단건 조회."""
+    with _get_conn() as conn:
+        rows = conn.execute(
+            _SHARES_SELECT + " WHERE ms.id = ? GROUP BY ms.id",
+            (share_id,),
+        ).fetchall()
+        if not rows:
+            return None
+        r = rows[0]
+        images = conn.execute(
+            "SELECT filename FROM modding_image WHERE share_id = ? ORDER BY sort_order",
+            (r[0],),
+        ).fetchall()
+        return ModdingShare(
+            id=r[0], category=r[1], item_name=r[2],
+            author=r[3], memo=r[4] or "", created_at=r[5],
+            sub_type=r[6] or "",
+            images=[img[0] for img in images],
+            has_password=r[7] is not None,
+            likes=r[8],
+        )
+
+
 def add_like(share_id: int, voter_key: str) -> dict:
     """좋아요 추가. 이미 누른 경우 already_liked 반환."""
     hashed = hashlib.sha256(voter_key.encode()).hexdigest()[:32]

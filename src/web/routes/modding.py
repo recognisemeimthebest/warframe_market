@@ -15,6 +15,7 @@ from src.modding.share import (
     delete_share,
     update_share,
     get_items_in_category,
+    get_share_by_id,
     get_shares,
     get_weekly_best,
     save_image,
@@ -92,6 +93,21 @@ async def api_modding_shares(category: str = "warframe", item_name: str = "", li
         }
         for s in shares
     ]}
+
+
+@router.get("/shares/{share_id}")
+async def api_modding_get_share(share_id: int):
+    """모딩 공유 단건 조회 (URL 공유용)."""
+    s = get_share_by_id(share_id)
+    if not s:
+        return {"ok": False, "msg": "not found"}
+    return {"ok": True, "data": {
+        "id": s.id, "category": s.category, "item_name": s.item_name,
+        "author": s.author, "memo": s.memo, "created_at": s.created_at,
+        "sub_type": s.sub_type, "has_password": s.has_password,
+        "images": [f"/api/modding/images/{fname}" for fname in s.images],
+        "likes": s.likes,
+    }}
 
 
 @router.post("/shares/{share_id}/like")

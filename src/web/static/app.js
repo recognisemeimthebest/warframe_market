@@ -2332,6 +2332,41 @@ let moddingSelectedItem = "";
 let moddingFormOpen = false;
 let moddingFormImages = [];
 
+async function handleModdingShareLink() {
+    const params = new URLSearchParams(window.location.search);
+    const mid = params.get("mid");
+    if (!mid) return;
+
+    try {
+        const res = await fetch(`/api/modding/shares/${mid}`);
+        const json = await res.json();
+        if (!json.ok || !json.data) return;
+
+        const s = json.data;
+        // URL 파라미터 제거 (히스토리 오염 방지)
+        const cleanUrl = window.location.pathname;
+        history.replaceState(null, "", cleanUrl);
+
+        // 모딩 탭으로 이동 후 해당 빌드 위치로 이동
+        moddingCategory = s.category;
+        moddingSelectedItem = s.item_name;
+        switchTab("modding");
+        await renderModdingTab();
+
+        // 해당 카드 하이라이트
+        setTimeout(() => {
+            const card = document.querySelector(`.modding-like-btn[data-share-id="${s.id}"]`)?.closest(".modding-card");
+            if (card) {
+                card.scrollIntoView({ behavior: "smooth", block: "center" });
+                card.style.outline = "2px solid var(--accent)";
+                setTimeout(() => { card.style.outline = ""; }, 3000);
+            }
+        }, 300);
+    } catch {
+        // 공유 링크 처리 실패 시 무시
+    }
+}
+
 async function renderModdingTab() {
     const container = document.getElementById("modding-content");
     container.innerHTML = "";
@@ -2494,6 +2529,7 @@ async function renderModdingDetail(container) {
                     ${subTypeTag}
                     <span class="modding-card-date">${dateStr}</span>
                     <div class="modding-card-actions">
+                        <button class="modding-action-btn modding-link-btn" title="링크 복사" data-share-id="${s.id}">🔗</button>
                         <button class="modding-action-btn modding-edit-btn" title="수정">✏️</button>
                         <button class="modding-action-btn modding-delete-btn" title="삭제">🗑️</button>
                     </div>
@@ -2510,6 +2546,7 @@ async function renderModdingDetail(container) {
             card.dataset.imageFilenames = JSON.stringify(
                 (s.images || []).map((url) => url.split("/").pop())
             );
+            card.querySelector(".modding-link-btn").addEventListener("click", () => copyModdingShareLink(s.id));
             card.querySelector(".modding-edit-btn").addEventListener("click", () => openModdingAuthModal(s.id, s.author, "edit", card));
             card.querySelector(".modding-delete-btn").addEventListener("click", () => openModdingAuthModal(s.id, s.author, "delete", card));
             if (!alreadyLiked) {
@@ -2693,6 +2730,24 @@ function _getModdingLikedSet() {
 
 function isModdingLiked(shareId) {
     return _getModdingLikedSet().has(shareId);
+}
+
+function copyModdingShareLink(shareId) {
+    const url = `${window.location.origin}${window.location.pathname}?mid=${shareId}`;
+    navigator.clipboard.writeText(url).then(() => {
+        showToast("링크가 복사됐어요! 📋");
+    }).catch(() => {
+        // clipboard API 실패 시 fallback
+        const ta = document.createElement("textarea");
+        ta.value = url;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        ta.remove();
+        showToast("링크가 복사됐어요! 📋");
+    });
 }
 
 async function likeModdingShare(shareId) {
@@ -3810,3 +3865,4 @@ function renderWeeklyReport(data, el) {
 applyPalette();
 connect();
 loadSurgeThresholds();
+handleModdingShareLink();
