@@ -2343,17 +2343,18 @@ async function handleModdingShareLink() {
         if (!json.ok || !json.data) return;
 
         const s = json.data;
-        // URL 파라미터 제거 (히스토리 오염 방지)
-        const cleanUrl = window.location.pathname;
-        history.replaceState(null, "", cleanUrl);
 
-        // 모딩 탭으로 이동 후 해당 빌드 위치로 이동
+        // 전역 상태 먼저 세팅 — _activateTab이 renderModdingTab을 부를 때 이미 반영됨
         moddingCategory = s.category;
         moddingSelectedItem = s.item_name;
-        _activateTab("modding");
-        await renderModdingTab();
 
-        // 해당 카드 하이라이트
+        // URL을 ?tab=modding으로 변경 (mid 파라미터 제거)
+        history.replaceState({ tab: "modding" }, "", "?tab=modding");
+
+        // 탭 전환 — 내부적으로 renderModdingTab() 호출함
+        _activateTab("modding", false);
+
+        // 카드 렌더 완료 후 하이라이트 (renderModdingTab이 async이므로 충분히 대기)
         setTimeout(() => {
             const card = document.querySelector(`.modding-like-btn[data-share-id="${s.id}"]`)?.closest(".modding-card");
             if (card) {
@@ -2361,7 +2362,7 @@ async function handleModdingShareLink() {
                 card.style.outline = "2px solid var(--accent)";
                 setTimeout(() => { card.style.outline = ""; }, 3000);
             }
-        }, 300);
+        }, 800);
     } catch {
         // 공유 링크 처리 실패 시 무시
     }
@@ -3865,4 +3866,5 @@ function renderWeeklyReport(data, el) {
 applyPalette();
 connect();
 loadSurgeThresholds();
-handleModdingShareLink();
+// 공유 링크 처리 — DOM/탭 초기화 완료 후 실행
+setTimeout(() => handleModdingShareLink(), 300);
