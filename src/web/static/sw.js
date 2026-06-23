@@ -1,6 +1,6 @@
 /* 오디스 프라임 — Service Worker */
 
-const CACHE = "ordis-v1";
+const CACHE = "ordis-v2";
 const PRECACHE = ["/", "/static/style.css", "/static/app.js"];
 
 self.addEventListener("install", e => {
